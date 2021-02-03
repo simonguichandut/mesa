@@ -321,7 +321,7 @@
             type(auto_diff_real_18var_order1) :: res18
             real(dp) :: resid1
             integer :: j
-            include 'formats'            
+            include 'formats'
             call unpack_res18_partials(s, k, nvar, xscale, i_dv_dt, &
                res18, d_dm1, d_d00, d_dp1)
             if (s% rotation_flag .and. s% w_div_wc_flag .and. s% use_gravity_rotation_correction) then
@@ -365,12 +365,12 @@
          m = s% m_grav(k)
          
          if (s% using_Fraley_time_centering) then
-            area = 4d0*pi*(s% r(k)**2 + s% r(k)*s% r_start(k) + s% r_start(k)**2)/3d0
-            d_area_dlnR = 4d0*pi*s% r(k)*(2d0*s% r(k) + s% r_start(k))/3d0
+            area = pi4*(s% r(k)**2 + s% r(k)*s% r_start(k) + s% r_start(k)**2)/3d0
+            d_area_dlnR = pi4*s% r(k)*(2d0*s% r(k) + s% r_start(k))/3d0
             inv_R2 = 1d0/(s% r(k)*s% r_start(k))
             d_inv_R2_dlnR = -1d0*inv_R2
          else
-            area = 4d0*pi*s% r(k)**2
+            area = pi4*s% r(k)**2
             d_area_dlnR = 2d0*area
             inv_R2 = 1d0/s% r(k)**2
             d_inv_R2_dlnR = -2d0*inv_R2

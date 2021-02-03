@@ -51,7 +51,7 @@
          logical, intent(in) :: skip_partials, do_chem
          integer, intent(out) :: ierr         
          real(dp), dimension(nvar) :: d_dm1, d_d00, d_dp1      
-         include 'formats'         
+         include 'formats'
          call get1_energy_eqn( &
             s, k, xscale, equ, skip_partials, do_chem, nvar, &
             d_dm1, d_d00, d_dp1, ierr)
@@ -613,7 +613,7 @@
          if (k > s% nz .or. (s% dt <= 0d0 .and. .not. (s% v_flag .or. s% u_flag))) then
             work_18 = 0d0
             if (k == s% nz+1) then
-               work = 4*pi*s% r_center*s% r_center*s% P_start(s% nz)*s% v_center
+               work = pi4*s% r_center*s% r_center*s% P_start(s% nz)*s% v_center
                s% work_inward_at_center = work
             end if
             work_18%val = work
@@ -623,8 +623,8 @@
          end if
          
          A_18 = 0d0
-         A_18%val = 4d0*pi*s% R2(k)
-         A_18%d1Array(i_lnR_00) = 4d0*pi*s% d_R2_dlnR(k)
+         A_18%val = pi4*s% R2(k)
+         A_18%d1Array(i_lnR_00) = pi4*s% d_R2_dlnR(k)
          A = A_18%val
 
          if (s% u_flag) then ! keep it simple for now.
@@ -774,7 +774,7 @@
          integer, intent(out) :: ierr
          real(dp) :: rho, dlnd, theta, P, d_P_dlnd00, d_P_dlnT00, dV, d_dV_dlnd
          logical :: test_partials
-         include 'formats'         
+         include 'formats'
          ierr = 0         
          
          if (s% using_Fraley_time_centering .and. &
