@@ -235,6 +235,8 @@ Comparing results obtained with CPM and Predictive mixing
 
 In the figure below we show the evolution of the convective core boundary and of the central helium abundance along the CHeB, using the CPM and the Predictive schemes.
 
+To be done
+
 
 
 
