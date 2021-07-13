@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -59,7 +59,7 @@ contains
     type (star_info), pointer :: s
     real(dp), intent(in)      :: tau_surf, L, R, M, cgrav
     logical, intent(in)       :: skip_partials
-    real(dp), intent(out)     :: Teff
+    real(dp), intent(in)      :: Teff
     real(dp), intent(out)     :: lnT_surf
     real(dp), intent(out)     :: dlnT_dL
     real(dp), intent(out)     :: dlnT_dlnR
@@ -79,6 +79,8 @@ contains
     
     if (is_bad(tau_surf)) then
        write(*,*) 'tau_surf', tau_surf
+       ierr = -1
+       return
        stop 'bad tau_surf arg for get_atm_PT'
     end if
 
@@ -137,7 +139,7 @@ contains
     type(star_info), pointer :: s
     real(dp), intent(in)     :: tau_surf, L, R, M, cgrav
     logical, intent(in)      :: skip_partials
-    real(dp), intent(out)    :: Teff
+    real(dp), intent(in)     :: Teff
     real(dp), intent(out)    :: kap
     real(dp), intent(out)    :: lnT_surf
     real(dp), intent(out)    :: dlnT_dL
@@ -257,7 +259,7 @@ contains
     character(*), intent(in)  :: T_tau_relation
     character(*), intent(in)  :: T_tau_opacity
     logical, intent(in)       :: skip_partials
-    real(dp), intent(out)     :: Teff
+    real(dp), intent(in)      :: Teff
     real(dp), intent(out)     :: kap
     real(dp), intent(out)     :: lnT_surf
     real(dp), intent(out)     :: dlnT_dL
@@ -272,6 +274,7 @@ contains
     integer, intent(out)      :: ierr
 
     integer  :: T_tau_id
+    real(dp) :: kap_guess
 
     include 'formats'
 
@@ -302,7 +305,8 @@ contains
     select case (T_tau_opacity)
 
     case ('fixed')
-
+       
+       ! ok to use s% opacity(1) for fixed
        call atm_eval_T_tau_uniform( &
             tau_surf, L, R, M, cgrav, s% opacity(1), s% Pextra_factor, &
             T_tau_id, eos_proc_for_get_T_tau, kap_proc_for_get_T_tau, &
@@ -320,9 +324,15 @@ contains
          if (s% report_ierr) write(*, *) s% retry_message
           return
        endif
-
+       
+       ! need to start iterations from same kap each time, so use opacity_start
+       if (s% solver_iter > 0) then
+          kap_guess = s% opacity_start(1)
+       else
+          kap_guess = s% opacity(1)
+       end if
        call atm_eval_T_tau_uniform( &
-            tau_surf, L, R, M, cgrav, s% opacity_start(1), s% Pextra_factor, &
+            tau_surf, L, R, M, cgrav, kap_guess, s% Pextra_factor, &
             T_tau_id, eos_proc_for_get_T_tau, kap_proc_for_get_T_tau, &
             s%atm_T_tau_errtol, s%atm_T_tau_max_iters, skip_partials, &
             Teff, kap, &
@@ -467,7 +477,7 @@ contains
     type (star_info), pointer :: s
     logical, intent(in)       :: skip_partials
     real(dp), intent(in)      :: L, R, M, cgrav
-    real(dp), intent(out)     :: Teff
+    real(dp), intent(in)      :: Teff
     real(dp), intent(out)     :: lnT
     real(dp), intent(out)     :: dlnT_dL
     real(dp), intent(out)     :: dlnT_dlnR
@@ -506,8 +516,6 @@ contains
     real(dp) :: dlnP_dlnR_b
     real(dp) :: dlnP_dlnM_b
     real(dp) :: dlnP_dlnkap_b
-    real(dp) :: Teff_a
-    real(dp) :: Teff_b
     real(dp) :: kap_a
     real(dp) :: tau_b
 
@@ -547,7 +555,7 @@ contains
     ! option
 
     call atm_get_table_alfa_beta( &
-         L, R, M, cgrav, table_id, alfa, beta, ierr)
+         L, Teff, R, M, cgrav, table_id, alfa, beta, ierr)
     if (ierr /= 0) then
        s% retry_message = 'Call to atm_get_table_alfa_beta failed in get_table'
        if (s% report_ierr) write(*, *) s% retry_message
@@ -600,7 +608,7 @@ contains
 
        call atm_eval_table( &
             L, R, M, cgrav, table_id, Z, skip_partials, &
-            Teff_b, &
+            Teff, &
             lnT_b, dlnT_dL_b, dlnT_dlnR_b, dlnT_dlnM_b, dlnT_dlnkap_b, &
             lnP_b, dlnP_dL_b, dlnP_dlnR_b, dlnP_dlnM_b, dlnP_dlnkap_b, &
             ierr)
@@ -638,7 +646,7 @@ contains
           call get_T_tau( &
                s, s% tau_base, L, R, M, cgrav, &
                s% atm_T_tau_relation, s% atm_T_tau_opacity, skip_partials, &
-               Teff_a, kap_a, &
+               Teff, kap_a, &
                lnT_a, dlnT_dL_a, dlnT_dlnR_a, dlnT_dlnM_a, dlnT_dlnkap_a, &
                lnP_a, dlnP_dL_a, dlnP_dlnR_a, dlnP_dlnM_a, dlnP_dlnkap_a, &
                ierr)
@@ -698,19 +706,19 @@ contains
 
     ! Set the effective temperature
 
-    if (alfa /= 0._dp) then
-       if (beta /= 0._dp) then
-          if (Teff_a /= Teff_b) then
-             ierr = -1
-             s% retry_message = 'Mismatch between Teff values in get_tables'
-             write(*,*) 'Mismatch between Teff values in get_tables: ', Teff_a, Teff_b
-             !call mesa_error(__FILE__,__LINE__)
-          end if
-       endif
-       Teff = Teff_a
-    else
-       Teff = Teff_b
-    endif
+    ! if (alfa /= 0._dp) then
+    !    if (beta /= 0._dp) then
+    !       if (Teff_a /= Teff_b) then
+    !          ierr = -1
+    !          s% retry_message = 'Mismatch between Teff values in get_tables'
+    !          write(*,*) 'Mismatch between Teff values in get_tables: ', Teff_a, Teff_b
+    !          !call mesa_error(__FILE__,__LINE__)
+    !       end if
+    !    endif
+    !    Teff = Teff_a
+    ! else
+    !    Teff = Teff_b
+    ! endif
 
     ! Finish
 
@@ -781,7 +789,7 @@ contains
     character(*), intent(in)  :: irradiated_opacity
     logical, intent(in)       :: skip_partials
     real(dp), intent(in)      :: L, R, M, cgrav
-    real(dp), intent(out)     :: Teff
+    real(dp), intent(in)      :: Teff
     real(dp), intent(out)     :: lnT_surf
     real(dp), intent(out)     :: dlnT_dL
     real(dp), intent(out)     :: dlnT_dlnR
@@ -794,13 +802,17 @@ contains
     real(dp), intent(out)     :: dlnP_dlnkap
     integer, intent(out)      :: ierr
 
-    real(dp) :: kap_guess
+    real(dp) :: kap_for_atm
     real(dp) :: kap
     real(dp) :: tau_surf
 
     include 'formats'
-
-    kap_guess = s% opacity_start(1)
+    
+    if (s% solver_iter > 0) then
+       kap_for_atm = s% opacity_start(1)
+    else
+       kap_for_atm = s% opacity(1)
+    end if
 
     ! Sanity check on L
 
@@ -823,7 +835,7 @@ contains
 
        call atm_eval_irradiated( &
             L, R, M, cgrav, s% atm_irradiated_T_eq, s% atm_irradiated_P_surf, &
-            kap_guess, s% atm_irradiated_kap_v, s% atm_irradiated_kap_v_div_kap_th, &
+            kap_for_atm, s% atm_irradiated_kap_v, s% atm_irradiated_kap_v_div_kap_th, &
             eos_proc_for_get_irradiated, kap_proc_for_get_irradiated, &
             s% atm_irradiated_errtol, 0, skip_partials, &
             Teff, kap, tau_surf, &
@@ -841,7 +853,7 @@ contains
 
        call atm_eval_irradiated( &
             L, R, M, cgrav, s% atm_irradiated_T_eq, s% atm_irradiated_P_surf, &
-            kap_guess, s% atm_irradiated_kap_v, s% atm_irradiated_kap_v_div_kap_th, &
+            kap_for_atm, s% atm_irradiated_kap_v, s% atm_irradiated_kap_v_div_kap_th, &
             eos_proc_for_get_irradiated, kap_proc_for_get_irradiated, &
             s% atm_irradiated_errtol, s% atm_irradiated_max_iters, skip_partials, &
             Teff, kap, tau_surf, &
@@ -1246,8 +1258,6 @@ contains
     real(dp) :: logRho, logRho_guess
     real(dp) :: dlnRho_dlnPgas
     real(dp) :: dlnRho_dlnT
-    real(dp) :: dres_dabar(num_eos_basic_results)
-    real(dp) :: dres_dzbar(num_eos_basic_results)
     real(dp) :: dres_dxa(num_eos_basic_results,s% species)
 
     T = exp(lnT)
@@ -1267,9 +1277,9 @@ contains
     logRho_guess = log10(rho)
 
     call solve_eos_given_PgasT( &
-         s, 0, s% Z(1), s% X(1), s% abar(1), s% zbar(1), s% xa(:,1), &
+         s, 0, s% xa(:,1), &
          lnT/ln10, log10(Pgas), logRho_guess, LOGRHO_TOL, LOGPGAS_TOL, &
-         logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+         logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
          ierr)
     if (ierr /= 0) then
        s% retry_message = 'Call to solve_eos_given_PgasT failed in eos_proc'
@@ -1308,6 +1318,8 @@ contains
     integer, intent(out)     :: ierr
 
     real(dp) :: kap_fracs(num_kap_fracs)
+    
+    include 'formats'
 
     call get_kap( &
          s, 0, s% zbar(1), s% xa(:,1), lnRho/ln10, lnT/ln10, &
@@ -1321,6 +1333,17 @@ contains
     end if
 
     ! Finish
+    
+    if (kap <= 0d0 .or. is_bad(kap)) then
+       write(*,1) 'bad kap', kap
+       write(*,1) 's% zbar(1)', s% zbar(1)
+       write(*,1) 'lnRho/ln10', lnRho/ln10
+       write(*,1) 'lnT/ln10', lnT/ln10
+       write(*,1) 'res(i_eta)', res(i_eta)
+       ierr = -1
+       return
+       stop 'atm kap_proc'
+    end if
 
     return
 

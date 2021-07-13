@@ -1,12 +1,13 @@
 program eos_plotter
 
    use eos_def
-   use eos_lib, only: eosDT_get
+   use eos_lib, only: eos_ptr, eosDT_get
    use chem_def
    use chem_lib
    use const_lib
    use math_lib
    use num_lib, only : dfridr
+   use utils_lib, only: set_nan
 
    implicit none
 
@@ -21,6 +22,8 @@ program eos_plotter
    real(dp) :: Rho, T, log10Rho, log10T, X, Z
    real(dp), dimension(num_eos_basic_results) :: res, d_dlnd, d_dlnT
    real(dp), dimension(num_eos_d_dxa_results, species) :: d_dxa
+   real(dp), dimension(num_eos_basic_results) :: res_other, d_dlnd_other, d_dlnT_other
+   real(dp), dimension(num_eos_d_dxa_results, species) :: d_dxa_other
    integer :: ierr
    character (len=32) :: my_mesa_dir
 
@@ -37,16 +40,15 @@ program eos_plotter
 
    integer :: iounit
 
-   integer :: i_var, i_max, i_eos, i_cons, i
+   integer :: i_var, i_max, i_eos, i_eos_other, i_cons, i
    integer :: j,k, njs,nks
    real(dp) :: jval, kval
 
    real(dp) :: var, dvardx_0, dvardx, err, dx_0, xdum
    logical :: doing_partial, doing_dfridr, doing_d_dlnd, doing_consistency, ignore_ierr
+   logical :: only_blend_regions
 
    character(len=4) :: xname, yname
-
-   logical, parameter :: compare_to_old_eosDT = .false.
 
    real(dp), parameter :: UNSET = -999
    real(dp), parameter :: min_derivative_error = 1d-4
@@ -58,7 +60,7 @@ program eos_plotter
       X_center, delta_X, Z_center, delta_Z, &
       X_min, X_max, Z_min, Z_max, &
       xname, yname, doing_partial, doing_dfridr, doing_d_dlnd, doing_consistency, &
-      i_var, i_eos, i_cons, ignore_ierr
+      i_var, i_eos, i_eos_other, i_cons, ignore_ierr, only_blend_regions
 
 
    include 'formats'
@@ -82,7 +84,7 @@ program eos_plotter
 
    ! allocate and initialize the eos tables
    call Setup_eos(handle)
-   rq => eos_handles(handle)
+   call eos_ptr(handle, rq, ierr)
 
    allocate(net_iso(num_chem_isos), chem_id(species), stat=ierr)
    if (ierr /= 0 .and. .not. ignore_ierr) stop 'allocate failed'
@@ -137,18 +139,23 @@ program eos_plotter
             end if
          else if (doing_consistency) then
             if (i_cons == 1) then
-               write(*,*) 'plotting thermodynamic consistency metric log10(dpe)'
-               write(iounit,*) 'log10(dpe)'
+               write(*,*) 'plotting thermodynamic consistency metric dpe'
+               write(iounit,*) 'dpe'
             else if (i_cons == 2) then
-               write(*,*) 'plotting thermodynamic consistency metric log10(dse)'
-               write(iounit,*) 'log10(dse)'
+               write(*,*) 'plotting thermodynamic consistency metric dse'
+               write(iounit,*) 'dse'
             else if (i_cons == 3) then
-               write(*,*) 'plotting thermodynamic consistency metric log10(dsp)'
-               write(iounit,*) 'log10(dsp)'
+               write(*,*) 'plotting thermodynamic consistency metric dsp'
+               write(iounit,*) 'dsp'
             end if
          else
-            write(*,*) 'plotting ' // eosDT_result_names(i_var)
-            write(iounit,*) eosDT_result_names(i_var)
+            if (i_eos_other .ge. 0) then
+               write(*,*) 'plotting difference of ' // eosDT_result_names(i_var)
+               write(iounit,*) 'difference of ' // eosDT_result_names(i_var)
+            else
+               write(*,*) 'plotting ' // eosDT_result_names(i_var)
+               write(iounit,*) eosDT_result_names(i_var)
+            end if
          end if
       end if
    end if
@@ -309,6 +316,21 @@ program eos_plotter
             stop 1
          end if
 
+         if (i_eos_other .ge. 0) then
+            ! get a set of results for given temperature and density
+            call eos_call(&
+               handle, i_eos_other, species, chem_id, net_iso, xa, &
+               Rho, log10Rho, T, log10T, &
+               res_other, d_dlnd_other, d_dlnT_other, d_dxa_other, ierr)
+            if (ierr /= 0 .and. .not. ignore_ierr) then
+               write(*,*) 'failed in eosDT_get'
+               write(*,1) 'log10Rho', log10Rho
+               write(*,1) 'log10T', log10T
+               stop 1
+            end if
+         end if
+
+
          if (i_var .gt. 0) then
 
             ! return that part of the EOS results
@@ -319,7 +341,12 @@ program eos_plotter
                   res1 = d_dlnT(i_var)
                end if
             else
-               res1 = res(i_var)
+               if (i_eos_other .ge. 0) then
+                  ! doing comparison
+                  res1 = res(i_var) - res_other(i_var)
+               else
+                  res1 = res(i_var)
+               end if
             end if
 
 
@@ -366,26 +393,12 @@ program eos_plotter
             else if (i_cons == 3) then
                res1 = -T * rho * (exp(res(i_lnS)) * d_dlnd(i_lnS)) / (d_dlnT(i_lnPgas) * exp(res(i_lnPgas)) + (4d0 / 3d0) * crad * pow4(T)) - 1
             end if
-            res1 = log10(abs(res1))
+            res1 = abs(res1)
          end if
 
 
-         if (compare_to_old_eosDT) then
-            rq% use_FreeEOS = .false.
-            call eos_call(&
-               handle, i_eos, species, chem_id, net_iso, xa, &
-               Rho, log10Rho, T, log10T, &
-               res, d_dlnd, d_dlnT, d_dxa, ierr)
-            if (ierr /= 0 .and. .not. ignore_ierr) then
-               write(*,*) 'failed in eosDT_get for old value'
-               write(*,1) 'log10Rho', log10Rho
-               write(*,1) 'log10T', log10T
-               stop 1
-            end if
-            rq% use_FreeEOS = .true.
-            res2 = res(i_grad_ad) ! res(i_lnE)/ln10
-            res1 = log10(abs(res1 - res2)/max(1d-99,abs(res1),abs(res2)))
-            ! if res1 == res2, then get bad num and plots as white
+         if (only_blend_regions .and. .not. in_eos_blend(res)) then
+            call set_nan(res1)
          end if
 
          write(iounit,*) kval, jval, res1
@@ -417,7 +430,7 @@ contains
 
       eos_file_prefix = 'mesa'
 
-      call eos_init(' ', ' ', ' ', use_cache, ierr)
+      call eos_init(' ', use_cache, ierr)
       if (ierr /= 0 .and. .not. ignore_ierr) then
          write(*,*) 'eos_init failed in Setup_eos'
          stop 1
@@ -536,10 +549,8 @@ contains
          real(dp), intent(inout) :: d_dlnT(:) ! (num_eos_basic_results)
          real(dp), intent(inout) :: d_dxa(:,:) ! (num_eos_d_dxa_results,species)
          integer, intent(out) :: ierr ! 0 means AOK.
-         real(dp) :: d_dxa_eos(num_eos_basic_results,species) ! eos internally returns derivs of all quantities
          type (EoS_General_Info), pointer :: rq
-         real(dp) :: Pgas, Prad, energy, entropy, Y, Z, X, abar, zbar, &
-            z2bar, z53bar, ye, mass_correction, sumx
+         real(dp) :: Y, Z, X, abar, zbar, z2bar, z53bar, ye, mass_correction, sumx
          call get_eos_ptr(handle,rq,ierr)
          if (ierr /= 0 .and. .not. ignore_ierr) then
             write(*,*) 'invalid handle for eos_get -- did you call alloc_eos_handle?'
@@ -549,22 +560,43 @@ contains
          if (i_eos == 0) then
             call eosDT_get( &
             handle, species, chem_id, net_iso, xa, &
-            Rho, log10Rho, T, logT, &
+            Rho, logRho, T, logT, &
             res, d_dlnd, d_dlnT, d_dxa, ierr)
          else
-            call basic_composition_info( &
-               species, chem_id, xa, X, Y, Z, &
-               abar, zbar, z2bar, z53bar, ye, mass_correction, sumx)
-            d_dxa = 0
-
-            call eosDT_test_component( &
-                  handle, i_eos, Z, X, abar, zbar, &
-                  species, chem_id, net_iso, xa, &
+            call eosDT_get_component( &
+                  handle, i_eos, species, chem_id, net_iso, xa, &
                   Rho, logRho, T, logT, &
-                  res, d_dlnd, d_dlnT, &
-                  Pgas, Prad, energy, entropy, ierr)
+                  res, d_dlnd, d_dlnT, d_dxa, ierr)
+         end if
+
+         if (ierr /= 0) then
+            call set_nan(res)
+            call set_nan(d_dlnd)
+            call set_nan(d_dlnT)
+            call set_nan(d_dxa)
          end if
 
    end subroutine eos_call
+
+
+   logical function in_eos_blend(res)
+      real(dp), dimension(num_eos_basic_results) :: res
+      integer :: i
+
+      if (i_eos_other .gt. 0) then
+         ! check for blends including i_eos_other
+         i = i_frac + i_eos_other - 1
+         in_eos_blend = ((res(i) .gt. 0) .and. (res(i) .lt. 1))
+      else
+         ! check for all blends
+         in_eos_blend = .false.
+         do i = i_frac, i_frac+num_eos_frac_results
+            in_eos_blend = in_eos_blend .or. &
+               ((res(i) .gt. 0) .and. (res(i) .lt. 1))
+         end do
+      end if
+
+   end function in_eos_blend
+
 
 end program eos_plotter

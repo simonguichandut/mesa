@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -199,7 +199,7 @@
 
             else if (names(i) == 'P_function') then
                do k=1,nz
-                  vals(k,i) = s% P_function_weight * s% lnP(k)/ln10
+                  vals(k,i) = s% P_function_weight * s% lnPeos(k)/ln10
                end do
 
             else if (names(i) == 'T_function1') then

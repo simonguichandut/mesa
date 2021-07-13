@@ -14,7 +14,7 @@ assist you.
 
 Before modifying any source code in the main MESA directory, check if
 these changes cannot be applied locally in your work folder using the
-:ref:`hooks provided by MESA <Extending MESA>`. If you have a use
+:ref:`hooks provided by MESA <using_mesa/extending_mesa:Extending MESA>`. If you have a use
 case that cannot be completed with the provided set of hooks, you can
 always contact us to request a new one.
 
@@ -22,7 +22,7 @@ The MESA test suite (``star/test_suite`` and ``binary/test_suite``) is a
 valuable source of examples and a good first stop when setting up a new
 problem with MESA. Looking at the test suite inlists is a quick way to
 familiarize yourself with the set of options relevant to your problem.
-More information is available on :ref:`how to use a test suite case as a starting point for your own work directory <Test suite>`.
+More information is available on :ref:`how to use a test suite case as a starting point for your own work directory <test_suite:Test suite>`.
 
 You should always perform some sort of convergence study to ensure that
 your results are not sensitive to the time or mass resolution of your
@@ -35,6 +35,74 @@ This will usually require appropriate testing and critical analysis of the model
 
 Throughout your project, the best way to solicit community help and
 input is via a message to the ``mesa-users@lists.mesastar.org`` mailing list.
+
+
+Starting with a test suite case
+-------------------------------
+
+mini-lab 1
+
+semiconvection
+
+convert to regulatr mesa work directory outside of ``$MESA_DIR``
+
+run
+
+
+Explore Numerical Convergence 
+-----------------------------
+
+maxi-lab 1
+
+mass resolution
+
+temporal resolution
+
+
+Explore Physics Variations
+--------------------------
+
+max-lab 2
+
+reaction network
+
+alpha-overshoot
+
+
+
+Checklist For Publishing Results
+--------------------------------
+
+Describe your MESA setup 
+
+Include ‘standard’ References 
+
+Check naming conventions 
+
+Share your inlists
+
+Share your extensions
+
+point to youtube video and zenodo repo 
+
+
+Draft Research Notes Abstract
+-----------------------------
+
+post-maxi labs
+
+submit an actual rnaas?!
+
+
+Share your Results
+------------------
+
+post maxi-labs
+
+zenodo sandbox upload
+
+
+
 
 In the paper
 ------------
@@ -65,7 +133,7 @@ briefly summarize these, including appropriate citations.
 
   The MESA EOS is a blend of the OPAL \citep{Rogers2002}, SCVH
   \citep{Saumon1995}, FreeEOS \citep{Irwin2004}, HELM \citep{Timmes2000},
-  and PC \citep{Potekhin2010} EOSes.
+  PC \citep{Potekhin2010}, and Skye \citep{Jermyn2021} EOSes.
   
   Radiative opacities are primarily from OPAL \citep{Iglesias1993,
   Iglesias1996}, with low-temperature data from \citet{Ferguson2005}
@@ -75,10 +143,7 @@ briefly summarize these, including appropriate citations.
   
   Nuclear reaction rates are from JINA REACLIB \citep{Cyburt2010} plus
   additional tabulated weak reaction rates \citet{Fuller1985, Oda1994,
-  Langanke2000}.  (For MESA versions before 11701): Screening is
-  included via the prescriptions of \citet{Salpeter1954, Dewitt1973,
-  Alastuey1978, Itoh1979}. (For MESA versions 11701 or later):
-  Screening is included via the prescription of \citet{Chugunov2007}.
+  Langanke2000}.  Screening is included via the prescription of \citet{Chugunov2007}.
   Thermal neutrino loss rates are from \citet{Itoh1996}.
 
 

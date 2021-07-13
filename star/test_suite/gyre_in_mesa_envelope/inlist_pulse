@@ -3,16 +3,14 @@
   ! load the starting model
 
   load_saved_model = .true.
-  saved_model_name = 'removed.mod'
+  load_model_filename = 'removed.mod'
 
   ! save a model at the end of the run
 
   save_model_when_terminate = .true.
   save_model_filename = 'pulse.mod'
 
-  ! terminate immediately
-
-  steps_to_take_before_terminate = 0
+  steps_to_take_before_terminate = 5
 
 / !end of star_job namelist
 

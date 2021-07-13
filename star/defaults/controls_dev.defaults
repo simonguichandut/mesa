@@ -2,75 +2,125 @@
 ! controls_dev
 ! ============
 
-! CONTAINS OPTIONS THAT HAVE NOT YET BEEN THE GIVEN A GREEN LIGHT FOR GENERAL USE.
-! IN PARTICULAR, THESE ARE NOT FOR USE IN RESEARCH TO BE PUBLISHED.
+! .. warning::
+!
+!  CONTAINS OPTIONS THAT HAVE NOT YET BEEN THE GIVEN A GREEN LIGHT FOR GENERAL USE.
+!  IN PARTICULAR, THESE ARE NOT YET FOR USE IN RESEARCH TO BE PUBLISHED.
 
 
-      D_mix_zero_region_bottom_q = 1d99
-      D_mix_zero_region_top_q = -1d99
-      dq_D_mix_zero_at_H_He_crossover = -1d0
-      dq_D_mix_zero_at_H_C_crossover = -1d0
-      
-      
-      
-      ! normalize_dqs destroys bit-for-bit read as inverse of write for models.
-      ! ok for create pre ms etc., but not for read model
-      ! create_pre_ms calls normalize_dqs even if this flag is false.
-      do_normalize_dqs_as_part_of_set_qs = .false.
-      
-      
+      ! TDC options
+      ! ~~~~~~~~~~~
+      ! Things related to TDC
+      ! ::
+
+      alpha_TDC_DAMP = 1d0
+      alpha_TDC_DAMPR = 0d0
+      alpha_TDC_PtdVdt = 0d0
+   
+      max_X_for_gradT_eqn = -1   ! only used if > 0
+      compare_TDC_to_MLT = .false.
       
 
-      ! Eturb parameters
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! RSP2 parameters
+      ! ~~~~~~~~~~~~~~~
          
-      !   Eturb_alfa  =     1.5d0         ! mixing length; alfa = 0 gives a purely radiative model.
-      !   Eturb_alfap =     0.0d0         ! turbulent pressure; Pt ~ alfap     
-      !   Eturb_alfat =     0.0d0         ! turbulent flux; Lt ~ Eturb_alfat
-      !   Eturb_alfam =     0.25d0        ! turbulent viscosity; Eq and Uq ~ Eturb_alfam
-      !   Eturb_alfar =     0.0d0         ! radiative dissipation of turbulent energy; Dr ~ Eturb_alfar    
+      !|   RSP2_alfad =     1.0d0         ! turbulent dissipation; damp ~ RSP2_alfad    
+      !|   RSP2_alfap =     0.0d0         ! turbulent pressure; Pt ~ alfap     
+      !|   RSP2_alfat =     0.0d0         ! turbulent flux; Lt ~ RSP2_alfat
+      !|   RSP2_alfam =     0.25d0        ! turbulent viscosity; Eq and Uq ~ RSP2_alfam
+      !|   RSP2_alfar =     0.0d0         ! radiative dissipation of turbulent energy; Dr ~ RSP2_alfar    
       !      
-      ! Eturb time weighting is determined by the Fraley_time_centering controls.
-      !     for Pt and Lt in turbulent energy equation
-      !     for P and grav in momentum equation
-      !     for P and L in energy equation
-      !     for area when multiplied by P
-      ! Eturb_Lsurf_factor: Lsurf = Eturb_Lsurf_factor*area(1)*clight*crad*T(1)**4
+      ! RSP2 time weighting is determined by the velocity_time_centering controls.
+      !
+      !     + for Pt and Lt in turbulent energy equation
+      !     + for P and grav in momentum equation
+      !     + for P and L in energy equation
+      !     + for area when multiplied by P
+      !
+      ! RSP2_Lsurf_factor: Lsurf = RSP2_Lsurf_factor*area(1)*clight*crad*T(1)**4
+      ! RSP2_use_Stellingwerf_Lr as in RSP
       !   
 
       ! ::
 
-    Eturb_alfa  = 1.5d0
-    Eturb_alfap = 0.0d0
-    Eturb_alfat = 0.0d0
-    Eturb_alfam = 0.25d0
-    Eturb_alfar = 0.0d0
+    RSP2_alfad = 1.0d0
+    RSP2_alfap = 0.0d0
+    RSP2_alfat = 0.0d0
+    RSP2_alfam = 0.25d0
+    RSP2_alfar = 0.0d0
+    
+    RSP2_min_Lt_div_L_for_overshooting_mixing_type = 1d-4
+    RSP2_min_Lc_div_L_for_convective_mixing_type = 1d-4
 
-    Eturb_Lsurf_factor = 0.5d0
+    RSP2_Lsurf_factor = 0.5d0
+    
+    RSP2_report_adjust_w = .false.
+    RSP2_use_L_eqn_at_surface = .true.
+    RSP2_assume_HSE = .true.
+    RSP2_use_RSP_eqn_for_Y_face = .true.
+    RSP2_use_mass_interp_face_values = .false.
+    RSP2_use_Stellingwerf_Lr = .true.
+    
+    RSP2_num_outermost_cells_forced_nonturbulent = 0
+    RSP2_num_innermost_cells_forced_nonturbulent = 0
 
+   RSP2_w_fix_if_neg = 5d-5
+   RSP2_w_min_for_damping = 1d2
+   RSP2_source_seed = 0d0
+     
+   RSP2_remesh_when_load = .true.
+     
+   RSP2_nz = 150
+   RSP2_nz_outer = 40
+   RSP2_T_anchor = 11d3
+   RSP2_dq_1_factor = 2d0
+     
+   RSP2_nz_div_IBOTOM = 30d0
+     
 
-      ! use_DGESVX_in_bcyclic
-      ! use_equilibration_in_DGESVX
-      ! report_min_rcond_from_DGESXV
-      
-      ! FOR DEBUGGING ONLY.   NOT FOR GENERAL USE.
+      ! period controls
 
       ! ::
 
-    use_DGESVX_in_bcyclic = .false.
-    use_equilibration_in_DGESVX = .false.
-    report_min_rcond_from_DGESXV = .false.
+    RSP2_target_steps_per_cycle = 600
+    RSP2_min_max_R_for_periods = -1
 
-
-      ! mlt_make_surface_no_mixing
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! this defaults to false for (temoporary) backward compatibility.
-      ! it should be true.
+      ! when to stop
 
       ! ::
 
-    mlt_make_surface_no_mixing = .false.
+    RSP2_max_num_periods = -1
+    RSP2_GREKM_avg_abs_frac_new = 0.1d0
+    RSP2_GREKM_avg_abs_limit = -1
+
+      ! output data for work integrals during a particular period
+
+      ! ::
+
+    RSP2_work_period = -1
+    RSP2_work_filename = 'work.data'
+
+      ! output data for 3d map.  format same as for gnuplot pm3d
+
+      ! ::
+
+    RSP2_write_map = .false.
+    RSP2_map_columns_filename = 'map_columns.list'
+
+      ! items listed in your map columns must also appear in your profile columns
+
+      ! ::
+
+    RSP2_map_filename = 'map.data'
+    RSP2_map_first_period = -1
+    RSP2_map_last_period = -1
+    RSP2_map_zone_interval = 2
+    RSP2_map_history_filename = 'map_history.data'
+
+
+
+
+    
 
 
       ! use_superad_reduction
@@ -183,4 +233,45 @@
       ! ::
 
     conv_vel_use_mlt_vc_start = .true.
+
+
+! mass corrections
+! ================
+
+
+      ! use_mass_corrections
+      ! ~~~~~~~~~~~~~~~~~~~~
+
+      ! Gravitational vs baryonic mass corrections.
+
+      ! The Lagrangian coordinate (:math:`m`) in MESA is the baryonic
+      ! mass and the density (:math:`\rho`) is the baryonic mass
+      ! density.
+
+      ! If false, then no distinction between gravitational and baryonic mass.
+      ! If true, then the gravitational mass is calculated using mass corrections
+      ! and the momentum equation, total energy equation, and Brunt are modified.
+
+      ! The variable ``mass_correction`` is the quantity you multiply
+      ! the baryonic mass density by to get the gravitational mass
+      ! density:
+
+      !     (mass density) = (baryon density) * amu * mass_correction
+
+      ! Given the mass fractions in a cell, the value of
+      ! mass_correction is provided by the ``chem`` module.
+
+      ! MESA holds m_grav fixed during the newton iterations.  This results
+      ! in an energy conservation error, because the specific potential energy
+      ! changes when m_grav is updated afterwards.  A message showing
+      ! the relative energy error incurred due to this assumption
+      ! will be printed to the terminal.
+
+      ! Not compatible with RSP.
+
+      ! ::
+
+    use_mass_corrections = .false.
+
+
 

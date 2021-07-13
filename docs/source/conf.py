@@ -10,18 +10,18 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('./_ext/'))
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'MESA'
-copyright = '2020, Bill Paxton & The MESA Team'
-author = 'Bill Paxton & The MESA Team'
-release = '15140'
-version = '15140'
+copyright = '2021, The MESA Team'
+author = 'The MESA Team'
+release = 'main'
+version = 'main'
 
 
 # -- General configuration ---------------------------------------------------
@@ -31,6 +31,7 @@ version = '15140'
 # ones.
 extensions = [
     'sphinx.ext.autosectionlabel',
+    'defaults2rst',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -56,6 +57,11 @@ html_static_path = ['_static']
 
 # -- Additional configuration ------------------------------------------------
 
+# Ensure that autosectionlabel will produce unique names
+autosectionlabel_prefix_document = True
+# Go to depth 3 so options in defaults files get labels
+autosectionlabel_maxdepth = 6
+
 # sphinx_rtd options
 html_theme_options = {
     'collapse_navigation': True,
@@ -73,11 +79,10 @@ master_doc = 'index'
 html_logo = 'mesa-logo-200.png'
 
 # Override theme stylesheet
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # overrides for wide tables in RTD theme
-        ],
-    }
+html_css_files = [
+    'theme_overrides.css',  # overrides for wide tables in RTD theme
+]
+
 
 # standard substitutions
 rst_prolog = r"""
@@ -93,6 +98,7 @@ rst_prolog = r"""
 .. |logRho| replace:: :math:`\log(\rho/\rm g\,cm^{-3})`
 .. |logT| replace:: :math:`\log(T/\rm K)`
 .. |chi^2| replace:: :math:`\chi^2`
+.. |gpercm3| replace:: :math`g\,cm^{-3}`
 """
 
 # set default highlighting language

@@ -2,7 +2,7 @@
       show_log_description_at_start = .false.
 
       load_saved_model = .true.
-      saved_model_name = 'done_with_edep.mod'
+      load_model_filename = 'done_with_edep.mod'
 
       save_model_when_terminate = .true.
       save_model_filename = 'shock_part1.mod'
@@ -48,8 +48,7 @@
 ! output controls
 
       terminal_show_age_units = 'seconds'
-      
-      
+
       !photo_interval = 1
       !profile_interval = 1
       !history_interval = 1
@@ -60,6 +59,8 @@
       !report_solver_progress = .true. ! set true to see info about solver iterations
       !report_ierr = .true. ! if true, produce terminal output when have some internal error
       !stop_for_bad_nums = .true.
+      !trace_evolve = .true.
+      !fill_arrays_with_NaNs = .true.
 
       !solver_save_photo_call_number = 0
          ! Saves a photo when solver_call_number = solver_save_photo_call_number - 1
@@ -91,8 +92,8 @@
       !solver_test_net_partials = .true.
       !solver_test_atm_partials = .true.
 
-      !report_why_dt_limits = .true.
       !report_all_dt_limits = .true.
+      !report_solver_dt_info = .true.
       
       !show_mesh_changes = .true.
       !mesh_dump_call_number = 5189
@@ -100,12 +101,19 @@
       
       !energy_conservation_dump_model_number = -1
       
-      !trace_evolve = .true.
-      
       !use_DGESVX_in_bcyclic = .true.
       !use_equilibration_in_DGESVX = .true.
       !report_min_rcond_from_DGESXV = .true.
 
+      ! solver debugging
+      !solver_check_everything = .true.
+      
+      !solver_epsder_struct = 1d-6
+      !solver_epsder_chem = 1d-6
+      
+      !report_solver_dt_info = .true.
+      !report_dX_nuc_drop_dt_limits = .true.
+      !report_bad_negative_xa = .true.
 
 / ! end of controls namelist
 

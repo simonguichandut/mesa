@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -41,8 +41,6 @@
       real(dp), parameter :: center_h_going = 1d0/3d0
       real(dp), parameter :: center_he_going = 5d-2
 
-      real(dp), parameter :: min_Eturb = 1d-20, min_Eturb_pow_1_pt_5 = 1d-30
-
 
       contains
 
@@ -56,28 +54,34 @@
 
          okay = .true.
          
-         mlt_partial_str(1:num_mlt_partials) = ''
-         mlt_partial_str(mlt_dlnd00) = 'mlt_dlnd00'
-         mlt_partial_str(mlt_dlnT00) = 'mlt_dlnT00'
-         mlt_partial_str(mlt_dlndm1) = 'mlt_dlndm1'
-         mlt_partial_str(mlt_dlnTm1) = 'mlt_dlnTm1'
-         mlt_partial_str(mlt_dlnR) = 'mlt_dlnR'
-         mlt_partial_str(mlt_dL) = 'mlt_dL'
-         mlt_partial_str(mlt_cv_var) = 'mlt_cv_var'
-         mlt_partial_str(mlt_w_div_wc_var) = 'mlt_w_div_wc_var'
-
-         do i=1,num_mlt_partials
-            if (len_trim(mlt_partial_str(i)) == 0) then
-               if (i > 1) then
-                  im1 = i-1
-                  write(*,2) 'missing mlt_partial_str following ' // &
-                     trim(mlt_partial_str(im1)), i
-               else
-                  write(*,2) 'missing mlt_partial_str 1'
-               end if
-               okay = .false.
-            end if
-         end do
+         auto_diff_star_d1_names(1:auto_diff_star_num_vars) = ''
+         auto_diff_star_d1_names(i_lnd_m1) = 'i_lnd_m1'
+         auto_diff_star_d1_names(i_lnd_00) = 'i_lnd_00'
+         auto_diff_star_d1_names(i_lnd_p1) = 'i_lnd_p1'
+         auto_diff_star_d1_names(i_lnT_m1) = 'i_lnT_m1'
+         auto_diff_star_d1_names(i_lnT_00) = 'i_lnT_00'
+         auto_diff_star_d1_names(i_lnT_p1) = 'i_lnT_p1'
+         auto_diff_star_d1_names(i_w_m1) = 'i_w_m1'
+         auto_diff_star_d1_names(i_w_00) = 'i_w_00'
+         auto_diff_star_d1_names(i_w_p1) = 'i_w_p1'
+         auto_diff_star_d1_names(i_lnR_m1) = 'i_lnR_m1'
+         auto_diff_star_d1_names(i_lnR_00) = 'i_lnR_00'
+         auto_diff_star_d1_names(i_lnR_p1) = 'i_lnR_p1'
+         auto_diff_star_d1_names(i_v_m1) = 'i_v_m1'
+         auto_diff_star_d1_names(i_v_00) = 'i_v_00'
+         auto_diff_star_d1_names(i_v_p1) = 'i_v_p1'
+         auto_diff_star_d1_names(i_L_m1) = 'i_L_m1'
+         auto_diff_star_d1_names(i_L_00) = 'i_L_00'
+         auto_diff_star_d1_names(i_L_p1) = 'i_L_p1'
+         auto_diff_star_d1_names(i_Hp_m1) = 'i_Hp_m1'
+         auto_diff_star_d1_names(i_Hp_00) = 'i_Hp_00'
+         auto_diff_star_d1_names(i_Hp_p1) = 'i_Hp_p1'
+         auto_diff_star_d1_names(i_xtra1_m1) = 'i_xtra1_m1'
+         auto_diff_star_d1_names(i_xtra1_00) = 'i_xtra1_00'
+         auto_diff_star_d1_names(i_xtra1_p1) = 'i_xtra1_p1'
+         auto_diff_star_d1_names(i_xtra2_m1) = 'i_xtra2_m1'
+         auto_diff_star_d1_names(i_xtra2_00) = 'i_xtra2_00'
+         auto_diff_star_d1_names(i_xtra2_p1) = 'i_xtra2_p1'
 
          termination_code_str(1:num_termination_codes) = ''
 
@@ -100,8 +104,8 @@
          termination_code_str(t_HB_limit) = 'HB_limit'
          termination_code_str(t_star_mass_min_limit) = 'star_mass_min_limit'
          termination_code_str(t_star_mass_max_limit) = 'star_mass_max_limit'
-         termination_code_str(t_bound_mass_min_limit) = 'bound_mass_min_limit'
-         termination_code_str(t_bound_mass_max_limit) = 'bound_mass_max_limit'
+         termination_code_str(t_remnant_mass_min_limit) = 'remnant_mass_min_limit'
+         termination_code_str(t_ejecta_mass_max_limit) = 'ejecta_mass_max_limit'
          
          termination_code_str(t_star_species_mass_min_limit) = 'star_species_mass_min_limit'
          termination_code_str(t_star_species_mass_max_limit) = 'star_species_mass_max_limit'
@@ -113,6 +117,7 @@
 
          termination_code_str(t_he_core_mass_limit) = 'he_core_mass_limit'
          termination_code_str(t_co_core_mass_limit) = 'co_core_mass_limit'
+         termination_code_str(t_one_core_mass_limit) = 'one_core_mass_limit'
          termination_code_str(t_fe_core_mass_limit) = 'fe_core_mass_limit'
          termination_code_str(t_neutron_rich_core_mass_limit) = 'neutron_rich_core_mass_limit'
 
@@ -125,7 +130,6 @@
          termination_code_str(t_delta_Pg_lower_limit) = 'delta_Pg_lower_limit'
          termination_code_str(t_delta_Pg_upper_limit) = 'delta_Pg_upper_limit'
          termination_code_str(t_shock_mass_upper_limit) = 'shock_mass_upper_limit'
-         termination_code_str(t_mach1_mass_upper_limit) = 'mach1_mass_upper_limit'
          termination_code_str(t_photosphere_m_sub_M_center_limit) = 'photosphere_m_sub_M_center_limit'
          termination_code_str(t_photosphere_m_lower_limit) = 'photosphere_m_lower_limit'
          termination_code_str(t_photosphere_m_upper_limit) = 'photosphere_m_upper_limit'
@@ -274,6 +278,7 @@
          dt_why_str(Tlim_dt_div_dt_cell_collapse) = 'dt_collapse'
          dt_why_str(Tlim_dt_div_min_dr_div_cs) = 'min_dr_div_cs'
          dt_why_str(Tlim_lgL) = 'lgL'
+         dt_why_str(Tlim_force_timestep) = 'force_dt'
          dt_why_str(Tlim_max_timestep) = 'max_dt'
          dt_why_str(Tlim_timestep_hold) = 'hold'
          dt_why_str(Tlim_dX_nuc_drop) = 'dX_nuc'
@@ -366,7 +371,6 @@
       
       integer function find_next_star_id()
          integer :: id
-         
          id = 0
 !$omp critical (star_handle_next)
          if (have_initialized_star_handles) then
@@ -375,9 +379,20 @@
             end do
          end if
 !$omp end critical (star_handle_next)         
-      
-      find_next_star_id  = id
+         find_next_star_id  = id
       end function find_next_star_id
+      
+      
+      integer function how_many_allocated_star_ids()
+         integer :: id
+         how_many_allocated_star_ids = 0
+         if (have_initialized_star_handles) then
+            do id = 1, max_star_handles
+               if (star_handles(id)% in_use .eqv. .true.) &
+                  how_many_allocated_star_ids = how_many_allocated_star_ids+1
+            end do
+         end if
+      end function how_many_allocated_star_ids
       
 
 
@@ -394,9 +409,8 @@
             use_special_weak_rates, special_weak_states_file, special_weak_transitions_file, &
             reaclib_min_T9_in, &
             rate_tables_dir, rates_cache_suffix, &
-            ionization_file_prefix, ionization_Z1_suffix, &
-            eosDT_cache_dir, eosPT_cache_dir, eosDE_cache_dir, &
-            ionization_cache_dir, kap_cache_dir, rates_cache_dir, &
+            eosDT_cache_dir, &
+            kap_cache_dir, rates_cache_dir, &
             color_num_files,color_file_names,color_num_colors,&
             ierr)
          use iso_fortran_env
@@ -406,7 +420,6 @@
          use rates_lib, only: rates_init
          use rates_def, only: reaclib_min_T9
          use net_lib, only: net_init
-         use ionization_lib, only: ionization_init
          use atm_lib
          use chem_lib
          use const_lib
@@ -419,9 +432,8 @@
             jina_reaclib_filename, rate_tables_dir, &
             special_weak_states_file, special_weak_transitions_file, &
             rates_cache_suffix, &
-            ionization_file_prefix, ionization_Z1_suffix, &
-            eosDT_cache_dir, eosPT_cache_dir, eosDE_cache_dir, &
-            ionization_cache_dir, kap_cache_dir, rates_cache_dir
+            eosDT_cache_dir, &
+            kap_cache_dir, rates_cache_dir
          integer, intent(in) :: color_num_files
          character (len=*), intent(in) :: color_file_names(:)
          integer , intent(in):: color_num_colors(:)
@@ -469,11 +481,8 @@
          if (dbg) write(*,*) 'call eos_init'
          !write(*,*) 'eos_file_prefix "' // trim(eos_file_prefix) // '"'
          !write(*,*) 'eosDT_cache_dir "' // trim(eosDT_cache_dir) // '"'
-         !write(*,*) 'eosPT_cache_dir "' // trim(eosPT_cache_dir) // '"'
-         !write(*,*) 'eosDE_cache_dir "' // trim(eosDE_cache_dir) // '"'
          call eos_init( &
-            eosDT_cache_dir, eosPT_cache_dir, eosDE_cache_dir, &
-            use_cache, ierr)
+            eosDT_cache_dir, use_cache, ierr)
          if (ierr /= 0) return
 
          if (dbg) write(*,*) 'call kap_init'
@@ -515,12 +524,6 @@
 
          if (dbg) write(*,*) 'call atm_init'
          call atm_init(use_cache, ierr)
-         if (ierr /= 0) return
-
-         if (dbg) write(*,*) 'call ionization_init'
-         call ionization_init( &
-            ionization_file_prefix, ionization_Z1_suffix, &
-            ionization_cache_dir, use_cache, ierr)
          if (ierr /= 0) return
 
          version_number = ''

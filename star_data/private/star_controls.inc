@@ -12,6 +12,7 @@
          real(dp) :: &
             he_core_boundary_h1_fraction, &
             co_core_boundary_he4_fraction, &
+            one_core_boundary_he4_c12_fraction, &
             fe_core_boundary_si28_fraction, &
             neutron_rich_core_boundary_Ye_max, &
             min_boundary_fraction
@@ -22,7 +23,7 @@
          real(dp) :: when_to_stop_atol
          real(dp) :: when_to_stop_rtol
 
-         real(dp) :: max_age, max_age_in_seconds, &
+         real(dp) :: max_age, max_age_in_days, max_age_in_seconds, &
             dt_years_for_steps_before_max_age, reduction_factor_for_max_timestep
          integer :: num_adjusted_dt_steps_before_max_age
          real(dp) :: gamma_center_limit
@@ -62,7 +63,7 @@
          real(dp) :: HB_limit
 
          real(dp) :: star_mass_min_limit, star_mass_max_limit
-         real(dp) :: bound_mass_min_limit, bound_mass_max_limit
+         real(dp) :: remnant_mass_min_limit, ejecta_mass_max_limit
          
          real(dp) :: star_species_mass_min_limit, star_species_mass_max_limit
          character (len=iso_name_length) :: &
@@ -75,6 +76,7 @@
 
          real(dp) :: he_core_mass_limit
          real(dp) :: co_core_mass_limit
+         real(dp) :: one_core_mass_limit
          real(dp) :: fe_core_mass_limit
          real(dp) :: neutron_rich_core_mass_limit
 
@@ -189,7 +191,7 @@
 
          logical :: write_pulse_data_with_profile
          character (len=strlen) :: pulse_data_format, &
-            format_for_FGONG_data, format_for_OSC_data
+            format_for_OSC_data
          logical :: &
             add_atmosphere_to_pulse_data, &
             add_center_point_to_pulse_data, &
@@ -198,6 +200,8 @@
             interpolate_rho_for_pulse_data
          real(dp) :: threshold_grad_mu_for_double_point
          integer :: max_number_of_double_points
+         character (len=strlen) :: fgong_header(4)
+         integer :: fgong_ivers
 
          integer :: max_num_gyre_points
 
@@ -241,7 +245,7 @@
 
       ! mixing parameters
 
-         real(dp) :: alpha_semiconvection, semiconvection_upper_limit_center_h1
+         real(dp) :: alpha_semiconvection
          real(dp) :: thermohaline_coeff
          character (len=32) :: &
             thermohaline_option, MLT_option, semiconvection_option
@@ -254,7 +258,7 @@
          real(dp) :: Henyey_MLT_y_param, Henyey_MLT_nu_param, mlt_Pturb_factor, &
             min_logT_for_make_gradr_sticky_in_solver_iters
          logical :: mlt_use_rotation_correction, make_gradr_sticky_in_solver_iters, &
-            no_MLT_below_shock, no_MLT_below_T_max
+            no_MLT_below_shock, mlt_make_surface_no_mixing
 
          real(dp) :: T_mix_limit
 
@@ -262,6 +266,14 @@
          real(dp) :: &
             gradT_excess_f1, &
             gradT_excess_f2, &
+            gradT_excess_age_fraction, &
+            gradT_excess_max_change, &
+            gradT_excess_lambda1, &
+            gradT_excess_beta1, &
+            gradT_excess_lambda2, &
+            gradT_excess_beta2, &
+            gradT_excess_dlambda, &
+            gradT_excess_dbeta, &
             gradT_excess_max_center_h1, &
             gradT_excess_min_center_he4, &
             gradT_excess_max_logT, &
@@ -314,7 +326,7 @@
             use_other_RSP_linear_analysis, RSP_testing, RSP_use_Prad_for_Psurf, RSP_use_atm_grey_with_kap_for_Psurf, &
             RSP_fixed_Psurf, RSP_hydro_only, RSP_report_undercorrections, RSP_relax_initial_model, &
             use_other_RSP_build_model, RSP_relax_adjust_inner_mass_distribution, RSP_trace_RSP_build_model, &
-            RSP_relax_alfap_before_alfat, use_RSP_new_start_scheme
+            RSP_relax_alfap_before_alfat, use_RSP_new_start_scheme, RSP_do_check_omega, RSP_report_check_omega_changes
          integer :: RSP_max_num_periods, RSP_max_iters_per_try, RSP_max_retries_per_step, &
             RSP_mode_for_setting_PERIODLIN, RSP_nmodes, &
             RSP_target_steps_per_cycle, RSP_nz_outer, RSP_nz, &
@@ -332,7 +344,7 @@
             RSP_min_PERIOD_div_PERIODLIN, RSP_v_div_cs_threshold_for_dt_limit, RSP_initial_dt_factor, &
             RSP_fraction_1st_overtone, RSP_fraction_2nd_overtone, &
             RSP_max_dt_times_min_dr_div_cs, RSP_tau_surf_for_atm_grey_with_kap, &
-            RSP_min_tau_for_turbulent_flux, RSP_max_dt, &
+            RSP_min_tau_for_turbulent_flux, RSP_max_dt, RSP_min_deltaR_for_periods, &
             RSP_kap_density_factor, RSP_T_anchor_tolerance, RSP_T_inner_tolerance, RSP_relax_dm_tolerance, &
             RSP_max_dt_times_min_rad_diff_time, RSP_Qvisc_linear_static, RSP_dq_1_factor, &
             RSP_surface_tau
@@ -345,7 +357,6 @@
             RSP_alpha_P_factor, RSP_alpha_s_factor, RSP_alpha_c_factor, &
             RSP_alpha_d_factor, RSP_gamma_r_factor, &
             RSP_min_tau, RSP_min_q, max_conv_vel_div_csound, &
-            min_dt_for_increases_in_convection_velocity, &
             max_v_for_convection, max_q_for_convection_with_hydro_on, &
             max_v_div_cs_for_convection, &
             max_abs_du_div_cs_for_convection, &
@@ -391,19 +402,15 @@
          real(dp) :: atm_irradiated_P_surf
          integer :: atm_irradiated_max_iters
 
-         real(dp) :: surface_extra_Pgas
-         real(dp) :: Tsurf_factor
-         real(dp) :: fixed_vsurf
-         real(dp) :: fixed_L_for_BB_outer_BC
-         real(dp) :: tau_for_L_BB
-         logical :: use_atm_PT_at_center_of_surface_cell
          logical :: use_compression_outer_BC
          logical :: use_momentum_outer_BC
          logical :: use_zero_Pgas_outer_BC
-         logical :: use_zero_dLdm_outer_BC
-         logical :: use_T_black_body_outer_BC
          logical :: use_fixed_vsurf_outer_BC
-         logical :: use_fixed_L_for_BB_outer_BC
+         real(dp) :: fixed_vsurf
+         logical :: use_fixed_Psurf_outer_BC
+         real(dp) :: fixed_Psurf
+         
+         real(dp) :: Tsurf_factor
 
       ! create atmosphere
 
@@ -467,7 +474,7 @@
          real(dp) :: min_q_for_k_below_const_q, max_q_for_k_below_const_q
          real(dp) :: min_q_for_k_const_mass, max_q_for_k_const_mass
 
-         ! composition of accreted material
+         ! specification of accreted material
          logical :: accrete_same_as_surface
 
          logical :: accrete_given_mass_fractions
@@ -551,10 +558,9 @@
 
          logical :: show_mesh_changes
 
-         logical :: mesh_adjust_use_quadratic, &
-            mesh_adjust_get_T_from_E, mesh_ok_to_merge
+         logical :: mesh_adjust_get_T_from_E, mesh_ok_to_merge
 
-         integer :: mesh_dump_call_number, mesh_max_k_old_for_split, mesh_min_k_old_for_split
+         integer :: mesh_max_k_old_for_split, mesh_min_k_old_for_split
 
          real(dp) :: max_dq, min_dq, min_dq_for_split, min_dq_for_logT, &
             min_dq_for_xa, min_dq_for_xa_convective
@@ -645,6 +651,7 @@
          logical :: use_split_merge_amr, trace_split_merge_amr, &
             equal_split_density_amr, split_merge_amr_skip_inner_cell, &
             split_merge_amr_hybrid_zoning, &
+            split_merge_amr_flipped_hybrid_zoning, &
             split_merge_amr_log_zoning, &
             split_merge_amr_logtau_zoning, &
             split_merge_amr_okay_to_split_nz, &
@@ -653,8 +660,9 @@
          integer :: split_merge_amr_nz_baseline, split_merge_amr_max_iters, &
             split_merge_amr_nz_r_core
          real(dp) :: split_merge_amr_MaxLong, split_merge_amr_MaxShort, &
+            split_merge_amr_nz_r_core_fraction, &
             merge_amr_max_abs_du_div_cs, split_merge_amr_dq_min, split_merge_amr_dq_max, &
-            split_merge_amr_r_core_cm
+            split_merge_amr_r_core_cm, split_merge_amr_mesh_delta_coeff
 
          logical :: merge_amr_ignore_surface_cells
          integer :: merge_amr_k_for_ignore_surface_cells
@@ -723,6 +731,9 @@
          real(dp) :: diffusion_T_full_on
          real(dp) :: diffusion_T_full_off
          real(dp) :: D_mix_ignore_diffusion
+         
+         real(dp) :: D_mix_zero_region_bottom_q, D_mix_zero_region_top_q, &
+            dq_D_mix_zero_at_H_He_crossover, dq_D_mix_zero_at_H_C_crossover
 
          real(dp) :: diffusion_Vlimit_dm_full_on
          real(dp) :: diffusion_Vlimit_dm_full_off
@@ -760,12 +771,6 @@
          character(len=64) :: diffusion_isolve_solver
 
 
-      ! eos controls
-         logical :: &
-            report_eos_settings_at_start_of_run, &
-            use_fixed_XZ_for_eos
-         real(dp) :: fixed_X_for_eos, fixed_Z_for_eos
-
       ! opacity controls
 
          logical :: use_simple_es_for_kap, use_starting_composition_for_kap
@@ -793,23 +798,22 @@
 
          real(dp) :: eps_nuc_factor, max_abs_eps_nuc, op_split_burn_eps_nuc_infall_limit
          real(dp) :: eps_WD_sedimentation_factor, non_nuc_neu_factor, eps_grav_factor, eps_mdot_factor
-         real(dp) :: dedt_eqn_r_scale, &
-            max_eta_for_dedt_form_of_energy_eqn, max_gamma_for_dedt_form_of_energy_eqn
+         real(dp) :: dedt_eqn_r_scale
 
          logical :: use_mass_corrections, use_gravity_rotation_correction, &
             use_dPrad_dm_form_of_T_gradient_eqn, &
+            use_gradT_actual_vs_gradT_MLT_for_T_gradient_eqn, &
             use_dedt_form_of_energy_eqn, &
             no_dedt_form_during_relax, &
             always_use_dedt_form_of_energy_eqn, &
-            use_dedt_form_with_total_energy_conservation, &
             always_use_eps_grav_form_of_energy_eqn, &
-            use_Fraley_time_centering, &
-            include_P_in_Fraley_time_centering, &
-            include_L_in_Fraley_time_centering, &
+            include_P_in_velocity_time_centering, &
+            include_L_in_velocity_time_centering, &
+            use_P_d_1_div_rho_form_of_work_when_time_centering_velocity, &
             use_time_centered_eps_grav
-            
-         integer :: steps_before_always_use_dedt_form_of_energy_eqn, &
-            steps_before_use_Fraley_time_centering
+         real(dp) :: P_theta_for_velocity_time_centering, &
+            L_theta_for_velocity_time_centering
+         integer :: steps_before_use_velocity_time_centering
 
          real(dp) :: &
             RTI_A, RTI_B, RTI_C, RTI_D, &
@@ -829,8 +833,17 @@
          real(dp) :: op_split_burn_min_T, op_split_burn_eps, op_split_burn_odescal, &
             op_split_burn_min_T_for_variable_T_solver
 
-         logical :: include_L_in_error_est, &
-            include_v_in_error_est, include_u_in_error_est
+         logical :: include_L_in_correction_limits, &
+            include_v_in_correction_limits, include_u_in_correction_limits
+         
+         real(dp) :: max_X_for_conv_timescale, min_X_for_conv_timescale
+         real(dp) :: max_q_for_conv_timescale, min_q_for_conv_timescale
+         real(dp) :: max_q_for_QHSE_timescale, min_q_for_QHSE_timescale
+
+         logical :: use_DGESVX_in_bcyclic, use_equilibration_in_DGESVX
+         logical :: report_min_rcond_from_DGESXV
+         
+         logical :: do_normalize_dqs_as_part_of_set_qs
 
          logical :: trace_solver_damping
 
@@ -907,18 +920,12 @@
          real(dp) :: &
             hydro_mtx_max_allowed_abs_dlogT, &
             hydro_mtx_max_allowed_abs_dlogRho, &
-            hydro_mtx_max_allowed_abs_dlogPgas, &
             min_logT_for_hydro_mtx_max_allowed, &
             hydro_mtx_max_allowed_logT, &
             hydro_mtx_max_allowed_logRho, &
-            hydro_mtx_max_allowed_logPgas, &
             hydro_mtx_min_allowed_logT, &
             hydro_mtx_min_allowed_logRho, &
-            solver_reduced_min_corr_coeff, &
-            solver_clip_dlogT, &
-            solver_clip_dlogRho, &
-            solver_clip_dlogPgas, &
-            solver_clip_dlogR
+            solver_reduced_min_corr_coeff
 
          character (len=32) :: hydro_solver_name
 
@@ -943,8 +950,8 @@
 
          integer :: retry_limit, redo_limit
 
-         logical :: use_avQ_art_visc
-         real(dp) :: avQ_cq, avQ_zsh
+         logical :: use_Pvsc_art_visc
+         real(dp) :: Pvsc_cq, Pvsc_zsh
 
          real(dp) :: sig_term_limit, sig_min_factor_for_high_Tcenter, &
             Tcenter_min_for_sig_min_factor_full_on, &
@@ -993,7 +1000,7 @@
          integer :: max_mdot_redo_cnt
          real(dp) :: min_years_dt_for_redo_mdot, mdot_crit_boost_factor, &
             mdot_revise_factor, implicit_mdot_boost
-         real(dp) :: surf_w_div_w_crit_limit, surf_w_div_w_crit_tol
+         real(dp) :: surf_omega_div_omega_crit_limit, surf_omega_div_omega_crit_tol
          logical :: fitted_fp_ft_i_rot
          real(dp) :: w_div_wcrit_max, w_div_wcrit_max2
          real(dp) :: fp_min, ft_min, fp_error_limit, ft_error_limit
@@ -1038,7 +1045,6 @@
          logical :: solver_show_correction_info
          real(dp) :: solver_epsder_chem, solver_epsder_struct
          
-         integer :: trace_k
          logical :: fill_arrays_with_NaNs
          logical :: zero_when_allocate, warn_when_get_a_bad_eos_result, &
             warn_rates_for_high_temp
@@ -1069,8 +1075,8 @@
          real(dp) :: timestep_dt_factor
          logical :: use_dt_low_pass_controller
          
-         real(dp) :: force_timestep_min, &
-            force_timestep_min_years, force_timestep_min_factor
+         real(dp) :: force_timestep_min, force_timestep_min_years, force_timestep_min_factor, &
+            force_timestep, force_timestep_years
 
          real(dp) :: varcontrol_target, varcontrol_dt_limit_ratio_hard_max, &
             min_allowed_varcontrol_target
@@ -1094,9 +1100,11 @@
             dt_div_min_dr_div_cs_limit, &
             dt_div_min_dr_div_cs_hard_limit, &
             min_abs_du_div_cs_for_dt_div_min_dr_div_cs_limit, &
+            min_abs_u_div_cs_for_dt_div_min_dr_div_cs_limit, &
             min_q_for_dt_div_min_dr_div_cs_limit, &
             max_q_for_dt_div_min_dr_div_cs_limit
          integer :: min_k_for_dt_div_min_dr_div_cs_limit
+         logical :: check_remnant_only_for_dt_div_min_dr_div_cs_limit
 
          real(dp) :: dX_mix_dist_limit
 
@@ -1316,17 +1324,16 @@
          character (len=strlen) :: zams_filename
          logical :: set_rho_to_dm_div_dV
          
-         logical :: use_d_eos_dxa
+         logical :: fix_d_eos_dxa_partials
 
-         logical :: use_other_eos
          logical :: use_other_surface_PT
          logical :: use_other_kap
          logical :: use_other_diffusion
          logical :: use_other_diffusion_factor
-         logical :: use_other_mlt
          logical :: use_other_adjust_mdot
          logical :: use_other_j_for_adjust_J_lost
          logical :: use_other_alpha_mlt
+         logical :: use_other_mlt_results
          logical :: use_other_am_mixing
          logical :: use_other_brunt, use_other_brunt_smoothing
          logical :: use_other_solver_monitor
@@ -1361,6 +1368,8 @@
          logical :: use_other_edit_pulse_data
          logical :: use_other_astero_freq_corr
          logical :: use_other_timestep_limit
+         logical :: use_other_set_pgstar_controls
+         logical :: use_other_screening
 
          real(dp) :: x_ctrl(num_x_ctrls)
          integer :: x_integer_ctrl(num_x_ctrls)

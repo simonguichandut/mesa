@@ -7,7 +7,7 @@
       show_log_description_at_start = .false. 
       
       load_saved_model = .true.
-      saved_model_name = 'ns_env.mod'
+      load_model_filename = 'ns_env.mod'
       
       save_model_when_terminate = .true.
       save_model_filename = 'ns_plus_he_layer.mod'
@@ -31,13 +31,11 @@
       set_initial_age = .true.
       initial_age = 0
 
-      !pgstar_flag = .true.
+!      pgstar_flag = .true.
 
 / ! end of star_job namelist
 
 &eos
-   logRho1_PC_limit = 3.1d0 ! 2.999d0 ! keep < logRho2_OPAL_SCVH_limit (3.48)
-   logRho2_PC_limit = 2.8d0 ! must be > 2.8 or so to avoid NaN's from PC
 / ! end of eos namelist
 
 &kap
@@ -51,16 +49,15 @@
       use_other_cgrav = .true. ! for GR factor with gravity
 
       max_age_in_seconds = 0.5d0 ! use max age to set thickness of he layer
-           
       mass_change = 1d-9
       max_years_for_timestep = 1d-3
 
       max_number_retries = 200
       max_model_number = 2000
          
-      use_gold2_tolerances = .false.
-      use_gold_tolerances = .false.
-      convergence_ignore_equL_residuals = .true.
+      use_gold2_tolerances = .true.
+      use_gold_tolerances = .true.
+      convergence_ignore_equL_residuals = .false.
 
       max_number_retries = 250
       max_model_number = 2000
@@ -94,22 +91,22 @@
       initial_z = 0.02d0
 
       mixing_length_alpha = 1.5
-      MLT_option = 'Henyey'
+      MLT_option = 'TDC'
 
-      use_Ledoux_criterion = .false.  
+      use_Ledoux_criterion = .true.  
       alpha_semiconvection = 0.1
       thermohaline_coeff = 2
       thermohaline_option = 'Kippenhahn'
    
-      merge_if_dlnR_too_small = .true.
-      mesh_min_dlnR = 1d-9
+!      merge_if_dlnR_too_small = .true.
+!      mesh_min_dlnR = 1d-9
 
       atm_option = 'T_tau'
       atm_T_tau_relation = 'Eddington'
       atm_T_tau_opacity = 'fixed'
       Pextra_factor = 2
    
-      varcontrol_target = 1d-3 
+      varcontrol_target = 1d-3
 
       limit_for_rel_error_in_energy_conservation = 1d-4
       hard_limit_for_rel_error_in_energy_conservation = 1d-3
@@ -123,53 +120,8 @@
       terminal_interval = 10
       write_header_frequency = 10
    
-      !photo_interval = 1
-      !profile_interval = 1
-      !history_interval = 1
-      !terminal_interval = 1
 
-! FOR DEBUGGING
-
-      !report_solver_progress = .true. ! set true to see info about solver iterations
-      !report_ierr = .true. ! if true, produce terminal output when have some internal error
-
-      !solver_save_photo_call_number = 0
-         ! Saves a photo when solver_call_number = solver_save_photo_call_number - 1
-         ! e.g., useful for testing partials to set solver_call_number = solver_test_partials_call_number - 1
-
-      !solver_test_partials_k = 197
-      !solver_test_partials_call_number = 110
-      !solver_test_partials_iter_number = 7
-      !solver_test_partials_dx_0 = 1d-6
-      !solver_test_partials_var_name = 'lnd' ! or 'lnd', 'lnT', 'lnR', 'L', 'v', etc.    '' means code sets 
-      !solver_test_partials_equ_name = 'opacity' ! or 'dlnE_dt', 'dlnd_dt', 'dlnR_dt', etc   '' means code sets 
-         ! equ name can also be 'lnE' to test eos, 'eps_nuc' to test net, or 'opacity' to test kap.
-      !solver_test_partials_sink_name = 'he4' ! iso name to use for "sink" to keep sum = 1
-         ! if possible, use he4 as sink so change Y rather than X or Z.
-      !solver_test_partials_show_dx_var_name = 'h1'
-
-      !solver_test_partials_write_eos_call_info = .true.
-      
-      !solver_test_partials_k_low = 114
-      !solver_test_partials_k_high = 114
-      
-      !solver_test_eos_partials = .true.
-      !solver_test_kap_partials = .true.
-      !solver_test_net_partials = .true.
-      !solver_test_atm_partials = .true.
-
-      !report_why_dt_limits = .true.
-      !report_all_dt_limits = .true.
-      
-      !show_mesh_changes = .true.
-      !mesh_dump_call_number = 5189
-      !okay_to_remesh = .false.
-      
-      !trace_evolve = .true.
-
-      !stop_for_bad_nums = .true.
-      
-
+report_solver_progress = .true.
 
 / ! end of controls namelist
 

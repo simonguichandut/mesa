@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -33,8 +33,8 @@
       implicit none
 
       private
-      public :: set_vars_if_needed, set_vars, set_final_vars, set_cgrav, &
-         set_hydro_vars, set_Teff_info_for_eqns, set_Teff, get_surf_PT
+      public :: set_vars_if_needed, set_vars, set_final_vars, update_vars, set_cgrav, &
+         set_hydro_vars, unpack_xh, set_Teff_info_for_eqns, set_Teff, get_surf_PT, set_grads
 
       logical, parameter :: dbg = .false.
       logical, parameter :: trace_setvars = .false.
@@ -64,7 +64,6 @@
          real(dp), intent(in) :: dt
          integer, intent(out) :: ierr
          logical, parameter :: &
-            skip_time_derivatives = .false., &
             skip_m_grav_and_grav = .false., &
             skip_net = .false., &
             skip_neu = .false., &
@@ -81,7 +80,7 @@
          skip_set_cz_bdy_mass = .not. s% have_new_generation
          skip_mixing_info = .not. s% okay_to_set_mixing_info
          call set_some_vars( &
-            s, skip_time_derivatives, skip_m_grav_and_grav, &
+            s, skip_m_grav_and_grav, &
             skip_net, skip_neu, skip_kap, skip_grads, skip_rotation, &
             skip_brunt, skip_mixing_info, skip_set_cz_bdy_mass, skip_irradiation_heat, &
             dt, ierr)
@@ -89,7 +88,6 @@
 
       
       subroutine set_final_vars(s, dt, ierr)
-         use alloc, only: non_crit_get_work_array, non_crit_return_work_array
          use rates_def, only: num_rvs
          type (star_info), pointer :: s
          real(dp), intent(in) :: dt
@@ -111,43 +109,11 @@
             skip_set_cz_bdy_mass, &
             skip_mlt
          integer :: nz, ierr1, k, i
-         real(dp), pointer, dimension(:) :: &
-            d_mx, cv, nu_st, d_st, d_dsi, d_sh, d_ssi, d_es, d_gsf, rti_info
          
          include 'formats'
          
          ierr = 0
          nz = s% nz
-
-         nullify(d_mx, cv, nu_st, d_st, d_dsi, d_sh, d_ssi, d_es, d_gsf, rti_info)
-
-         ! save and restore mixing coeffs needed for time smoothing
-         if (s% rotation_flag) then
-            call get_cpy(s% nu_ST, nu_st, ierr1)
-            if (ierr1 /= 0) ierr = -1
-            call get_cpy(s% D_ST, d_st, ierr1)
-            if (ierr1 /= 0) ierr = -1
-            call get_cpy(s% D_DSI, d_dsi, ierr1)
-            if (ierr1 /= 0) ierr = -1
-            call get_cpy(s% D_SH, d_sh, ierr1)
-            if (ierr1 /= 0) ierr = -1
-            call get_cpy(s% D_SSI, d_ssi, ierr1)
-            if (ierr1 /= 0) ierr = -1
-            call get_cpy(s% D_ES, d_es, ierr1)
-            if (ierr1 /= 0) ierr = -1
-            call get_cpy(s% D_GSF, d_gsf, ierr1)
-            if (ierr1 /= 0) ierr = -1
-         end if
-
-         if (s% RTI_flag) then
-            call get_cpy(s% dPdr_dRhodr_info, RTI_info, ierr1)
-            if (ierr1 /= 0) ierr = -1
-         end if
-
-         call get_cpy(s% D_mix, d_mx, ierr1)
-         if (ierr1 /= 0) ierr = -1
-         
-         if (ierr /= 0) return
          
          skip_grads = .false.
          skip_rotation = .false.
@@ -187,13 +153,6 @@
             return
          end if
 
-         call set_Teff(s, ierr)
-         if (ierr /= 0) then
-            if (s% report_ierr .or. dbg) &
-               write(*,*) 'update_vars: set_Teff returned ierr', ierr
-            return
-         end if
-         
          if (s% op_split_burn) then
             do k = 1, nz
                if (s% T_start(k) >= s% op_split_burn_min_T) &
@@ -201,46 +160,18 @@
             end do
          end if
 
-         contains
-
-
-         subroutine get_cpy(src,cpy,ierr)
-            real(dp), pointer, dimension(:) :: src, cpy
-            integer, intent(out) :: ierr
-            integer :: k
-            ierr = 0
-            call non_crit_get_work_array( &
-               s, cpy, nz, nz_alloc_extra, 'set_final_vars', ierr)
-            if (ierr /= 0) return
-            do k=1,nz
-               cpy(k) = src(k)
-            end do
-         end subroutine get_cpy
-
-
-         subroutine restore(src,cpy)
-            real(dp), pointer, dimension(:) :: src, cpy
-            integer :: k
-            if (.not. associated(cpy)) return
-            do k=1,nz
-               src(k) = cpy(k)
-            end do
-            call non_crit_return_work_array(s, cpy, 'set_final_vars')
-         end subroutine restore
-
-
       end subroutine set_final_vars
 
 
       subroutine set_some_vars( &
-            s, skip_time_derivatives, skip_m_grav_and_grav, &
+            s, skip_m_grav_and_grav, &
             skip_net, skip_neu, skip_kap, skip_grads, skip_rotation, &
             skip_brunt, skip_mixing_info, skip_set_cz_bdy_mass, skip_irradiation_heat, &
             dt, ierr)
          use star_utils, only: start_time, update_time
          type (star_info), pointer :: s
          logical, intent(in) :: &
-            skip_time_derivatives, skip_m_grav_and_grav, &
+            skip_m_grav_and_grav, &
             skip_net, skip_neu, skip_kap, skip_grads, &
             skip_rotation, skip_brunt, &
             skip_mixing_info, skip_set_cz_bdy_mass, skip_irradiation_heat
@@ -258,7 +189,7 @@
          include 'formats'
             
          call update_vars(s, &
-            skip_time_derivatives, skip_basic_vars, skip_micro_vars, &
+            skip_basic_vars, skip_micro_vars, &
             skip_m_grav_and_grav, skip_net, skip_neu, skip_kap, &
             skip_grads, skip_rotation, skip_brunt, skip_other_cgrav, &
             skip_mixing_info, skip_set_cz_bdy_mass, skip_irradiation_heat, &
@@ -273,52 +204,36 @@
 
 
       subroutine update_vars(s, &
-            skip_time_derivatives, skip_basic_vars, skip_micro_vars, &
+            skip_basic_vars, skip_micro_vars, &
             skip_m_grav_and_grav, skip_net, skip_neu, skip_kap, &
             skip_grads, skip_rotation, skip_brunt, skip_other_cgrav, &
             skip_mixing_info, skip_set_cz_bdy_mass, skip_irradiation_heat, &
             skip_mlt, skip_eos, dt, ierr)
-         use star_utils, only: eval_irradiation_heat, set_qs, set_dm_bar, set_m_and_dm
+         use star_utils, only: eval_irradiation_heat
          type (star_info), pointer :: s
          logical, intent(in) :: &
-            skip_time_derivatives, skip_basic_vars, skip_micro_vars, &
+            skip_basic_vars, skip_micro_vars, &
             skip_m_grav_and_grav, skip_net, skip_neu, skip_kap, skip_grads, &
             skip_rotation, skip_brunt, skip_other_cgrav, &
             skip_mixing_info, skip_set_cz_bdy_mass, skip_irradiation_heat, &
             skip_mlt, skip_eos
          real(dp), intent(in) :: dt
          integer, intent(out) :: ierr
-
-         integer :: i_lnd, i_lnT, i_lnR, i_eturb, &
-            i_lum, i_v, i_u, i_alpha_RTI, i_ln_cvpv0, i_eturb_RSP, &
-            j, k, species, nvar_chem, nz, k_below_just_added
-         real(dp) :: dt_inv
-
+         integer :: k, nz
          include 'formats'
-
          ierr = 0
          nz = s% nz
-         k_below_just_added = 1
-         species = s% species
-         nvar_chem = s% nvar_chem
-         i_lnd = s% i_lnd
-         i_lnT = s% i_lnT
-         i_lnR = s% i_lnR
-         i_lum = s% i_lum
-         i_eturb = s% i_eturb
-         i_v = s% i_v
-         i_u = s% i_u
-         i_alpha_RTI = s% i_alpha_RTI
-         i_eturb_RSP = s% i_eturb_RSP
-         i_ln_cvpv0 = s% i_ln_cvpv0
-
          if (s% doing_finish_load_model .or. .not. s% RSP_flag) then
-            call unpack
+            call unpack_xh(s,ierr)
             if (ierr /= 0) then
                if (s% report_ierr .or. dbg) &
                   write(*,*) 'after unpack ierr', ierr
                return
             end if
+            if (.not. skip_mixing_info) then
+               s% mixing_type(1:nz) = no_mixing
+               s% adjust_mlt_gradT_fraction(1:nz) = -1
+            end if            
          end if
          
          call set_hydro_vars( &
@@ -330,15 +245,6 @@
             if (s% report_ierr .or. dbg) &
                write(*,*) 'update_vars: set_hydro_vars returned ierr', ierr
             return
-         end if
-
-         if (s% Teff <= 0 .and. .not. s% doing_finish_load_model) then
-            call set_Teff(s, ierr)
-            if (ierr /= 0) then
-               if (s% report_ierr .or. dbg) &
-                  write(*,*) 'update_vars: set_Teff returned ierr', ierr
-               return
-            end if
          end if
 
          if (s% use_other_momentum) then
@@ -359,482 +265,198 @@
                s% irradiation_heat(1:nz) = 0
             end if
          end if
-         
-         contains
-         
-         subroutine unpack
-            integer :: j, k
-            include 'formats'
-         
-            do j=1,s% nvar_hydro
-               if (j == i_lnd) then
-                  do k=1,nz
-                     s% lnd(k) = s% xh(i_lnd,k)
-                     s% dxh_lnd(k) = 0d0
-                  end do
-               else if (j == i_lnT) then
-                  do k=1,nz
-                     s% lnT(k) = s% xh(i_lnT,k)
-                     s% dxh_lnT(k) = 0d0
-                  end do
-               else if (j == i_lnR) then
-                  do k=1,nz
-                     s% lnR(k) = s% xh(i_lnR,k)
-                     s% dxh_lnR(k) = 0d0
-                  end do
-               else if (j == i_eturb) then
-                  do k=1,nz
-                     s% Eturb(k) = max(s% xh(i_eturb, k), min_eturb)
-                     s% dxh_eturb(k) = 0d0
-                  end do
-               else if (j == i_lum) then
-                  do k=1,nz
-                     s% L(k) = s% xh(i_lum, k)
-                  end do
-               else if (j == i_v) then
-                  do k=1,nz
-                     s% v(k) = s% xh(i_v,k)
-                  end do
-               else if (j == i_u) then
-                  do k=1,nz
-                     s% u(k) = s% xh(i_u,k)
-                  end do
-               else if (j == i_alpha_RTI) then
-                  do k=1,nz
-                     s% alpha_RTI(k) = max(0d0, s% xh(i_alpha_RTI,k))
-                  end do
-               else if (j == i_eturb_RSP) then
-                  do k=1,nz
-                     s% Et(k) = max(0d0,s% xh(i_eturb_RSP,k))
-                  end do
-               else if (j == i_ln_cvpv0) then
-                  do k=1,nz
-                     s% conv_vel(k) = max(0d0, exp(s% xh(i_ln_cvpv0,k))-s% conv_vel_v0)
-                     s% dxh_ln_cvpv0(k) = 0d0
-                  end do
-               end if
-            end do
-
-            if (s% trace_k > 0 .and. s% trace_k <= nz) then
-               k = s% trace_k
-               if (i_lnd /= 0) &
-                  write(*,5) 'update_vars: lnd', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% lnd(k)
-               if (i_lnT /= 0) &
-                  write(*,5) 'update_vars: lnT', k, s% solver_iter, s% solver_adjust_iter, &
-                              s% model_number, s% lnT(k)
-               if (i_lum /= 0) &
-                  write(*,5) 'update_vars: L', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% L(k)
-               if (i_lnR /= 0) &
-                  write(*,5) 'update_vars: lnR', k, s% solver_iter, s% solver_adjust_iter, &
-                        s% model_number, s% lnR(k)
-               if (i_v /= 0) &
-                  write(*,5) 'update_vars: v', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% v(k)
-               if (i_u /= 0) &
-                  write(*,5) 'update_vars: u', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% u(k)
-               if (i_alpha_RTI /= 0) &
-                  write(*,5) 'update_vars: alpha_RTI', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% alpha_RTI(k)
-               if (i_eturb_RSP /= 0) &
-                  write(*,5) 'update_vars: Et', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% Et(k)
-               if (i_ln_cvpv0 /= 0) &
-                  write(*,5) 'update_vars: conv_vel', k, s% solver_iter, s% solver_adjust_iter, &
-                           s% model_number, s% conv_vel(k)
-            end if
-
-            if (i_lum == 0 .and. .not. (s% RSP_flag .or. s% Eturb_flag)) s% L(1:nz) = 0d0
-
-            if (i_v == 0) s% v(1:nz) = 0d0
-
-            if (i_u == 0) s% u(1:nz) = 0d0
-
-            call set_qs(s, nz, s% q, s% dq, ierr)
-            if (ierr /= 0) then
-               write(*,*) 'update_vars failed in set_qs'
-               return
-            end if
-            call set_m_and_dm(s)
-            call set_dm_bar(s, s% nz, s% dm, s% dm_bar)
-
-            if (.not. skip_mixing_info) then
-               s% mixing_type(1:nz) = no_mixing
-               s% adjust_mlt_gradT_fraction(1:nz) = -1
-            end if
-
-            if (.not. skip_time_derivatives) then
-
-               ! time derivatives at constant q for use by eps_grav and convective velocities
-               if (s% generations < 2 .or. dt <= 0 .or. s% nz /= s% nz_old) then
-
-                  if (i_lnd /= 0) s% dlnd_dt_const_q(1:nz) = 0
-                  if (i_lnT /= 0) s% dlnT_dt_const_q(1:nz) = 0
-                  if (i_ln_cvpv0 /= 0) s% dln_cvpv0_dt_const_q(1:nz) = 0
-
-               else
-
-                  dt_inv = 1/dt
-                  if (i_lnd /= 0) then
-                     do k=1,nz
-                        s% dlnd_dt_const_q(k) = &
-                           (s% xh(i_lnd,k) - s% lnd_for_d_dt_const_q(k))*dt_inv
-                        if (is_bad(s% dlnd_dt_const_q(k))) then
-                           s% retry_message = 'update_vars: bad dlnd_dt_const_q'
-                           ierr = -1
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad dlnd_dt_const_q', k, &
-                                 s% dlnd_dt_const_q(k), &
-                                 s% lnd_for_d_dt_const_q(k), s% xh(i_lnd,k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dlnd_dt_const_q', k, s% dlnd_dt_const_q(k)
-                              write(*,2) 's% lnd_for_d_dt_const_q(k)', k, s% lnd_for_d_dt_const_q(k)
-                              write(*,2) 's% xh(i_lnd,k)', k, s% xh(i_lnd,k)
-                              stop 'update_vars'
-                           end if
-                           return
-                           stop 'update_vars'
-                        end if
-                     end do
-                  end if
-
-                  if (i_lnT /= 0) then
-                     do k=1,nz
-                        s% dlnT_dt_const_q(k) = &
-                           (s% xh(i_lnT,k) - s% lnT_for_d_dt_const_q(k))*dt_inv
-                        if (is_bad(s% dlnT_dt_const_q(k))) then
-                           s% retry_message = 'update_vars: bad dlnT_dt_const_q'
-                           ierr = -1
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad dlnT_dt_const_q', k, &
-                                 s% dlnT_dt_const_q(k), &
-                                 s% lnT_for_d_dt_const_q(k), s% xh(i_lnT,k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dlnT_dt_const_q', k, &
-                                 s% dlnT_dt_const_q(k), &
-                                 s% lnT_for_d_dt_const_q(k), s% xh(i_lnT,k)
-                              stop 'update_vars'
-                           end if
-                           return
-                        end if
-                     end do
-                  end if
-
-                  if (i_ln_cvpv0 /= 0) then
-                     do k=1,nz
-                        s% dln_cvpv0_dt_const_q(k) = &
-                           (s% xh(i_ln_cvpv0,k) - s% ln_cvpv0_for_d_dt_const_q(k))*dt_inv
-                        if (is_bad(s% dln_cvpv0_dt_const_q(k))) then
-                           ierr = -1
-                           s% retry_message = 'update_vars: bad dln_cvpv0_dt_const_q'
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad dln_cvpv0_dt_const_q', k, &
-                                 s% dln_cvpv0_dt_const_q(k), &
-                                 s% ln_cvpv0_for_d_dt_const_q(k), s% xh(i_ln_cvpv0,k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dln_cvpv0_dt_const_q', k, &
-                                 s% dln_cvpv0_dt_const_q(k), &
-                                 s% ln_cvpv0_for_d_dt_const_q(k), s% xh(i_ln_cvpv0,k)
-                              stop 'update_vars'
-                           end if
-                           return
-                        end if
-                     end do
-                  end if
-
-               end if
-
-               ! time derivatives at constant mass
-               if (dt > 0d0) then
-                  dt_inv = 1/dt
-                  s% dVARdot_dVAR = dt_inv
-               else
-                  s% dVARdot_dVAR = 0
-                  dt_inv = 0
-               end if
-            
-               if (s% generations < 2 .or. dt <= 0 .or. s% nz /= s% nz_old) then
-
-                  if (i_lnd /= 0) s% dlnd_dt(1:nz) = 0
-                  if (i_lnT /= 0) s% dlnT_dt(1:nz) = 0
-                  if (i_eturb /= 0) s% deturb_dt(1:nz) = 0
-                  if (i_lnR /= 0) s% dlnR_dt(1:nz) = 0
-                  if (s% v_flag) s% dv_dt(1:nz) = 0
-                  if (s% u_flag) s% du_dt(1:nz) = 0
-                  if (s% RTI_flag) s% dalpha_RTI_dt(1:nz) = 0
-                  if (s% RSP_flag) s% dEt_dt(1:nz) = 0
-                  if (s% conv_vel_flag) s% dln_cvpv0_dt(1:nz) = 0
-
-               else
-
-                  do k=1,k_below_just_added-1
-                     if (i_lnR /= 0) s% dlnR_dt(k) = 0
-                     if (i_v /= 0) s% dv_dt(k) = 0
-                     if (i_u /= 0) s% du_dt(k) = 0
-                     if (i_lnd /= 0) s% dlnd_dt(k) = 0
-                     if (i_lnT /= 0) s% dlnT_dt(k) = 0
-                     if (i_eturb /= 0) s% deturb_dt(k) = 0
-                     if (i_eturb_RSP /= 0) s% dEt_dt(k) = 0
-                     if (i_alpha_RTI /= 0) s% dalpha_RTI_dt(k) = 0
-                     if (i_ln_cvpv0 /= 0) s% dln_cvpv0_dt(k) = 0
-                  end do
-
-                  if (i_lnd /= 0) then
-                     do k=k_below_just_added,nz
-                        s% dlnd_dt(k) = &
-                           (s% xh(i_lnd,k) - s% lnd_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% dlnd_dt(k))) then
-                           s% retry_message = 'update_vars: bad dlnd_dt'
-                           ierr = -1
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad dlnd_dt', k, &
-                                 s% dlnd_dt(k), s% lnd_for_d_dt_const_m(k), s% xh(i_lnd,k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dlnd_dt', k, &
-                                 s% dlnd_dt(k)
-                              stop 'update_vars'
-                           end if
-                           return
-                           stop 'update_vars'
-                        end if
-                     end do
-                  end if
-
-                  if (i_lnT /= 0) then
-                     do k=k_below_just_added,nz
-                        s% dlnT_dt(k) = (s% xh(i_lnT,k) - s% lnT_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% dlnT_dt(k))) then
-                           s% retry_message = 'update_vars: bad dlnT_dt'
-                           ierr = -1
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad dlnT_dt', k, s% dlnT_dt(k), &
-                                 s% xh(i_lnT,k), s% lnT_for_d_dt_const_m(k), dt_inv
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dlnT_dt', k, &
-                                 s% dlnT_dt(k)
-                              stop 'update_vars'
-                           end if
-                        end if
-                     end do
-                  end if
-
-                  if (s% v_flag) then
-                     do k=k_below_just_added,nz
-                        s% dv_dt(k) = (s% xh(i_v,k) - s% v_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% dv_dt(k))) then
-                           s% retry_message = 'update_vars: bad dv_dt'
-                           ierr = -1
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad dv_dt', k, s% dv_dt(k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dv_dt', k, &
-                                 s% dv_dt(k), s% xh(i_v,k), s% v_for_d_dt_const_m(k)
-                              stop 'update_vars'
-                           end if
-                        end if
-                     end do
-                  end if
-
-                  if (s% u_flag) then
-                     do k=k_below_just_added,nz
-                        s% du_dt(k) = (s% xh(i_u,k) - s% u_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% du_dt(k))) then
-                           ierr = -1
-                           s% retry_message = 'update_vars: bad du_dt'
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad du_dt', k, s% du_dt(k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad du_dt', k, &
-                                 s% du_dt(k)
-                              stop 'update_vars'
-                           end if
-                        end if
-                     end do
-                  end if
-
-                  if (s% Eturb_flag) then
-                     do k=k_below_just_added,nz
-                        s% deturb_dt(k) = (s% xh(i_eturb,k) - s% eturb_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% deturb_dt(k))) then
-                           ierr = -1
-                           s% retry_message = 'update_vars: bad deturb_dt'
-                           if (s% report_ierr) &
-                              write(*,2) 'update_vars: bad deturb_dt', k, s% deturb_dt(k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad deturb_dt', k, &
-                                 s% du_dt(k)
-                              stop 'update_vars'
-                           end if
-                        end if
-                     end do
-                  end if
-
-                  if (s% RTI_flag) then
-                     do k=k_below_just_added,nz
-                        s% dalpha_RTI_dt(k) = &
-                           (s% xh(i_alpha_RTI,k) - s% alpha_RTI_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% dalpha_RTI_dt(k))) then
-                           ierr = -1
-                           s% retry_message = 'update_vars: bad dalpha_RTI_dt'
-                           if (s% report_ierr) &
-                              write(*,3) 'update_vars: bad dalpha_RTI_dt', k, k_below_just_added, &
-                                 s% alpha_RTI_for_d_dt_const_m(k), s% dalpha_RTI_dt(k), &
-                                 s% xh(i_alpha_RTI,k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dalpha_RTI_dt', k, &
-                                 s% dalpha_RTI_dt(k)
-                              stop 'update_vars'
-                           end if
-                        end if
-                     end do
-                  end if
-
-                  if (s% conv_vel_flag) then
-                     do k=k_below_just_added,nz
-                        s% dln_cvpv0_dt(k) = &
-                           (s% xh(i_ln_cvpv0,k) - s% ln_cvpv0_for_d_dt_const_m(k))*dt_inv
-                        if (is_bad(s% dln_cvpv0_dt(k))) then
-                           ierr = -1
-                           s% retry_message = 'update_vars: bad dln_cvpv0_dt'
-                           if (s% report_ierr) &
-                              write(*,3) 'update_vars: bad dln_cvpv0_dt', k, k_below_just_added, &
-                                 s% ln_cvpv0_for_d_dt_const_m(k), s% dln_cvpv0_dt(k), &
-                                 s% xh(i_ln_cvpv0,k), s% ln_cvpv0_for_d_dt_const_m(k)
-                           if (s% stop_for_bad_nums) then
-                              write(*,2) 'update_vars: bad dln_cvpv0_dt', k, &
-                                 s% dln_cvpv0_dt(k)
-                              stop 'update_vars'
-                           end if
-                        end if
-                     end do
-                  end if
-
-                  do k=k_below_just_added,nz
-                     s% dlnR_dt(k) = (s% xh(i_lnR,k) - s% lnR_for_d_dt_const_m(k))*dt_inv
-                     if (is_bad(s% dlnR_dt(k))) then
-                        ierr = -1
-                        s% retry_message = 'update_vars: bad dlnR_dt'
-                        if (s% report_ierr) &
-                           write(*,2) 'update_vars: bad dlnR_dt', k, s% dlnR_dt(k)
-                        if (s% stop_for_bad_nums) then
-                           write(*,2) 'update_vars: bad dlnR_dt', k, &
-                              s% dlnR_dt(k)
-                           stop 'update_vars'
-                        end if
-                     end if
-                  end do
-
-               end if
-
-            end if
-
-         end subroutine unpack
 
       end subroutine update_vars
+      
+      
+      subroutine unpack_xh(s,ierr)
+         use star_utils, only: set_qs, set_dm_bar, set_m_and_dm
+         type (star_info), pointer :: s
+         integer, intent(out) :: ierr
+         integer :: i_lnd, i_lnT, i_lnR, i_w, i_Hp, &
+            i_lum, i_v, i_u, i_alpha_RTI, i_ln_cvpv0, i_Et_RSP, &
+            j, k, species, nvar_chem, nz, k_below_just_added
+         include 'formats'
+         ierr = 0
+         nz = s% nz
+         k_below_just_added = 1
+         species = s% species
+         nvar_chem = s% nvar_chem
+         i_lnd = s% i_lnd
+         i_lnT = s% i_lnT
+         i_lnR = s% i_lnR
+         i_lum = s% i_lum
+         i_w = s% i_w
+         i_Hp = s% i_Hp
+         i_v = s% i_v
+         i_u = s% i_u
+         i_alpha_RTI = s% i_alpha_RTI
+         i_Et_RSP = s% i_Et_RSP
+         i_ln_cvpv0 = s% i_ln_cvpv0
+      
+         do j=1,s% nvar_hydro
+            if (j == i_lnd) then
+               do k=1,nz
+                  s% lnd(k) = s% xh(i_lnd,k)
+                  s% rho(k) = exp(s% lnd(k))
+               end do
+               s% dxh_lnd(1:nz) = 0d0
+            else if (j == i_lnT) then
+               do k=1,nz
+                  s% lnT(k) = s% xh(i_lnT,k)
+                  s% T(k) = exp(s% lnT(k))
+               end do
+               s% dxh_lnT(1:nz) = 0d0
+            else if (j == i_lnR) then
+               do k=1,nz
+                  s% lnR(k) = s% xh(i_lnR,k)
+                  s% r(k) = exp(s% lnR(k))
+               end do
+               s% dxh_lnR(1:nz) = 0d0
+            else if (j == i_w) then
+               do k=1,nz
+                  s% w(k) = s% xh(i_w, k)
+                  if (s% w(k) < 0d0) then
+                     !write(*,4) 'unpack: fix w < 0', k, &
+                     !   s% solver_iter, s% model_number, s% w(k)
+                     s% w(k) = s% RSP2_w_fix_if_neg
+                  end if
+               end do
+            else if (j == i_Hp) then
+               do k=1,nz
+                  s% Hp_face(k) = s% xh(i_Hp, k)
+               end do
+            else if (j == i_lum) then
+               do k=1,nz
+                  s% L(k) = s% xh(i_lum, k)
+               end do
+            else if (j == i_v) then
+               do k=1,nz
+                  s% v(k) = s% xh(i_v,k)
+                  s% dxh_v(k) = 0d0
+               end do
+            else if (j == i_u) then
+               do k=1,nz
+                  s% u(k) = s% xh(i_u,k)
+                  s% dxh_u(k) = 0d0
+               end do
+            else if (j == i_alpha_RTI) then
+               do k=1,nz
+                  s% alpha_RTI(k) = max(0d0, s% xh(i_alpha_RTI,k))
+                  s% dxh_alpha_RTI(k) = 0d0
+               end do
+            else if (j == i_Et_RSP) then
+               do k=1,nz
+                  s% RSP_Et(k) = max(0d0,s% xh(i_Et_RSP,k))
+               end do
+            else if (j == i_ln_cvpv0) then
+               do k=1,nz
+                  s% conv_vel(k) = max(0d0, exp(s% xh(i_ln_cvpv0,k))-s% conv_vel_v0)
+                  s% dxh_ln_cvpv0(k) = 0d0
+               end do
+            end if
+         end do
+
+         if (i_lum == 0 .and. .not. s% RSP_flag) s% L(1:nz) = 0d0
+         if (i_v == 0) s% v(1:nz) = 0d0
+         if (i_u == 0) s% u(1:nz) = 0d0
+         if (i_w == 0) s% w(1:nz) = 0d0
+         if (i_Hp == 0) s% Hp_face(1:nz) = 0d0
+
+         call set_qs(s, nz, s% q, s% dq, ierr)
+         if (ierr /= 0) then
+            write(*,*) 'update_vars failed in set_qs'
+            return
+         end if
+         call set_m_and_dm(s)
+         call set_dm_bar(s, s% nz, s% dm, s% dm_bar)
+
+      end subroutine unpack_xh
 
 
       subroutine set_Teff(s, ierr)
          type (star_info), pointer :: s
          integer, intent(out) :: ierr
          real(dp) :: r_phot, L_surf
-         logical, parameter :: skip_partials = .true.
+         logical, parameter :: skip_partials = .false., &
+            need_atm_Psurf = .false., need_atm_Tsurf = .false.
          real(dp) :: Teff, &
             lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap
          ierr = 0
-         call set_Teff_info_for_eqns(s, skip_partials, r_phot, L_surf, Teff, &
+         call set_Teff_info_for_eqns(s, skip_partials, &
+            need_atm_Psurf, need_atm_Tsurf, r_phot, L_surf, Teff, &
             lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
             ierr)
       end subroutine set_Teff
 
 
-      subroutine set_Teff_info_for_eqns(s, skip_partials, r_surf, L_surf, Teff, &
+      subroutine set_Teff_info_for_eqns(s, skip_partials, &
+            need_atm_Psurf, need_atm_Tsurf, r_surf, L_surf, Teff, &
             lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
             ierr)
-         use star_utils, only: get_phot_info
+         use star_utils, only: set_phot_info
+         use atm_lib, only: atm_Teff
          type (star_info), pointer :: s
-         logical, intent(in) :: skip_partials
+         logical, intent(in) :: skip_partials, &
+            need_atm_Psurf, need_atm_Tsurf
          real(dp), intent(out) :: r_surf, L_surf, Teff, &
             lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap
          integer, intent(out) :: ierr
 
-         integer :: k_phot, k
-         real(dp) :: Tm1, T00, T4_m1, T4_00, P_rad_m1, P_rad_00, y_phot, &
-            alfa, beta, A, opacity_face, r_phot, m_phot, v_phot, &
-            L_phot, T_phot, cs_phot, kap_phot, logg_phot, dL_dlnR, dL_dlnT
-         real(qp) :: q1
-
          include 'formats'
 
          ierr = 0
          
-         ! Set surface values
-
-         L_surf = s% L(1)
          r_surf = s% r(1)
+         L_surf = s% L(1)
 
-         if (s% RSP_flag .and. .not. s% RSP_use_atm_grey_with_kap_for_Psurf) then
+         s% P_surf = s% Peos(1)
+         s% T_surf = s% T(1)
 
-            call get_phot_info( &
-                 s, r_phot, m_phot, v_phot, L_phot, T_phot, &
-                 cs_phot, kap_phot, logg_phot, y_phot, k_phot)
+         call set_phot_info(s) ! sets Teff using L_phot and R_phot
+         Teff = s% Teff
 
-            Teff = T_phot
+         if (s% RSP_flag) then
             lnT_surf = s% lnT(1)
             dlnT_dL = 0d0
             dlnT_dlnR = 0d0
             dlnT_dlnM = 0d0
             dlnT_dlnkap = 0d0
-            lnP_surf = s% lnP(1)
+            lnP_surf = s% lnPeos(1)
             dlnP_dL = 0d0
             dlnP_dlnR = 0d0
             dlnP_dlnM = 0d0
             dlnP_dlnkap = 0d0
-            s% Teff = Teff
-            s% L_phot = L_phot
-            s% photosphere_L = s% L_phot
-            s% photosphere_r = r_phot/Rsun
             return
          end if
-
+         
          if (s% use_other_surface_PT) then
             call s% other_surface_PT( &
                s% id, skip_partials, &
-               Teff, lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
+               lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
                lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
                ierr)
          else
             call get_surf_PT( &
-               s, skip_partials, &
-               Teff, lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
+               s, skip_partials, need_atm_Psurf, need_atm_Tsurf, &
+               lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
                lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
                ierr)
          end if
-
          if (ierr /= 0) then
             if (s% report_ierr) then
                write(*,*) 'error in get_surf_PT'
             end if
             return
          end if
+         s% T_surf = exp(lnT_surf)
+         s% P_surf = exp(lnP_surf)
 
-         s% Teff = Teff
-         
-         ! Calculate and store photosphere (tau=2/3) values; these
-         ! aren't actually used to set up surface values
-
-         call get_phot_info( &
-              s, r_phot, m_phot, v_phot, L_phot, T_phot, &
-              cs_phot, kap_phot, logg_phot, y_phot, k_phot)
-
-         s% L_phot = L_phot/Lsun
-         s% photosphere_L = s% L_phot
-         s% photosphere_r = r_phot/Rsun
+         call set_phot_info(s) ! s% T_surf might have changed so call again
 
       end subroutine set_Teff_info_for_eqns
 
@@ -847,14 +469,14 @@
          use atm_lib, only: atm_eval_T_tau_dq_dtau
          use atm_support, only: get_T_tau_id
          use micro, only: set_micro_vars
-         use mlt_info, only: set_mlt_vars, check_for_redo_MLT, set_grads
+         use mlt_info, only: set_mlt_vars, check_for_redo_MLT
          use star_utils, only: start_time, update_time, &
             set_m_grav_and_grav, set_scale_height, get_tau, &
-            set_abs_du_div_cs
+            set_abs_du_div_cs, set_conv_time_scales, set_using_TDC
          use hydro_rotation, only: set_rotation_info, compute_j_fluxes_and_extra_jdot
-         use hydro_eturb, only: reset_eturb_using_L
          use brunt, only: do_brunt_B, do_brunt_N2
          use mix_info, only: set_mixing_info
+         use hydro_rsp2, only: set_RSP2_vars
 
          type (star_info), pointer :: s
          integer, intent(in) :: nzlo, nzhi
@@ -918,28 +540,26 @@
             if (dbg) write(*,*) 'call set_grads'
             call set_grads(s, ierr)
             if (failed('set_grads')) return
+            call set_conv_time_scales(s) ! uses brunt_B
+            call set_using_TDC(s) ! uses max_conv_time_scale
          end if
 
-         if (.not. skip_mixing_info) then
-         
-            if (.not. s% Eturb_flag) then
+         if (.not. skip_mixing_info) then         
+            if (.not. s% RSP2_flag) then
                if (dbg) write(*,*) 'call other_adjust_mlt_gradT_fraction'
                call s% other_adjust_mlt_gradT_fraction(s% id,ierr)
                if (failed('other_adjust_mlt_gradT_fraction')) return
-            end if
-         
-            if (s% u_flag) then
-               if (dbg) write(*,*) 'call set_abs_du_div_cs'
-               call set_abs_du_div_cs(s)
-            end if
-
+            end if         
+            if (dbg) write(*,*) 'call set_abs_du_div_cs'
+            call set_abs_du_div_cs(s)
          end if
          
-         if (.not. skip_mlt .and. .not. s% RSP_flag .and. .not. s% Eturb_flag) then
+         if (.not. skip_mlt .and. .not. s% RSP_flag) then
          
             if (.not. skip_mixing_info) then
-               if (s% make_gradr_sticky_in_solver_iters) &
-                  s% fixed_gradr_for_rest_of_solver_iters(nzlo:nzhi) = .false.            
+               if (s% make_gradr_sticky_in_solver_iters) then
+                  s% fixed_gradr_for_rest_of_solver_iters(nzlo:nzhi) = .false.   
+               end if         
                s% alpha_mlt(nzlo:nzhi) = s% mixing_length_alpha
                if (s% use_other_alpha_mlt) then
                   call s% other_alpha_mlt(s% id, ierr)
@@ -970,6 +590,7 @@
             else
                s% gradr_factor(nzlo:nzhi) = 1d0
             end if
+            
             call set_mlt_vars(s, nzlo, nzhi, ierr)
             if (failed('set_mlt_vars')) return
             if (dbg) write(*,*) 'call check_for_redo_MLT'
@@ -978,18 +599,8 @@
             if (failed('check_for_redo_MLT')) return
             
          end if
-         
-         if (s% need_to_reset_eturb) then
-            stop 'need_to_reset_eturb is not ready for use'
-            if (dbg) write(*,*) 'call set_mlt_vars'
-            call set_mlt_vars(s, 1, s% nz, ierr)
-            if (failed('set_mlt_vars')) return
-            call reset_eturb_using_L(s,ierr)
-            if (failed('reset_eturb_using_L')) return
-            s% need_to_reset_eturb = .false.
-         end if
 
-         if (.not. skip_brunt) then
+         if (.not. skip_brunt) then ! skip_brunt during solver iterations
             if (dbg) write(*,*) 'call do_brunt_N2'
             call do_brunt_N2(s, nzlo, nzhi, ierr)
             if (failed('do_brunt_N2')) return
@@ -999,13 +610,21 @@
             if (dbg) write(*,*) 'call set_mixing_info'
             call set_mixing_info(s, skip_set_cz_bdy_mass, ierr)
             if (ierr /= 0) return
-            call set_photosphere_start_info
          end if
 
          if (s% j_rot_flag) then
             call compute_j_fluxes_and_extra_jdot(s% id, ierr)
             if (ierr /= 0) then
                write(*,*) 'failed in compute_j_fluxes'
+            end if
+         end if
+         
+         if (s% RSP2_flag) then
+            call set_RSP2_vars(s,ierr)
+            if (ierr /= 0) then
+               if (len_trim(s% retry_message) == 0) s% retry_message = 'set_RSP2_vars failed'
+               if (s% report_ierr) write(*,*) 'ierr from set_RSP2_vars'
+               return
             end if
          end if
 
@@ -1028,14 +647,6 @@
             failed = .true.
          end function failed
          
-         subroutine set_photosphere_start_info
-            use star_utils, only: get_phot_kap
-            real(dp) :: kap
-            include 'formats'
-            kap = get_phot_kap(s)
-            s% photosphere_opacity_start = kap
-         end subroutine set_photosphere_start_info
-
       end subroutine set_hydro_vars
 
 
@@ -1080,7 +691,7 @@
          nz = s% nz
          species = s% species
          s% L_phot = s% L(1)/Lsun
-         if (.not. s% using_Fraley_time_centering) then
+         if (.not. s% using_velocity_time_centering) then
             s% d_vc_dv = 1d0
          else
             s% d_vc_dv = 0.5d0
@@ -1088,12 +699,10 @@
 
 !$OMP PARALLEL DO PRIVATE(j,k,twoGmrc2,sum_xa) SCHEDULE(dynamic,2)
          do k=nzlo, nzhi
-            s% rho(k) = exp(s% lnd(k))
             if (s% lnd_start(k) < -1d90) then
                s% lnd_start(k) = s% lnd(k)
                s% rho_start(k) = s% rho(k)
             end if
-            s% T(k) = exp(s% lnT(k))
             if (s% T_start(k) < 0d0) then
                s% T_start(k) = s% T(k)
                s% lnT_start(k) = s% lnT(k)
@@ -1108,16 +717,12 @@
                if (s% alpha_RTI_start(k) < -1d90) &
                   s% alpha_RTI_start(k) = s% alpha_RTI(k)
             end if
-            if (s% conv_vel_flag) then
-               s% conv_vel_start(k) = s% conv_vel(k)
-            end if
             if (s% RSP_flag) then
-               s% w(k) = sqrt(s% Et(k))
-               if (s% w_start(k) < -1d90) then
-                  s% w_start(k) = s% w(k)
+               s% RSP_w(k) = sqrt(s% RSP_Et(k))
+               if (s% RSP_w_start(k) < -1d90) then
+                  s% RSP_w_start(k) = s% RSP_w(k)
                end if
             end if
-            s% r(k) = exp(s% lnR(k))
             if (s% r_start(k) < 0) s% r_start(k) = s% r(k)
             call set_rv_info(s,k)        
             do j=1,species
@@ -1155,7 +760,7 @@
 
       subroutine get_surf_PT( &
             s, skip_partials, &
-            Teff, &
+            need_atm_Psurf, need_atm_Tsurf, &
             lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
             ierr)
@@ -1167,47 +772,34 @@
          use eos_lib, only: Radiation_Pressure
 
          type (star_info), pointer :: s
-         logical, intent(in) :: skip_partials
-         real(dp), intent(out) :: Teff, &
+         logical, intent(in) :: skip_partials, &
+            need_atm_Psurf, need_atm_Tsurf
+         real(dp), intent(out) :: &
             lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap
          integer, intent(out) :: ierr
 
          real(dp) :: L_surf
          real(dp) :: R_surf
+         real(dp) :: Teff
          real(dp) :: tau_surf
          real(dp) :: Teff4
          real(dp) :: T_surf4
          real(dp) :: T_surf
          real(dp) :: P_surf_atm
          real(dp) :: P_surf
-         logical :: do_not_need_atm_Psurf, do_not_need_atm_Tsurf
 
          include 'formats'
-         
-         do_not_need_atm_Psurf = &
-            s% use_compression_outer_BC .or. &
-            s% use_zero_Pgas_outer_BC .or. &
-            s% use_fixed_vsurf_outer_BC .or. &
-            (s% use_momentum_outer_BC .and. trim(s% atm_option) == 'fixed_Psurf')
-            
-         do_not_need_atm_Tsurf = &
-            s% i_lum == 0 .or. &
-            ((s% use_fixed_L_for_BB_outer_BC .or. s% tau_for_L_BB > 0d0) .and. &
-             (s% use_T_black_body_outer_BC))
 
          ! Set up stellar surface parameters
          
-         if (s% use_T_black_body_outer_BC .and. s% use_fixed_L_for_BB_outer_BC) then
-            L_surf = s% fixed_L_for_BB_outer_BC
-         else
-            L_surf = s% L(1)
-         end if
+         L_surf = s% L(1)
          R_surf = s% r(1)
+         Teff = s% Teff
          
          ! Initialize partials
-          dlnT_dL = 0._dp; dlnT_dlnR = 0._dp; dlnT_dlnM = 0._dp; dlnT_dlnkap = 0._dp
-          dlnP_dL = 0._dp; dlnP_dlnR = 0._dp; dlnP_dlnM = 0._dp; dlnP_dlnkap = 0._dp
+         dlnT_dL = 0._dp; dlnT_dlnR = 0._dp; dlnT_dlnM = 0._dp; dlnT_dlnkap = 0._dp
+         dlnP_dL = 0._dp; dlnP_dlnR = 0._dp; dlnP_dlnM = 0._dp; dlnP_dlnkap = 0._dp
 
          ! Evaluate the surface optical depth
 
@@ -1221,11 +813,11 @@
 
          ! Evaluate surface temperature and pressure
              
-         if (do_not_need_atm_Psurf .and. do_not_need_atm_Tsurf) then
+         if (.not. (need_atm_Psurf .or. need_atm_Tsurf)) then
 
-            ! Special-case boundary conditions
+            ! Special-case boundary condition
 
-            lnP_surf = s% lnP_start(1)
+            lnP_surf = s% lnPeos_start(1)
             if (is_bad(lnP_surf)) lnP_surf = 0._dp
             T_surf = s% T_start(1)
             lnT_surf = log(T_surf)
@@ -1236,161 +828,40 @@
                dlnT_dL = 0._dp; dlnT_dlnR = 0._dp; dlnT_dlnM = 0._dp; dlnT_dlnkap = 0._dp
                dlnP_dL = 0._dp; dlnP_dlnR = 0._dp; dlnP_dlnM = 0._dp; dlnP_dlnkap = 0._dp
             endif
-             
-         !else if (do_not_need_atm_Tsurf) then
-             
-         !else if (do_not_need_atm_Psurf) then
 
          else
 
             ! Evaluate temperature and pressure based on atm_option
-            ! (yes, we might want to translate atm_option into an integer,
-            ! but these string comparisons are cheap)
-
-            ! The first few are special, 'trivial-atmosphere' options
-
-            select case (s% atm_option)
-
-            case ('fixed_Teff')
-
-               ! set Tsurf from Eddington T-tau relation
-               !     for current surface tau and Teff = `atm_fixed_Teff`.
-               ! set Psurf = Radiation_Pressure(Tsurf)
-
-               Teff = s% atm_fixed_Teff
-               Teff4 = Teff*Teff*Teff*Teff
-               T_surf = pow(0.75_dp*Teff4*(tau_surf + two_thirds), 0.25_dp)
-               lnT_surf = log(T_surf)
-               lnP_surf = Radiation_Pressure(T_surf)
-
-               if (.not. skip_partials) then
-                  dlnT_dL = 0._dp; dlnT_dlnR = 0._dp; dlnT_dlnM = 0._dp; dlnT_dlnkap = 0._dp
-                  dlnP_dL = 0._dp; dlnP_dlnR = 0._dp; dlnP_dlnM = 0._dp; dlnP_dlnkap = 0._dp
-               endif
                
-            case ('fixed_Tsurf')
-
-               ! set Teff from Eddington T-tau relation for given
-               ! Tsurf and tau=2/3 set Psurf =
-               ! Radiation_Pressure(Tsurf)
-
-               T_surf = s% atm_fixed_Tsurf
-               lnT_surf = log(T_surf)
-               T_surf4 = T_surf*T_surf*T_surf*T_surf
-               Teff = pow(four_thirds*T_surf4/(tau_surf + two_thirds), 0.25_dp)
-               lnP_surf = Radiation_Pressure(T_surf)
-
-               if (.not. skip_partials) then
-                  dlnT_dL = 0._dp; dlnT_dlnR = 0._dp; dlnT_dlnM = 0._dp; dlnT_dlnkap = 0._dp
-                  dlnP_dL = 0._dp; dlnP_dlnR = 0._dp; dlnP_dlnM = 0._dp; dlnP_dlnkap = 0._dp
-               endif
-
-            case ('fixed_Psurf')
-
-               ! set Teff from L and R using L = 4*pi*R^2*boltz_sigma*T^4.
-               ! set Tsurf using Eddington T-tau relation
-
-               if (L_surf < 0._dp) then
-                  if (s% report_ierr) then
-                     write(*,2) 'get_surf_PT: L_surf <= 0', s% model_number, L_surf
-                     call mesa_error(__FILE__,__LINE__)
-                  end if
-                  s% retry_message = 'L_surf < 0'
-                  ierr = -1
-                  return
-               end if
-
-               lnP_surf = safe_log(s% atm_fixed_Psurf)
-               if (R_surf <= 0._dp) then
-                  T_surf4 = 1._dp
-                  T_surf = 1._dp
-                  lnT_surf = 0._dp
-                  if (.not. skip_partials) then
-                     dlnT_dlnR = 0._dp
-                     dlnT_dL = 0._dp
-                  endif
-                  Teff = s% T(1)
-               else
-                  Teff = pow(L_surf/(pi4*R_surf*R_surf*boltz_sigma), 0.25_dp)
-                  T_surf4 = 0.75_dp*pow4(Teff)*(tau_surf + two_thirds)
-                  T_surf = pow(T_surf4, 0.25_dp)
-                  lnT_surf = log(T_surf)
-                  if (.not. skip_partials) then
-                     dlnT_dlnR = -0.5_dp
-                     dlnT_dL = 0.25_dp/L_surf
-                  endif
-               end if
-
-               if (.not. skip_partials) then
-                  dlnT_dlnM = 0._dp; dlnT_dlnkap = 0._dp
-                  dlnP_dL = 0._dp; dlnP_dlnR = 0._dp; dlnP_dlnM = 0._dp; dlnP_dlnkap = 0._dp
-               endif
-
-            case ('fixed_Psurf_and_Tsurf')
-
-               lnP_surf = safe_log(s% atm_fixed_Psurf)
-               T_surf = s% atm_fixed_Tsurf
-               lnT_surf = log(T_surf)
-               T_surf4 = T_surf*T_surf*T_surf*T_surf
-               Teff = pow(four_thirds*T_surf4/(tau_surf + two_thirds), 0.25d0)
-
-               if (.not. skip_partials) then
-                  dlnT_dL = 0; dlnT_dlnR = 0; dlnT_dlnM = 0; dlnT_dlnkap = 0
-                  dlnP_dL = 0; dlnP_dlnR = 0; dlnP_dlnM = 0; dlnP_dlnkap = 0
-               endif
-
-            case default
-
-               ! Everything else -- the 'non-trivial atmospheres' ---
-               ! gets passed to atm_support
-               
-               if (.false. .and. 1 == s% solver_test_partials_k .and. &
-                     s% solver_iter == s% solver_test_partials_iter_number) then
-                  star_debugging_atm_flag = .true.
-               end if
-
-               call get_atm_PT( &
-                    s, tau_surf, L_surf, R_surf, s% m(1), s% cgrav(1), skip_partials, &
-                    Teff, lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
-                    lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
-                    ierr)
-               if (ierr /= 0) then
-                  if (s% report_ierr) write(*,*) 'failed in get_atm_PT'
-                  return
-               end if
-
-               if (.false. .and. 1 == s% solver_test_partials_k .and. &
-                     s% solver_iter == s% solver_test_partials_iter_number) then
-                  s% solver_test_partials_val = atm_test_partials_val
-                  s% solver_test_partials_dval_dx = atm_test_partials_dval_dx
-               end if
-
-            end select
-
-         end if
-
-         ! Add in extra surface pressure
-
-         if (s% surface_extra_Pgas /= 0._dp) then
-            P_surf_atm = exp(lnP_surf)
-            P_surf = P_surf_atm + s% surface_extra_Pgas
-            if (P_surf < 1E-50_dp) then
-               lnP_surf = -50*ln10
-               if (.not. skip_partials) then
-                  dlnP_dL = 0._dp
-                  dlnP_dlnR = 0._dp
-                  dlnP_dlnM = 0._dp
-                  dlnP_dlnkap = 0._dp
-               endif
-            else
-               lnP_surf = log(P_surf)
-               if (.not. skip_partials) then
-                  dlnP_dL = dlnP_dL*P_surf_atm/P_surf
-                  dlnP_dlnR = dlnP_dlnR*P_surf_atm/P_surf
-                  dlnP_dlnM = dlnP_dlnM*P_surf_atm/P_surf
-                  dlnP_dlnkap = dlnP_dlnkap*P_surf_atm/P_surf
-               endif
+            if (.false. .and. 1 == s% solver_test_partials_k .and. &
+                  s% solver_iter == s% solver_test_partials_iter_number) then
+               star_debugging_atm_flag = .true.
             end if
+
+            call get_atm_PT( &
+                 s, tau_surf, L_surf, R_surf, s% m(1), s% cgrav(1), skip_partials, &
+                 Teff, lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
+                 lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
+                 ierr)
+            if (ierr /= 0) then
+               if (s% report_ierr) then
+                  write(*,1) 'tau_surf', tau_surf
+                  write(*,1) 'L_surf', L_surf
+                  write(*,1) 'R_surf', R_surf
+                  write(*,1) 'Teff', Teff
+                  write(*,1) 's% m(1)', s% m(1)
+                  write(*,1) 's% cgrav(1)', s% cgrav(1)
+                  write(*,*) 'failed in get_atm_PT'
+               end if
+               return
+            end if
+
+            if (.false. .and. 1 == s% solver_test_partials_k .and. &
+                  s% solver_iter == s% solver_test_partials_iter_number) then
+               s% solver_test_partials_val = atm_test_partials_val
+               s% solver_test_partials_dval_dx = atm_test_partials_dval_dx
+            end if
+
          end if
 
          ! Check outputs
@@ -1410,6 +881,130 @@
          return
 
       end subroutine get_surf_PT
+
+
+      subroutine set_grads(s, ierr)
+         use chem_def, only: chem_isos
+         use star_utils, only: smooth, safe_div_val
+         type (star_info), pointer :: s
+         integer, intent(out) :: ierr
+
+         integer :: k, nz, j, cid, max_cid
+         real(dp) :: val, max_val, A, Z
+         real(dp), pointer, dimension(:) :: dlnP, dlnd, dlnT
+
+         include 'formats'
+
+         ierr = 0
+         nz = s% nz
+         call do_alloc(ierr)
+         if (ierr /= 0) return
+
+         do k = 2, nz
+            dlnP(k) = s% lnPeos(k-1) - s% lnPeos(k)
+            dlnd(k) = s% lnd(k-1) - s% lnd(k)
+            dlnT(k) = s% lnT(k-1) - s% lnT(k)
+         end do
+         dlnP(1) = dlnP(2)
+         dlnd(1) = dlnd(2)
+         dlnT(1) = dlnT(2)
+
+         call smooth(dlnP,nz)
+         call smooth(dlnd,nz)
+         call smooth(dlnT,nz)
+
+         s% grad_density(1) = 0
+         s% grad_temperature(1) = 0
+         do k = 2, nz
+            if (dlnP(k) >= 0) then
+               s% grad_density(k) = 0
+               s% grad_temperature(k) = 0
+            else
+               s% grad_density(k) = safe_div_val(s, dlnd(k), dlnP(k))
+               s% grad_temperature(k) = safe_div_val(s, dlnT(k), dlnP(k))
+            end if
+         end do
+
+         call smooth(s% grad_density,nz)
+         call smooth(s% grad_temperature,nz)
+
+         if (s% use_Ledoux_criterion .and. s% calculate_Brunt_B) then
+            do k=1,nz
+               s% gradL_composition_term(k) = s% unsmoothed_brunt_B(k)
+            end do
+            call smooth_gradL_composition_term
+         else
+            do k=1,nz
+               s% gradL_composition_term(k) = 0d0
+            end do
+         end if
+
+         call dealloc
+
+         do k=3,nz-2
+            max_cid = 0
+            max_val = -1d99
+            do j=1,s% species
+               cid = s% chem_id(j)
+               A = dble(chem_isos% Z_plus_N(cid))
+               Z = dble(chem_isos% Z(cid))
+               val = (s% xa(j,k-2) + s% xa(j,k-1) - s% xa(j,k) - s% xa(j,k+1))*(1d0 + Z)/A
+               if (val > max_val) then
+                  max_val = val
+                  max_cid = cid
+               end if
+            end do
+            s% dominant_iso_for_thermohaline(k) = max_cid
+         end do
+         s% dominant_iso_for_thermohaline(1:2) = &
+            s% dominant_iso_for_thermohaline(3)
+         s% dominant_iso_for_thermohaline(nz-1:nz) = &
+            s% dominant_iso_for_thermohaline(nz-2)
+
+
+         contains
+
+         subroutine smooth_gradL_composition_term
+            use star_utils, only: weighed_smoothing, threshold_smoothing
+            logical, parameter :: preserve_sign = .false.
+            real(dp), pointer, dimension(:) :: work
+            integer :: k
+            include 'formats'
+            ierr = 0
+            work => dlnd
+            if (s% num_cells_for_smooth_gradL_composition_term <= 0) return
+            call threshold_smoothing( &
+               s% gradL_composition_term, s% threshold_for_smooth_gradL_composition_term, s% nz, &
+               s% num_cells_for_smooth_gradL_composition_term, preserve_sign, work)
+         end subroutine smooth_gradL_composition_term
+
+         subroutine do_alloc(ierr)
+            integer, intent(out) :: ierr
+            call do_work_arrays(.true.,ierr)
+         end subroutine do_alloc
+
+         subroutine dealloc
+            call do_work_arrays(.false.,ierr)
+         end subroutine dealloc
+
+         subroutine do_work_arrays(alloc_flag, ierr)
+            use alloc, only: work_array
+            logical, intent(in) :: alloc_flag
+            integer, intent(out) :: ierr
+            logical, parameter :: crit = .false.
+            ierr = 0
+            call work_array(s, alloc_flag, crit, &
+               dlnP, nz, nz_alloc_extra, 'mlt', ierr)
+            if (ierr /= 0) return
+            call work_array(s, alloc_flag, crit, &
+               dlnd, nz, nz_alloc_extra, 'mlt', ierr)
+            if (ierr /= 0) return
+            call work_array(s, alloc_flag, crit, &
+               dlnT, nz, nz_alloc_extra, 'mlt', ierr)
+            if (ierr /= 0) return
+         end subroutine do_work_arrays
+
+      end subroutine set_grads
 
    
       end module hydro_vars

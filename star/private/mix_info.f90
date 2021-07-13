@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2011-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2011-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -51,16 +51,17 @@
          use star_utils, only: start_time, update_time
          use overshoot, only: add_overshooting
          use predictive_mix, only: add_predictive_mixing
+         use auto_diff_support, only: get_RSP2_conv_velocity
          type (star_info), pointer :: s
          logical, intent(in) :: skip_set_cz_bdy_mass
          integer, intent(out) :: ierr
 
-         integer :: nz, i, k, max_conv_bdy, max_mix_bdy, k_dbg, k_Tmax, i_h1, i_he4, i_c12
+         integer :: nz, i, k, max_conv_bdy, max_mix_bdy, k_Tmax, i_h1, i_he4, i_c12
          real(dp) :: c, rho_face, f, Tmax, conv_vel, min_conv_vel_for_convective_mixing_type, &
-            region_bottom_q, region_top_q
-         real(dp), pointer, dimension(:) :: eps_h, eps_he, eps_z, cdc_factor
+            region_bottom_q, region_top_q, L_val
+         real(dp), allocatable, dimension(:) :: eps_h, eps_he, eps_z, cdc_factor
 
-         logical :: rsp_or_eturb, dbg
+         logical :: RSP2_or_RSP
 
          integer(8) :: time0
          real(dp) :: total
@@ -69,28 +70,19 @@
 
          ierr = 0
          nz = s% nz
-
-         dbg = .false.
-         !dbg = .true.
-         k_dbg = -1152
          
          min_conv_vel_for_convective_mixing_type = 1d0 ! make this a control parameter
          
-         rsp_or_eturb = s% RSP_flag .or. s% Eturb_flag
+         RSP2_or_RSP = s% RSP_flag .or. s% RSP2_flag
 
-         if (dbg) write(*, *) 'set_mixing_info'
          if (s% doing_timing) call start_time(s, time0, total)
          
          if (s% RTI_flag) then
-            if (dbg) write(*,*) 'call set_RTI_mixing_info'
             call set_RTI_mixing_info(s, ierr)
             if (failed('set_RTI_mixing_info')) return
-            if (dbg) write(*,*) 'call set_dPdr_dRhodr_info'
             call set_dPdr_dRhodr_info(s, ierr)
             if (failed('set_dPdr_dRhodr_info')) return
          end if
-
-         nullify(eps_h, eps_he, eps_z, cdc_factor)
 
          max_conv_bdy = 10 ! will automatically be increased if necessary
          max_mix_bdy = 10 ! will automatically be increased if necessary
@@ -111,10 +103,9 @@
          if (.not. associated(s% burn_he_mix_region)) allocate(s% burn_he_mix_region(max_mix_bdy))
          if (.not. associated(s% burn_z_mix_region)) allocate(s% burn_z_mix_region(max_mix_bdy))
 
-         call do_alloc(ierr)
-         if (ierr /= 0) return
+         allocate(eps_h(nz), eps_he(nz), eps_z(nz), cdc_factor(nz))
          
-         if (.not. s% RSP_flag) then
+         if (.not. RSP2_or_RSP) then
             do k = 1, nz
                s% mixing_type(k) = s% mlt_mixing_type(k)
             end do
@@ -135,23 +126,25 @@
                s% cdc(k) = 0d0
                s% conv_vel(k) = 0d0
             end do
-         else if (s% conv_vel_flag .or. s% Eturb_flag) then
+         else if (s% RSP2_flag) then
             do k = 1, nz
-               if (s% Eturb_flag) then
-                  s% conv_vel(k) = sqrt2*sqrt(s% Eturb(k))
-                  if (s% conv_vel(k) >= min_conv_vel_for_convective_mixing_type) then
-                     s% mixing_type(k) = convective_mixing
-                  else
-                     s% mixing_type(k) = no_mixing
-                  end if
+               s% conv_vel(k) = get_RSP2_conv_velocity(s,k)
+               s% D_mix(k) = s% conv_vel(k)*s% mixing_length_alpha*s% Hp_face(k)/3d0
+               s% cdc(k) = cdc_factor(k)*s% D_mix(k)
+               L_val = max(1d-99,abs(s% L(k)))
+               if (abs(s% Lt(k)) > &
+                     L_val*s% RSP2_min_Lt_div_L_for_overshooting_mixing_type) then
+                  s% mixing_type(k) = overshoot_mixing
+               else if (abs(s% Lc(k)) > &
+                     L_val*s% RSP2_min_Lc_div_L_for_convective_mixing_type) then
+                  s% mixing_type(k) = convective_mixing
+               else
+                  s% mixing_type(k) = no_mixing
                end if
+            end do
+         else if (s% conv_vel_flag) then
+            do k = 1, nz
                s% D_mix(k) = s% conv_vel(k)*s% mlt_mixing_length(k)/3d0
-               if (s% conv_vel_ignore_thermohaline) then
-                  s% D_mix(k) = s% D_mix(k) + s% mlt_D_thrm(k)
-               end if
-               if (s% conv_vel_ignore_semiconvection) then
-                  s% D_mix(k) = s% D_mix(k) + s% mlt_D_semi(k)
-               end if
                s% cdc(k) = cdc_factor(k)*s% D_mix(k)
             end do
          else
@@ -164,45 +157,26 @@
          
          call check('after get mlt_D')
          
-         if (dbg) write(*,3) 'after copy mlt results', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
-         
-         if (s% remove_mixing_glitches) then
+         if (s% remove_mixing_glitches .and. .not. RSP2_or_RSP) then
 
-            if (dbg) write(*, *) 'remove_mixing_glitches'
-
-            if (dbg) write(*,3) 'call remove_tiny_mixing', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call remove_tiny_mixing(s, ierr)
             if (failed('remove_tiny_mixing')) return
 
-            if (dbg) write(*,3) 'call remove_mixing_singletons', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call remove_mixing_singletons(s, ierr)
             if (failed('remove_mixing_singletons')) return
 
-            if (dbg) write(*,3) 'call close_convection_gaps', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call close_convection_gaps(s, ierr)
             if (failed('close_convection_gaps')) return
 
-            if (dbg) write(*,3) 'call close_thermohaline_gaps', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call close_thermohaline_gaps(s, ierr)
             if (failed('close_thermohaline_gaps')) return
 
-            if (dbg) write(*,3) 'call remove_thermohaline_dropouts', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call remove_thermohaline_dropouts(s, ierr)
             if (failed('remove_thermohaline_dropouts')) return
 
-            if (dbg) write(*,3) 'call close_semiconvection_gaps', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call close_semiconvection_gaps(s, ierr)
             if (failed('close_semiconvection_gaps')) return
 
-            if (dbg) write(*,3) 'call remove_embedded_semiconvection', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
             call remove_embedded_semiconvection(s, ierr)
               if (failed('remove_embedded_semiconvection')) return
 
@@ -210,8 +184,6 @@
          
          call check('after get remove_mixing_glitches')
 
-         if (dbg) write(*,3) 'call do_mix_envelope', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
          call do_mix_envelope(s)
 
          do k=1,s% nz
@@ -220,24 +192,20 @@
             eps_he(k) = s% eps_nuc_categories(i3alf,k)
             eps_z(k) = s% eps_nuc(k) - (eps_h(k) + eps_he(k))
          end do
-
-         if (dbg) write(*,3) 'call set_mlt_cz_boundary_info', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
-         call set_mlt_cz_boundary_info(s, ierr)
-         if (failed('set_mlt_cz_boundary_info')) return
-
-         if (dbg) write(*,3) 'call locate_convection_boundaries', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
-         call locate_convection_boundaries( &
-            s, nz, eps_h, eps_he, eps_z, s% mstar, &
-            s% q, s% cdc, ierr)
-         if (failed('locate_convection_boundaries')) return
          
-         if (.not. rsp_or_eturb) then
-            if (dbg) write(*,3) 'call add_predictive_mixing', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
+         if (.not. s% RSP_flag) then
+
+            call set_cz_boundary_info(s, ierr)
+            if (failed('set_cz_boundary_info')) return
+
+            call locate_convection_boundaries( &
+               s, nz, eps_h, eps_he, eps_z, s% mstar, &
+               s% q, s% cdc, ierr)
+            if (failed('locate_convection_boundaries')) return
+        
             call add_predictive_mixing(s, ierr)
             if (failed('add_predictive_mixing')) return
+            
          end if
          
          call check('after add_predictive_mixing')
@@ -245,40 +213,30 @@
          ! NB: re-call locate_convection_boundries to take into
          ! account changes from add_predictive_mixing
 
-         if (dbg) write(*,3) 'call locate_convection_boundaries', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
-         call locate_convection_boundaries( &
-            s, nz, eps_h, eps_he, eps_z, s% mstar, &
-            s% q, s% cdc, ierr)
-         if (failed('locate_convection_boundaries')) return
+         if (.not. s% RSP_flag) then
 
-         if (dbg) write(*,*) 'call locate_mixing_boundaries'
-         ! need to call this before add_overshooting
-         call locate_mixing_boundaries(s, eps_h, eps_he, eps_z, ierr)
-         if (failed('locate_mixing_boundaries')) return
+            call locate_convection_boundaries( &
+               s, nz, eps_h, eps_he, eps_z, s% mstar, &
+               s% q, s% cdc, ierr)
+            if (failed('locate_convection_boundaries')) return
 
-         if (.not. rsp_or_eturb) then
-            if (dbg) write(*,3) 'call add_overshooting', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
+            call locate_mixing_boundaries(s, eps_h, eps_he, eps_z, ierr)
+            if (failed('locate_mixing_boundaries')) return
+         
             call add_overshooting(s, ierr)
             if (failed('add_overshooting')) return
+            
          end if
          
          call check('after add_overshooting')
 
-         if (dbg) write(*,3) 'call add_RTI_turbulence', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
          call add_RTI_turbulence(s, ierr)
          if (failed('add_RTI_turbulence')) return
 
-         if (dbg) write(*,3) 'call s% other_after_set_mixing_info', &
-            k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
          call s% other_after_set_mixing_info(s% id, ierr)
          if (failed('other_after_set_mixing_info')) return
 
-         if (.not. skip_set_cz_bdy_mass) then
-            if (dbg) write(*,3) 'call set_cz_bdy_mass', &
-               k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
+         if (.not. (skip_set_cz_bdy_mass .or. RSP2_or_RSP)) then
             call set_cz_bdy_mass(s, ierr)
             if (failed('set_cz_bdy_mass')) return
          end if
@@ -319,7 +277,6 @@
          end if
 
          if (s% use_other_D_mix) then
-            if (dbg) write(*,*) 'call other_D_mix'
             call s% other_D_mix(s% id, ierr)
             if (failed('other_D_mix')) return
          end if
@@ -332,32 +289,17 @@
 
          if (s% rotation_flag) then
 
-            if (s% trace_k > 0 .and. s% trace_k <= s% nz) then
-               do k=1,nz
-                  write(*,3) 'before update_rotation_mixing_info D_mix', &
-                     s% model_number, k, s% D_mix(k)
-               end do
-            end if
-
-            if (dbg) write(*,*) 'call update_rotation_mixing_info'
             call update_rotation_mixing_info(s,ierr)
             if (failed('update_rotation_mixing_info')) return
 
             do k = 2, nz
                if (s% D_mix(k) < 1d-10) s% D_mix(k) = 0d0
                s% cdc(k) = s% D_mix(k)*cdc_factor(k)
-               if (s% D_mix(k) /= 0 .and. s% mixing_type(k) == no_mixing) then
+               if (s% D_mix(k) /= 0 .and. s% D_mix_non_rotation(k) < s% D_mix_rotation(k)) then
                   s% mixing_type(k) = rotation_mixing
                end if
             end do
             s% cdc(1) = s% cdc(2)
-
-            if (s% trace_k > 0 .and. s% trace_k <= s% nz) then
-               do k=1,nz
-                  write(*,3) 'after do rotation mixing D_mix', &
-                     s% model_number, k, s% D_mix(k)
-               end do
-            end if
 
          end if
          
@@ -444,10 +386,6 @@
          call check('final')
          if (failed('set_mixing_info')) return
 
-         if (dbg) write(*,3) 'done mixing', k_dbg, s% mixing_type(k_dbg), s% D_mix(k_dbg)
-
-         call dealloc
-
          if (s% doing_timing) &
             call update_time(s, time0, total, s% time_set_mixing_info)
 
@@ -461,41 +399,10 @@
                failed = .false.
                return
             end if
-            if (s% report_ierr .or. dbg) &
+            if (s% report_ierr) &
                write(*,*) 'set_mixing_info failed in call to ' // trim(str)
             failed = .true.
-            call dealloc
          end function failed
-
-
-         subroutine do_alloc(ierr)
-            integer, intent(out) :: ierr
-            call do_work_arrays(.true.,ierr)
-         end subroutine do_alloc
-
-         subroutine dealloc
-            call do_work_arrays(.false.,ierr)
-         end subroutine dealloc
-
-         subroutine do_work_arrays(alloc_flag, ierr)
-            use alloc, only: work_array
-            logical, intent(in) :: alloc_flag
-            integer, intent(out) :: ierr
-            logical, parameter :: crit = .false.
-            ierr = 0
-            call work_array(s, alloc_flag, crit, &
-               eps_h, nz, nz_alloc_extra, 'mix_info', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               eps_he, nz, nz_alloc_extra, 'mix_info', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               eps_z, nz, nz_alloc_extra, 'mix_info', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               cdc_factor, nz, nz_alloc_extra, 'mix_info', ierr)
-            if (ierr /= 0) return
-         end subroutine do_work_arrays
 
          subroutine check(str)
             character(len=*) :: str
@@ -526,7 +433,7 @@
       end subroutine set_mixing_info
 
 
-      subroutine set_mlt_cz_boundary_info(s, ierr)
+      subroutine set_cz_boundary_info(s, ierr)
          type (star_info), pointer :: s
          integer, intent(out) :: ierr
 
@@ -543,8 +450,6 @@
          ierr = 0
          nz = s% nz
          s% cz_bdy_dq(1:nz) = 0d0
-         
-         if (s% rsp_flag .or. s% Eturb_flag) return ! don't have MLT info
 
          do k = 2, nz
             mt1 = s% mixing_type(k-1)
@@ -563,13 +468,13 @@
             s% cz_bdy_dq(k-1) = find0(0d0,dg0,s% dq(k-1),dg1)
             if (s% cz_bdy_dq(k-1) < 0d0 .or. s% cz_bdy_dq(k-1) > s% dq(k-1)) then
                write(*,2) 'bad cz_bdy_dq', k-1, s% cz_bdy_dq(k-1), s% dq(k-1)
-               stop 'set_mlt_cz_boundary_info'
+               stop 'set_cz_boundary_info'
                ierr = -1
                return
             end if
          end do
 
-      end subroutine set_mlt_cz_boundary_info
+      end subroutine set_cz_boundary_info
 
 
       subroutine set_cz_bdy_mass(s, ierr)
@@ -690,8 +595,8 @@
             if (in_convective_region) then
                if (s% mixing_type(k) /= convective_mixing) then
                   call end_of_convective_region
-               else
-                  if(s% conv_vel(k).ne. 0d0) turnover_time = turnover_time + (s% rmid(k-1) - s% rmid(k))/s% conv_vel(k)
+               else if(s% conv_vel(k) .ne. 0d0) then
+                  turnover_time = turnover_time + (s% rmid(k-1) - s% rmid(k))/s% conv_vel(k)
                end if
             else ! in non-convective region
                if (s% mixing_type(k) == convective_mixing) then ! start of a convective region
@@ -893,10 +798,9 @@
 
 
       subroutine set_use_gradr(s,k)
-         use mlt_info
+         use mlt_info, only: switch_to_radiative
          type (star_info), pointer :: s
          integer, intent(in) :: k
-         call switch_to_no_mixing(s,k)
          call switch_to_radiative(s,k)
       end subroutine set_use_gradr
 
@@ -1246,7 +1150,7 @@
                if (s% mixing_type(k) == mix_type) then ! start of region
                   ktop = k
                   rtop = s% r(ktop)
-                  Hp = s% P(ktop)/(s% rho(ktop)*s% grav(ktop))
+                  Hp = s% Peos(ktop)/(s% rho(ktop)*s% grav(ktop))
                   if (dbg) write(*,2) 'start of region', ktop, rtop
                   if (dbg) write(*,1) 'rtop - rbot < Hp*min_gap', (rtop - rbot) - Hp*min_gap, &
                      rtop - rbot, Hp*min_gap, Hp, min_gap, (rtop-rbot)/Hp
@@ -1308,7 +1212,7 @@
                else ! end of radiative region
                   ktop = k+1
                   rtop = s% r(ktop)
-                  Hp = s% P(ktop)/(s% rho(ktop)*s% grav(ktop))
+                  Hp = s% Peos(ktop)/(s% rho(ktop)*s% grav(ktop))
                   q_upper = s% q(ktop-1)
                   q_lower = s% q(kbot+1)
                   if (rtop - rbot < Hp*s% min_thermohaline_dropout .and. &
@@ -1682,7 +1586,7 @@
             am_nu_GSF_factor, &
             am_nu_ST_factor, &
             f, lgT, full_off, full_on
-         real(dp), dimension(:), pointer :: & ! work vectors for tridiagonal solve
+         real(dp), dimension(:), allocatable :: & ! work vectors for tridiagonal solve
             sig, rhs, d, du, dl, bp, vp, xp, x
 
          include 'formats'
@@ -1729,31 +1633,6 @@
          end do
          
          call check('after include rotation part for mixing abundances')
-
-         if (s% trace_k > 0 .and. s% trace_k <= s% nz) then
-            do k=2,nz
-               write(*,2) 's% D_visc(k)', k, s% D_visc(k)
-               write(*,2) 's% D_DSI(k)', k, s% D_DSI(k)
-               write(*,2) 's% D_SH(k)', k, s% D_SH(k)
-               write(*,2) 's% D_SSI(k)', k, s% D_SSI(k)
-               write(*,2) 's% D_ES(k)', k, s% D_ES(k)
-               write(*,2) 's% D_GSF(k)', k, s% D_GSF(k)
-               write(*,2) 's% D_ST(k)', k, s% D_ST(k)
-            end do
-         end if
-
-         if (s% model_number == -1) then
-            k = 3
-            write(*,2) 's% D_visc(k)', k, s% D_visc(k)
-            write(*,2) 's% D_DSI(k)', k, s% D_DSI(k)
-            write(*,2) 's% D_SH(k)', k, s% D_SH(k)
-            write(*,2) 's% D_SSI(k)', k, s% D_SSI(k)
-            write(*,2) 's% D_ES(k)', k, s% D_ES(k)
-            write(*,2) 's% D_GSF(k)', k, s% D_GSF(k)
-            write(*,2) 's% D_ST(k)', k, s% D_ST(k)
-            write(*,2) 's% D_mix_non_rotation(k)', k, s% D_mix_non_rotation(k)
-            write(*,2) 's% D_mix(k)', k, s% D_mix(k)
-         end if
 
          am_nu_DSI_factor = s% am_nu_DSI_factor
          am_nu_SH_factor = s% am_nu_SH_factor
@@ -1960,8 +1839,7 @@
                if (s% smooth_am_nu_rot > 0 .or. &
                     (s% nu_omega_mixing_rate > 0d0 .and. s% dt > 0)) then
                   
-                  call do_alloc(ierr)
-                  if (ierr /= 0) return
+                  allocate(sig(nz), rhs(nz), d(nz), du(nz), dl(nz), bp(nz), vp(nz), xp(nz), x(nz))
 
                   if (s% smooth_am_nu_rot > 0) then
                      call smooth_for_rotation(s, s% am_nu_rot, s% smooth_am_nu_rot, sig)
@@ -2055,8 +1933,6 @@
                      s% am_nu_rot(1) = 0d0
                   
                   end if
-                  
-                  call dealloc
 
                end if
             
@@ -2073,52 +1949,6 @@
             end if         
          
          end subroutine set_am_nu_rot
-
-
-         subroutine do_alloc(ierr)
-            integer, intent(out) :: ierr
-            call do_work_arrays(.true.,ierr)
-         end subroutine do_alloc
-
-         subroutine dealloc
-            call do_work_arrays(.false.,ierr)
-         end subroutine dealloc
-
-         subroutine do_work_arrays(alloc_flag, ierr)
-            use alloc, only: work_array
-            logical, intent(in) :: alloc_flag
-            integer, intent(out) :: ierr
-            logical, parameter :: crit = .false.
-            ierr = 0
-            call work_array(s, alloc_flag, crit, &
-                sig, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                rhs, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                d, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                du, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                dl, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                bp, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                vp, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xp, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                x, nz, nz_alloc_extra, 'mix_am_nu_rot', ierr)
-            if (ierr /= 0) return
-         end subroutine do_work_arrays
-         
 
       end subroutine update_rotation_mixing_info
 
@@ -2245,7 +2075,7 @@
 
       subroutine get_RTI_sigmas(s, sig, eta, rho, r, dm_bar, dt, ierr)
          type (star_info), pointer :: s
-         real(dp), pointer, dimension(:) :: sig, eta, rho, r, dm_bar
+         real(dp), dimension(:) :: sig, eta, rho, r, dm_bar
          real(dp), intent(in) :: dt
          integer, intent(out) :: ierr
 
@@ -2299,7 +2129,7 @@
          real(dp) :: rho, r00, alfa00, beta00, P_face00, rho_face00, &
             rp1, alfap1, betap1, dr_m1, dr_00, &
             c, d, am1, a00, ap1, v, rmid
-         real(dp), pointer, dimension(:) :: dPdr, drhodr, P_face, rho_face
+         real(dp), allocatable, dimension(:) :: dPdr, drhodr, P_face, rho_face
          integer :: k, nz, width
          logical, parameter :: do_slope_limiting = .false.
          include 'formats'
@@ -2312,18 +2142,17 @@
 
          nz = s% nz
          
-         call do_alloc(ierr)
-         if (ierr /= 0) return
+         allocate(dPdr(nz), drhodr(nz), P_face(nz), rho_face(nz))
 
          do k=2,nz
             rho = s% rho(k)
             r00 = s% r(k)
             alfa00 = s% dq(k-1)/(s% dq(k-1) + s% dq(k))
             beta00 = 1d0 - alfa00
-            P_face(k) = alfa00*s% P(k) + beta00*s% P(k-1)
+            P_face(k) = alfa00*s% Peos(k) + beta00*s% Peos(k-1)
             rho_face(k) = alfa00*s% rho(k) + beta00*s% rho(k-1)
          end do
-         P_face(1) = s% P(1)
+         P_face(1) = s% Peos(1)
          rho_face(1) = s% rho(1)
 
          do k=1,nz
@@ -2390,8 +2219,6 @@
             s% dRhodr_info(k) = drhodr(k)
             s% dPdr_dRhodr_info(k) = min(0d0,dPdr(k)*drhodr(k))
          end do
-         
-         call dealloc
 
          contains
 
@@ -2410,35 +2237,6 @@
             end if
          end function slope_limit
 
-         subroutine do_alloc(ierr)
-            integer, intent(out) :: ierr
-            call do_work_arrays(.true.,ierr)
-         end subroutine do_alloc
-
-         subroutine dealloc
-            call do_work_arrays(.false.,ierr)
-         end subroutine dealloc
-
-         subroutine do_work_arrays(alloc_flag, ierr)
-            use alloc, only: work_array
-            logical, intent(in) :: alloc_flag
-            integer, intent(out) :: ierr
-            logical, parameter :: crit = .false.
-            ierr = 0
-            call work_array(s, alloc_flag, crit, &
-               P_face, nz, 0, 'set_dPdr_dRhodr_info', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               rho_face, nz, 0, 'set_dPdr_dRhodr_info', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               dPdr, nz, 0, 'set_dPdr_dRhodr_info', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               drhodr, nz, 0, 'set_dPdr_dRhodr_info', ierr)
-         if (ierr /= 0) return
-         end subroutine do_work_arrays
-
       end subroutine set_dPdr_dRhodr_info
 
 
@@ -2447,7 +2245,7 @@
          type (star_info), pointer :: s
          real(dp), intent(in) :: smooth_mass
          integer, intent(in) :: number_iterations
-         real(dp), pointer :: val(:)
+         real(dp) :: val(:)
          integer, intent(out) :: ierr
          integer :: nz, iter, k_center, k_inner, k_outer, j, k
          real(dp) :: mlo, mhi, mmid, smooth_m, v, dm_half, mtotal, mass_from_cell
@@ -2506,15 +2304,11 @@
 
 
       subroutine set_dxdt_mix(s)
-
          type (star_info), pointer :: s
-
          real(dp) :: x00, xp1, xm1, dx00, dxp1, dm, sig00, sigp1, &
               flux00, dflux00_dxm1, dflux00_dx00, &
               fluxp1, dfluxp1_dx00, dfluxp1_dxp1
-
          integer :: j, k
-         
          include 'formats'
 
          do k = 1, s% nz
@@ -2621,7 +2415,7 @@
             alfa = s% dq(k-1)/(s% dq(k-1) + s% dq(k))
             beta = 1 - alfa
             rho_face = alfa*s% rho(k) + beta*s% rho(k-1)
-            P_face = alfa*s% P(k) + beta*s% P(k-1)
+            P_face = alfa*s% Peos(k) + beta*s% Peos(k-1)
             r_face = s% r(k)
             q_face = s% q(k)
             cdc = pow2(pi4*s% r(k)*s% r(k)*rho_face)*D ! gm^2/sec

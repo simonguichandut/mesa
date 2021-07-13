@@ -130,11 +130,11 @@
       ! terminal_show_age_units
       ! ~~~~~~~~~~~~~~~~~~~~~~~
       ! terminal_show_timestep_units
-      ! ~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! terminal_show_log_dt
-      ! ~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~
       ! terminal_show_log_age
-      ! ~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
 
       ! options are 'years', 'yrs', 'days', 'secs', or 'seconds'
       ! this replaces the old controls terminal_show_age_in_years & terminal_show_age_in_days
@@ -605,23 +605,34 @@
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! maximum number of double points to be written (0 = no limit); when this limit
-      ! is set, double points are chosen in order of decreasing |grad_mu|
+      ! is set, double points are chosen in order of decreasing :math:`|\nabla_\mu|`
 
       ! ::
 
     max_number_of_double_points = 0
 
 
-      ! format_for_FGONG_data
-      ! ~~~~~~~~~~~~~~~~~~~~~
+      ! fgong_header
+      ! ~~~~~~~~~~~~
+      !
+      ! These are the four lines of arbitrary text that appear at the
+      ! beginning of an FGONG file to describe its contents.
 
-      ! This is the 'wide' FGONG format, as agreed on at the
-      ! 5th Aarhus RGB workshop (University of Birmingham, UK, October 2015)
+    fgong_header(1) = 'FGONG file'
+    fgong_header(2) = 'Created by MESAstar'
+    fgong_header(3) = ''
+    fgong_header(4) = ''
 
-      ! ::
+      ! fgong_ivers
+      ! ~~~~~~~~~~~
+      !
+      ! The version number for the FGONG file, which can only be 300 or 1300.
+      ! 300 gives the old narrow format ``'(1P5E16.9,x)'``, which
+      ! can produce numbers with no space separating them.
+      ! 1300 gives the 'wide' FGONG format, as agreed on at the
+      ! 5th Aarhus RGB workshop (University of Birmingham, UK, October 2015).
 
-    format_for_FGONG_data = '(1P,5(X,E26.18E3))'
-
+    fgong_ivers = 1300
 
       ! format_for_OSC_data
       ! ~~~~~~~~~~~~~~~~~~~
@@ -837,7 +848,7 @@
 
 
       ! co_core_boundary_he4_fraction
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! If fraction >= 0, boundary is outermost location where he4 mass fraction is <= this value,
       ! and c12+o16 mass fraction >= ``min_boundary_fraction`` (see below).
@@ -846,6 +857,18 @@
       ! ::
 
     co_core_boundary_he4_fraction = 0.1d0
+
+
+      ! one_core_boundary_he4_c12_fraction
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+      ! If fraction >= 0, boundary is outermost location where combine he4+c12 mass fraction is <= this value,
+      ! and o16+ne20 mass fraction >= ``min_boundary_fraction`` (see below).
+      ! If fraction < 0, boundary is outermost location where o16+ne20 is more abundant than any other species.
+
+      ! ::
+
+    one_core_boundary_he4_c12_fraction = 0.1d0
 
 
       ! fe_core_boundary_si28_fraction
@@ -931,6 +954,10 @@
 
       ! max_age
       ! ~~~~~~~
+      ! max_age_in_days
+      ! ~~~~~~~~~~~~~~~
+      ! max_age_in_seconds
+      ! ~~~~~~~~~~~~~~~~~~
 
       ! Stop when the age of the star exceeds this value (in years).
       ! only applies when > 0.
@@ -938,16 +965,7 @@
       ! ::
 
     max_age = 1d36
-
-
-      ! max_age_in_seconds
-      ! ~~~~~~~~~~~~~~~~~~
-
-      ! Stop when the age of the star exceeds this value (in seconds).
-      ! only applies when > 0.
-
-      ! ::
-
+    max_age_in_days = -1
     max_age_in_seconds = -1
 
 
@@ -1263,23 +1281,19 @@
 
     star_mass_max_limit = 0
 
-      ! bound_mass_min_limit
-      ! ~~~~~~~~~~~~~~~~~~~
+      ! remnant_mass_min_limit
+      ! ~~~~~~~~~~~~~~~~~~~~~~
+      ! ejecta_mass_max_limit
+      ! ~~~~~~~~~~~~~~~~~~~~~
 
-      ! Stop when star mass in Msun units is < this.  <= 0 means no limit.
-
-      ! ::
-
-    bound_mass_max_limit = 0
-
-      ! bound_mass_max_limit
-      ! ~~~~~~~~~~~~~~~~~~~
-
-      ! Stop when star mass in Msun units is > this.  <= 0 means no limit.
+      ! Stop when remnant mass in Msun units is < this.  <= 0 means no limit.
+      ! remnant_mass = star_mass - ejecta_mass
+      ! ejecta_mass is outermost mass that all has v(k) >= v_escape(k)
 
       ! ::
 
-    bound_mass_max_limit = 0
+    remnant_mass_min_limit = 0
+    ejecta_mass_max_limit = 1d99
 
 
       ! star_species_mass_min_limit
@@ -1318,8 +1332,6 @@
       ! envelope_mass_limit
       ! ~~~~~~~~~~~~~~~~~~~
 
-      ! ::
-
       !     envelope_mass = star_mass - he_core_mass
 
       ! Stop when ``envelope_mass`` drops below this limit, in Msun units.
@@ -1332,9 +1344,8 @@
       ! envelope_fraction_left_limit
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! ::
-
       !     envelope_fraction_left = (star_mass - he_core_mass)/(initial_mass - he_core_mass)
+      
       ! Stop when ``envelope_fraction_left`` < this limit.
 
       ! ::
@@ -1345,7 +1356,8 @@
       ! xmstar_min_limit
       ! ~~~~~~~~~~~~~~~~
 
-      ! ! xmstar = mstar - M_center
+      !     xmstar = mstar - M_center
+      
       ! stop when xmstar in grams is < this.  <= 0 means no limit.
 
       ! ::
@@ -1356,7 +1368,8 @@
       ! xmstar_max_limit
       ! ~~~~~~~~~~~~~~~~
 
-      ! xmstar = mstar - M_center
+      !     xmstar = mstar - M_center
+      
       ! stop when xmstar in grams is > this.  <= 0 means no limit.
 
       ! ::
@@ -1375,13 +1388,23 @@
 
 
       ! co_core_mass_limit
-      ! ~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
 
       ! stop when CO core reaches this mass, in Msun units
 
       ! ::
 
     co_core_mass_limit = 1d99
+
+
+      ! one_core_mass_limit
+      ! ~~~~~~~~~~~~~~~~~~~
+
+      ! stop when ONe core reaches this mass, in Msun units
+
+      ! ::
+
+    one_core_mass_limit = 1d99
 
 
       ! fe_core_mass_limit
@@ -1795,7 +1818,7 @@
 
 
       ! non_fe_core_rebound_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! stop if max rebound speed (outward) at any location interior to ``he_core_mass``. in cm/s
 
@@ -1885,31 +1908,31 @@
     
     
       ! stop_at_phase_PreMS
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_ZAMS
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_IAMS
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_TAMS
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_He_Burn
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_ZACHeB
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_TACHeB
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_TP_AGB
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_C_Burn
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_Ne_Burn
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_O_Burn
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_Si_Burn
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
       ! stop_at_phase_WDCS
-      ! ~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
 
       ! if true, when phase of evolution reaches this point.
 
@@ -1951,7 +1974,7 @@
 
 
       ! gamma1_limit
-      ! ~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~
 
       ! stop if min gamma1 < this limit in a cell with ``q <= gamma1_limit_max_q``
 
@@ -1961,7 +1984,7 @@
 
 
       ! gamma1_limit_max_q
-      ! ~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
 
       ! stop if gamma1 < this limit at any location with ``q <= gamma1_limit_max_q``
       ! values near unity skip the outer envelope
@@ -1972,7 +1995,7 @@
 
 
       ! gamma1_limit_max_v_div_vesc
-      ! ~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! stop if gamma1 < this limit at any location with ``v_div_vesc <= gamma1_limit_max_v_div_vesc``
 
@@ -2156,7 +2179,7 @@
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! Threshold for weighted smoothing of ``gradL_composition_term``. Only apply smoothing (controlled
-      ! by ``num_cells_for_smooth_gradL_composition_term``) for contiguous regions where |gradL| exceeds
+      ! by ``num_cells_for_smooth_gradL_composition_term``) for contiguous regions where :math:`|\nabla_L|` exceeds
       ! this threshold. Might be useful for preventing narrow composition jumps from being excessively
       ! broadened by smoothing
 
@@ -2174,20 +2197,6 @@
       ! ::
 
     alpha_semiconvection = 0
-
-
-      ! semiconvection_upper_limit_center_h1
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! Turn off semiconvection when ``center_h1`` > this limit.
-      ! This let's you delay semiconvection until helium burning.
-      ! E.g., you can do overshooting for core hydrogen burning,
-      ! then switch to semiconvection after core h is gone.
-
-      ! ::
-
-    semiconvection_upper_limit_center_h1 = 1d99
-
 
       ! semiconvection_option
       ! ~~~~~~~~~~~~~~~~~~~~~
@@ -2219,7 +2228,8 @@
 
       ! + ``'Kippenhahn'`` : use method of Kippenhahn, R., Ruschenplatt, G., & Thomas, H.-C. 1980, A&A, 91, 175.
       ! + ``'Traxler_Garaud_Stellmach_11'`` : use method of Traxler, Garaud, & Stellmach, ApJ Letters, 728:L29 (2011).
-      ! + ``'Brown_Garaud_Stellmach_13'`` : use method of Brown, Garaud, & Stellmach, (2013). Recommends ``thermohaline_coeff = 1``, but it can nevertheless be changed.
+      ! + ``'Brown_Garaud_Stellmach_13'`` : use method of Brown, Garaud, & Stellmach, ApJ 768:34 (2013)
+      !      Recommends ``thermohaline_coeff = 1``, but it can nevertheless be changed.
 
       ! ::
 
@@ -2266,18 +2276,19 @@
       ! Options are:
 
       ! + 'none'       : just give radiative values with no mixing.
+      ! + 'TDC'        : Time-dependent convection based on the Khufuss 1986 model. Reduces to Cox at long times.
       ! + 'Cox'        : MLT as developed in Cox & Giuli 1968, Chapter 14.
       ! + 'ML1'        : Bohm-Vitense 1958
       ! + 'ML2'        : Bohm and Cassinelli 1971
       ! + 'Mihalas'    : Mihalas 1978, Kurucz 1979
       ! + 'Henyey'     : Henyey, Vardya, and Bodenheimer 1965
 
-      ! 'Cox' option assumes optically thick material.
+      ! The 'Cox' and 'TDC' options assumes optically thick material.
       ! The other options are various ways of extending to include optically thin material.
 
       ! ::
 
-    MLT_option = 'Cox'
+    MLT_option = 'TDC'
 
 
       ! Henyey_MLT_y_param
@@ -2322,14 +2333,13 @@
     no_MLT_below_shock = .false.
 
 
-      ! no_MLT_below_T_max
-      ! ~~~~~~~~~~~~~~~~~~
-
-      ! if true, then no MLT below location of max T (just radiative).
+      ! mlt_make_surface_no_mixing
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! ::
 
-    no_MLT_below_T_max = .false.
+    mlt_make_surface_no_mixing = .false.
+    
 
 
       ! T_mix_limit
@@ -2369,7 +2379,8 @@
 
       ! Inefficient convection => large gradT excess and steep T gradient to enhance radiative transport.
       ! Reduce gradT excess by making gradT closer to adiabatic gradient.
-      ! If okay_to_reduce_gradT_excess is true, code is allowed to adjust gradT to boost efficiency of energy transport.
+      ! If true, code is allowed to adjust gradT to boost efficiency of energy transport
+      ! See ``gradT_excess_f1``, ``gradT_excess_f2``, and ``gradT_excess_age_fraction`` below.
 
       ! This is the treatment of convection, referred to as MLT++
       ! in Section 7.2 of Paxton et al. (2013), that reduces the
@@ -2391,6 +2402,70 @@
 
     gradT_excess_f1 = 1d-4
     gradT_excess_f2 = 1d-3
+
+
+      ! gradT_excess_age_fraction
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+      ! These are for calculation of efficiency boosted gradT.
+      ! Fraction of old to mix with new to get next.
+
+      ! ::
+
+    gradT_excess_age_fraction = 0.9d0
+
+
+      ! gradT_excess_max_change
+      ! ~~~~~~~~~~~~~~~~~~~~~~~
+
+      ! These are for calculation of efficiency boosted gradT.
+      ! Maximum change allowed in one timestep for ``gradT_excess_alpha``.
+      ! Ignored if negative.
+
+      ! ::
+
+    gradT_excess_max_change = -1d0
+
+
+      ! gradT_excess_lambda1
+      ! ~~~~~~~~~~~~~~~~~~~~
+      ! gradT_excess_beta1
+      ! ~~~~~~~~~~~~~~~~~~
+
+      ! In some situations you might want to force alfa = 1.
+      ! You can do that by setting ``gradT_excess_lambda1 < 0``.
+      ! The following are for the normal calculation of ``gradT_excess_alfa``
+
+      ! ::
+
+    gradT_excess_lambda1 = 1.0d0
+    gradT_excess_beta1 = 0.35d0
+
+
+      ! gradT_excess_lambda2
+      ! ~~~~~~~~~~~~~~~~~~~~
+      ! gradT_excess_beta2
+      ! ~~~~~~~~~~~~~~~~~~
+
+      ! The following are for the normal calculation of ``gradT_excess_alfa``.
+
+      ! ::
+
+    gradT_excess_lambda2 = 0.5d0
+    gradT_excess_beta2 = 0.25d0
+
+
+      ! gradT_excess_dlambda
+      ! ~~~~~~~~~~~~~~~~~~~~
+      ! gradT_excess_dbeta
+      ! ~~~~~~~~~~~~~~~~~~
+
+      ! The following are for the normal calculation of ``gradT_excess_alfa``.
+
+      ! ::
+
+    gradT_excess_dlambda = 0.1d0
+    gradT_excess_dbeta = 0.1d0
 
 
       ! gradT_excess_max_center_h1
@@ -2437,14 +2512,11 @@
     gradT_excess_max_log_tau_full_off = -99
 
 
-      ! max_logT_for_mlt
-      ! ~~~~~~~~~~~~~~~~
+         !### max_logT_for_mlt
 
-      ! No mlt at cell if local logT > this limit.
+         ! No mlt at cell if local logT > this limit.
 
-      ! ::
-
-    max_logT_for_mlt = 99
+      max_logT_for_mlt = 99
 
 
    ! overshooting
@@ -2459,12 +2531,12 @@
       ! Overshooting depends on the classification of the convective zone and can be different at the top and the bottom of the zone.
 
       ! The overshooting controls are based on convection-zone and convection-boundary matching criteria.
-      ! These criteria are ````overshoot_zone_type````, ````overshoot_zone_loc```` and ````overshoot_bdy_loc````.
+      ! These criteria are ``overshoot_zone_type``, ``overshoot_zone_loc`` and ``overshoot_bdy_loc``.
       ! The overshooting parameter values corresponding to the first set of matching criteria will be used.
       ! Therefore, narrower criteria should precede more general ones (i.e have lower array indices).
 
-      ! These are arrays of size ````NUM_OVERSHOOT_PARAM_SETS```` which is defined in
-      ! ````star_data/public/star_data_def.inc```` (currently 16)
+      ! These are arrays of size ``NUM_OVERSHOOT_PARAM_SETS`` which is defined in
+      ! ``star_data/public/star_data_def.inc`` (currently 16)
 
       ! ::
 
@@ -2474,8 +2546,8 @@
     overshoot_bdy_loc(:) = '' ! ``bottom``, ``top``, ``any``
 
       ! Amount of overshooting from edge of convective zone
-      ! These are arrays of size ````NUM_OVERSHOOT_PARAM_SETS```` which is defined in
-      ! ````star_data/public/star_data_def.inc```` (currently 16)
+      ! These are arrays of size ``NUM_OVERSHOOT_PARAM_SETS`` which is defined in
+      ! ``star_data/public/star_data_def.inc`` (currently 16)
 
       ! ::
 
@@ -2502,8 +2574,8 @@
       ! For step overshoot: overshooting extends a distance overshoot_f*Hp0 from r0 with constant diffusion coefficient
       ! D = overshoot_D0 + overshoot_Delta0*D_ob
       ! where D_ob is the convective diffusivity at the bottom (top) of the step overshoot region for outward (inward) overshooting.
-      ! These are arrays of size ````NUM_OVERSHOOT_PARAM_SETS```` which is defined in
-      ! ````star_data/public/star_data_def.inc```` (currently 16)
+      ! These are arrays of size ``NUM_OVERSHOOT_PARAM_SETS`` which is defined in
+      ! ``star_data/public/star_data_def.inc`` (currently 16)
 
       ! ::
 
@@ -2513,8 +2585,8 @@
       ! You can specify a range of star masses over which overshooting
       ! above H burning zones is gradually enabled.
       ! Do specified overshooting above H burning zone if ``star_mass`` >= this (Msun).
-      ! These are arrays of size ````NUM_OVERSHOOT_PARAM_SETS```` which is defined in
-      ! ````star_data/public/star_data_def.inc```` (currently 16)
+      ! These are arrays of size ``NUM_OVERSHOOT_PARAM_SETS`` which is defined in
+      ! ``star_data/public/star_data_def.inc`` (currently 16)
 
       ! ::
 
@@ -2523,8 +2595,8 @@
       ! You can specify a range of star masses over which overshooting
       ! above H burning zones is gradually enabled.
       ! No overshooting above H burning zone if ``star_mass`` <= this  (Msun).
-      ! These are arrays of size ````NUM_OVERSHOOT_PARAM_SETS```` which is defined in
-      ! ````star_data/public/star_data_def.inc```` (currently 16)
+      ! These are arrays of size ``NUM_OVERSHOOT_PARAM_SETS`` which is defined in
+      ! ``star_data/public/star_data_def.inc`` (currently 16)
 
       ! ::
 
@@ -2826,7 +2898,8 @@
 
     conv_premix_time_factor = 0.0
 
-      ! ### conv_premix_fix_pgas
+      ! conv_premix_fix_pgas
+      ! ~~~~~~~~~~~~~~~~~~~~
 
       ! Flag to decide whether gas pressure is kept constant during premixing (.true.), or instead
       ! density is kept constant (.false.). In both cases, temperature is kept constant.
@@ -2835,10 +2908,11 @@
 
     conv_premix_fix_pgas = .true.
 
-      ! ### conv_premix_dump_snapshots
+      ! conv_premix_dump_snapshots
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! Flag to write out snapshots of the intermediate stages during the convective premixing iterations.
-      ! Refer to the dump_snapshot_ routine in star/private/conv_premix.f90 to see what's written out. Note
+      ! Refer to the ``dump_snapshot_`` routine in star/private/conv_premix.f90 to see what's written out. Note
       ! that this can quickly fill up your disk!
 
       ! ::
@@ -2944,14 +3018,14 @@
       ! http://adsabs.harvard.edu/abs/2008AcA....58..193S
       ! for standard values and the description of the parameters.
          
-      !   RSP_alfa =      1.5d0         ! mixing length; alfa = 0 gives a purely radiative model.
-      !   RSP_alfac =     1.0d0         ! convective flux; Lc ~ RSP_alfac
-      !   RSP_alfas =     1.0d0         ! turbulent source; Lc ~ 1/ALFAS; PII ~ RSP_alfas
-      !   RSP_alfad =     1.0d0         ! turbulent dissipation; damp ~ RSP_alfad
-      !   RSP_alfap =     0.0d0         ! turbulent pressure; Pt ~ alfap     
-      !   RSP_alfat =     0.0d0         ! turbulent flux; Lt ~ RSP_alfat; overshooting.
-      !   RSP_alfam =     0.25d0        ! eddy viscosity; Chi & Eq ~ RSP_alfam
-      !   RSP_gammar =    0.0d0         ! radiative losses; dampR ~ RSP_gammar          
+      ! | RSP_alfa =      1.5d0         ! mixing length; alfa = 0 gives a purely radiative model.
+      ! | RSP_alfac =     1.0d0         ! convective flux; Lc ~ RSP_alfac
+      ! | RSP_alfas =     1.0d0         ! turbulent source; Lc ~ 1/ALFAS; PII ~ RSP_alfas
+      ! | RSP_alfad =     1.0d0         ! turbulent dissipation; damp ~ RSP_alfad
+      ! | RSP_alfap =     0.0d0         ! turbulent pressure; Pt ~ alfap     
+      ! | RSP_alfat =     0.0d0         ! turbulent flux; Lt ~ RSP_alfat; overshooting.
+      ! | RSP_alfam =     0.25d0        ! eddy viscosity; Chi & Eq ~ RSP_alfam
+      ! | RSP_gammar =    0.0d0         ! radiative losses; dampR ~ RSP_gammar          
 
       ! ::
 
@@ -2970,15 +3044,15 @@
       ! do not use values less than 0.5.  strongly recommend 0.5 for theta and thetat.
       ! don't mess with any of these unless you know what you are doing or like to watch the code crash.
       
-      !   RSP_theta =      0.5d0        ! Pgas and Prad
-      !   RSP_thetat =     0.5d0        ! Pturb
-      !   RSP_thetae =     0.5d0        ! erad in terms using f_Edd
-      !   RSP_thetaq =     1.0d0        ! avQ
-      !   RSP_thetau =     1.0d0        ! Eq and Uq
-      !   RSP_wtr =        0.6667d0     ! Lr
-      !   RSP_wtc =        0.6667d0     ! Lc
-      !   RSP_wtt =        0.6667d0     ! Lt
-      !   RSP_gam =        1.0d0        ! Et src_snk
+      ! | RSP_theta =      0.5d0        ! Pgas and Prad
+      ! | RSP_thetat =     0.5d0        ! Pturb
+      ! | RSP_thetae =     0.5d0        ! erad in terms using f_Edd
+      ! | RSP_thetaq =     1.0d0        ! Pvsc
+      ! | RSP_thetau =     1.0d0        ! Eq and Uq
+      ! | RSP_wtr =        0.6667d0     ! Lr
+      ! | RSP_wtc =        0.6667d0     ! Lc
+      ! | RSP_wtt =        0.6667d0     ! Lt
+      ! | RSP_gam =        1.0d0        ! Et src_snk
 
       ! ::
 
@@ -3059,6 +3133,7 @@
 
     RSP_target_steps_per_cycle = 600
     RSP_min_max_R_for_periods = -1
+    RSP_min_deltaR_for_periods = -1
     RSP_min_PERIOD_div_PERIODLIN = 0.5d0
     RSP_mode_for_setting_PERIODLIN = 1
     RSP_default_PERIODLIN = 34560
@@ -3219,6 +3294,14 @@
 
       ! ::
 
+    RSP_do_check_omega = .false.
+
+      ! ::
+
+    RSP_report_check_omega_changes = .false.
+
+      ! ::
+
     RSP_hydro_only = .false.
 
       ! this does not work with the standard build model, so requires use_other_RSP_build_model
@@ -3242,16 +3325,6 @@
       ! ::
 
     mix_factor = 1
-
-
-      ! min_dt_for_increases_in_convection_velocity
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! convective velocities are not increased if dt < this value (in seconds)
-
-      ! ::
-
-    min_dt_for_increases_in_convection_velocity = -1d0
 
 
       ! max_conv_vel_div_csound
@@ -3704,8 +3777,6 @@
       ! am_nu_omega_non_rot_factor
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! ::
-
       !     dj/dt = d/dm((4 pi r^2 rho)^2*(am_nu_omega*i_rot*domega/dm + am_nu_j*dj/dm))
       !     am_nu_omega = am_nu_omega_non_rot_factor*am_nu_non_rot + am_nu_omega_rot_factor*am_nu_rot
 
@@ -3719,8 +3790,6 @@
       ! ~~~~~~~~~~~~~~~~~~
       ! am_nu_j_non_rot_factor
       ! ~~~~~~~~~~~~~~~~~~~~~~
-
-      ! ::
 
       !     dj/dt = d/dm((4 pi r^2 rho)^2*(am_nu_omega*i_rot*domega/dm + am_nu_j*dj/dm))
       !     am_nu_j = am_nu_j_non_rot_factor*am_nu_non_rot + am_nu_j_rot_factor*am_nu_rot
@@ -4059,35 +4128,29 @@
       ! Controls how the surface temperature Tsurf and pressure Psurf are evaluated when
       ! setting up outer boundary conditions
 
-      ! + ``'T_tau'`` :
-      ! set Tsurf and Psurf by solving for the atmosphere structure given a T(tau) relation.
-      ! The choice of relation is set by the ``atm_T_tau_relation`` control. See also
-      ! the ``atm_T_tau_opacity``, ``atm_T_tau_errtol``, ``atm_T_tau_max_tries`` and
-      ! ``atm_T_tau_max_steps`` controls.
-      ! + ``'table`` :
-      ! set Tsurf and Psurf by interpolating in pre-calculated tables based on model
-      ! atmospheres. The choice of table is set by the ``atm_table`` control.
-      ! + ``'irradiated_grey'`` :
-      ! set Tsurf by solving for the atmosphere structure given the irradiated-grey
-      ! T(tau) relation of Guillot, T, and Havel, M., A&A 527, A20 (2011).
-      ! See also the ``atm_irradiated_opacity``, ``atm_irradiated_errtol``, ``atm_irradiated_T_eq``,
-      ! ``atm_irradiated_T_eq``, ``atm_irradiated_kap_v``, ``atm_irradiated_kap_v_div_kap_th``,
-      ! ``atm_irradiated_P_surf`` and ``atm_irradiated_max_tries`` controls.
-      ! + ``'fixed_Teff'`` :
-      ! set Tsurf from Eddington T(tau) relation
-      !     for current surface tau and Teff = ``atm_fixed_Teff``.
-      ! set Psurf = Radiation_Pressure(Tsurf)
-      ! + ``'fixed_Tsurf'`` :
-      ! get value of Tsurf from control parameter ``atm_fixed_Tsurf``.
-      ! set Teff from Eddington T(tau) relation for given Tsurf and tau=2/3
-      ! set Psurf = Radiation_Pressure(Tsurf)
-      ! + ``'fixed_Psurf'`` :
-      ! get value of Psurf from control parameter ``atm_fixed_Psurf``.
-      ! set Tsurf from L and R using ``L = 4*pi*R^2*boltz_sigma*T^4``.
-      ! set Teff using Eddington T(tau) relation for tau=2/3 and T=Tsurf.
-      ! + ``'fixed_Psurf_and_Tsurf'`` :
-      ! get value of Psurf from control parameter ``atm_fixed_Psurf``.
-      ! get value of Tsurf from control parameter ``atm_fixed_Tsurf``.
+      ! + ``'T_tau'``: 
+      !   set Tsurf and Psurf by solving for the atmosphere structure given a T(tau) relation.
+      !   The choice of relation is set by the ``atm_T_tau_relation`` control. See also
+      !   the ``atm_T_tau_opacity``, ``atm_T_tau_errtol``, ``atm_T_tau_max_tries`` and
+      !   ``atm_T_tau_max_steps`` controls.
+      !
+      ! + ``'table'``: 
+      !   set Tsurf and Psurf by interpolating in pre-calculated tables based on model
+      !   atmospheres. The choice of table is set by the ``atm_table`` control.
+      !   Requires tau_factor = 1, as surface of the model must always attach at the base
+      !   of the tables, so there is no flexibility to move model surface inward or outward.
+      !   Note that tau_base = tau_surf is the location at which the model attaches to the
+      !   table BCs, and there is no particular location identified as the photosphere, so
+      !   we fall back to the surface values of L, R, and m to calculate quantities such as
+      !   Teff and log_g. This is consistent with the assumptions used for table construction:
+      !   geometrically thin atmospheres with constant flux.
+      !
+      ! + ``'irradiated_grey'``: 
+      !   set Tsurf by solving for the atmosphere structure given the irradiated-grey
+      !   T(tau) relation of Guillot, T, and Havel, M., A&A 527, A20 (2011).
+      !   See also the ``atm_irradiated_opacity``, ``atm_irradiated_errtol``, ``atm_irradiated_T_eq``,
+      !   ``atm_irradiated_T_eq``, ``atm_irradiated_kap_v``, ``atm_irradiated_kap_v_div_kap_th``,
+      !   ``atm_irradiated_P_surf`` and ``atm_irradiated_max_tries`` controls.
 
       ! ::
 
@@ -4166,19 +4229,22 @@
 
       ! The T(tau) relation to use when ``atm_option`` = ``'T_tau'``
 
-      ! + ``'Eddington'`` :
-      ! use the grey Eddington T(tau) relation.
-      ! + ``'solar_Hopf'`` :
-      ! use a grey T(tau) relation with an approximate Hopf function tuned to
-      ! solar data. See Paper II, Sec. A.5. Equivalent to the fit given by Sonoi
-      ! et al. (2019, A&A, 621, 84) to the Vernazza et al. (1981) VAL-C model.
-      ! + ``'Krishna_Swamy'`` :
-      ! use the grey T(tau) relation described by K.S. Krishna-Swamy, ApJ 145,
-      ! 174–194 (1966).
-      ! + ``'Trampedach_solar'`` :
-      ! use the analytic fit by Ball (2021, RNAAS 5, 7) to the Hopf
-      ! function for the solar simulation by Trampedach et al. (2014,
-      ! MNRAS 442, 805–820)
+      ! + ``'Eddington'``:
+      !   use the grey Eddington T(tau) relation.
+
+      ! + ``'solar_Hopf'``:
+      !   use a grey T(tau) relation with an approximate Hopf function tuned to
+      !   solar data. See Paper II, Sec. A.5. Equivalent to the fit given by Sonoi
+      !   et al. (2019, A&A, 621, 84) to the Vernazza et al. (1981) VAL-C model.
+
+      ! + ``'Krishna_Swamy'``:
+      !   use the grey T(tau) relation described by K.S. Krishna-Swamy, ApJ 145,
+      !   174–194 (1966).
+
+      ! + ``'Trampedach_solar'``:
+      !   use the analytic fit by Ball (2021, RNAAS 5, 7) to the Hopf
+      !   function for the solar simulation by Trampedach et al. (2014,
+      !   MNRAS 442, 805–820)
 
       ! ::
 
@@ -4191,16 +4257,18 @@
       ! Controls how opacities are calculated throughout the atmosphere when
       ! ``atm_option`` = ``'T_tau'``
 
-      ! + ``'fixed'`` :
-      ! use a uniform opacity, fixed to the opacity of the outermost cell of the
-      ! interior model
-      ! + ``'iterated'`` :
-      ! use a uniform opacity, iterated to be consistent with the final Tsurf and
-      ! Psurf at the base of the atmosphere.
-      ! + ``'varying'`` :
-      ! use a varying opacity consistent with the local T and P throughout the
-      ! atmosphere. Involves numerical integration of the hydrostatic equilibrium
-      ! equation.
+      ! + ``'fixed'``:
+      !   use a uniform opacity, fixed to the opacity of the outermost cell of the
+      !   interior model
+      
+      ! + ``'iterated'``:
+      !   use a uniform opacity, iterated to be consistent with the final Tsurf and
+      !   Psurf at the base of the atmosphere.
+      
+      ! + ``'varying'``:
+      !   use a varying opacity consistent with the local T and P throughout the
+      !   atmosphere. Involves numerical integration of the hydrostatic equilibrium
+      !   equation.
 
       ! ::
 
@@ -4246,40 +4314,43 @@
 
       ! Determines which table Tsurf and Psurf are interpolated in
 
-      ! + ``'tau_100'``, ``'tau_10'``, ``'tau_1'``, ``'tau_1m1'`` :
-      ! use model atmosphere tables for Pgas and T at tau=100, 10, 1
-      ! or 0.1, respectively; solar Z only, as described in MESA Paper
-      ! I (Paxton et al. 2011), Sec. 5.3.
-      ! these tables are primarily for the evolution of low-mass
-      ! stars, brown dwarfs, and giant planets.  They are constructed
-      ! from Castelli & Kurucz (2003) for Teff > 3000 K and the COND
-      ! model atmospheres (Allard et al. 2001) for Teff < 3000 K.
-      ! where no published results are available, the table has been
-      ! filled in using integration of the Eddington T(tau) relation
-      ! + ``'photosphere'`` :
-      ! use model atmosphere tables for photosphere; range of Z's,
-      ! as described in MESA Paper I (Paxton et al. 2011), Sec. 5.3.
-      ! the tables cover log(Z/Zsun) from -4 to 0.5 for a GN93
-      ! solar mixture, and span logg = -0.5 to 5.5 in steps of
-      ! 0.5 dex and Teff = 2000 to 50 000 K in steps of 250 K.
-      ! they are constructed, in order of precedence, using the
-      ! PHOENIX model atmospheres (Hauschildt et al. 1999a,b)
-      ! and the models by Castelli & Kurucz (2003).  where
-      ! neither is available, an entry is generated by
-      ! integrating the Eddington T(tau) relation
-      ! + ``'WD_tau_25'`` :
-      ! hydrogen atmosphere tables for cool white dwarfs
-      ! giving Pgas and T at log10(tau) = 1.4 (tau = 25.11886)
-      ! Teff goes from 40,000 K down to 2,000K with step of 100 K
-      ! Log10(g) goes from 9.5 down to 5.5 with step of 0.1.
-      ! R.D. Rohrmann, L.G. Althaus, and S.O. Kepler,
-      ! Lyman α wing absorption in cool white dwarf stars,
-      ! Mon. Not. R. Astron. Soc. 411, 781–791 (2011)
-      ! + ``'DB_WD_tau_25'`` :
-      ! EXPERIMENTAL
-      ! helium dominated (log(H/He)=-5.0) atmosphere tables for DB
-      ! white dwarfs, provided by Odette Toloza and Detlev Koester.
-      ! 5000K < Teff < 40000K
+      ! + ``'tau_100'``, ``'tau_10'``, ``'tau_1'``, ``'tau_1m1'``:
+      !   use model atmosphere tables for Pgas and T at tau=100, 10, 1
+      !   or 0.1, respectively; solar Z only, as described in MESA Paper
+      !   I (Paxton et al. 2011), Sec. 5.3.
+      !   these tables are primarily for the evolution of low-mass
+      !   stars, brown dwarfs, and giant planets.  They are constructed
+      !   from Castelli & Kurucz (2003) for Teff > 3000 K and the COND
+      !   model atmospheres (Allard et al. 2001) for Teff < 3000 K.
+      !   where no published results are available, the table has been
+      !   filled in using integration of the Eddington T(tau) relation
+      
+      ! + ``'photosphere'``:
+      !   use model atmosphere tables for photosphere; range of Z's,
+      !   as described in MESA Paper I (Paxton et al. 2011), Sec. 5.3.
+      !   the tables cover log(Z/Zsun) from -4 to 0.5 for a GN93
+      !   solar mixture, and span logg = -0.5 to 5.5 in steps of
+      !   0.5 dex and Teff = 2000 to 50 000 K in steps of 250 K.
+      !   they are constructed, in order of precedence, using the
+      !   PHOENIX model atmospheres (Hauschildt et al. 1999a,b)
+      !   and the models by Castelli & Kurucz (2003).  where
+      !   neither is available, an entry is generated by
+      !   integrating the Eddington T(tau) relation
+      
+      ! + ``'WD_tau_25'``:
+      !   hydrogen atmosphere tables for cool white dwarfs
+      !   giving Pgas and T at log10(tau) = 1.4 (tau = 25.11886)
+      !   Teff goes from 40,000 K down to 2,000K with step of 100 K
+      !   Log10(g) goes from 9.5 down to 5.5 with step of 0.1.
+      !   R.D. Rohrmann, L.G. Althaus, and S.O. Kepler,
+      !   Lyman α wing absorption in cool white dwarf stars,
+      !   Mon. Not. R. Astron. Soc. 411, 781–791 (2011)
+      
+      ! + ``'DB_WD_tau_25'``:
+      !   EXPERIMENTAL
+      !   helium dominated (log(H/He)=-5.0) atmosphere tables for DB
+      !   white dwarfs, provided by Odette Toloza and Detlev Koester.
+      !   5000K < Teff < 40000K
 
       ! ::
 
@@ -4292,12 +4363,13 @@
       ! Controls how thermal opacities are calculated throughout the atmosphere when
       ! ``atm_option`` = ``'irradiated_grey'``
 
-      ! + ``'fixed'`` :
-      ! use a uniform opacity, fixed to the opacity of the outermost cell of the
-      ! interior model.
-      ! + ``'iterated'`` :
-      ! use a uniform opacity, iterated to be consistent with the final Tsurf and
-      ! Psurf at the base of the atmosphere.
+      ! + ``'fixed'``:
+      !   use a uniform opacity, fixed to the opacity of the outermost cell of the
+      !   interior model.
+
+      ! + ``'iterated'``:
+      !   use a uniform opacity, iterated to be consistent with the final Tsurf and
+      !   Psurf at the base of the atmosphere.
 
       ! ::
 
@@ -4353,9 +4425,11 @@
       ! ratio ``kap_v/kap_th`` where ``kap_v`` is the planet atmosphere opacity for stellar
       ! irradiation, and ``kap_th`` is the thermal opacity for the internally produced
       ! radiation. There are two ways to calculate the ratio:
+      !
       ! + if ``atm_irradiated_kap_v_div_kap_th`` > 0, then use it for ``kap_v/kap_th``
-      ! + if ``atm_irradiated_kap_v_div_kap_th`` == 0, then use ``atm_irradiated_kap_v`` to
-      !   set ``kap_v``, and then evaluate the ratio using ``kap_th``
+      !
+      ! + if ``atm_irradiated_kap_v_div_kap_th`` == 0, then use ``atm_irradiated_kap_v``
+      !   to set ``kap_v``, and then evaluate the ratio using ``kap_th``
 
       ! ::
 
@@ -4374,47 +4448,10 @@
     atm_irradiated_P_surf = 1d6
 
 
-      ! surface_extra_Pgas
-      ! ~~~~~~~~~~~~~~~~~~
-
-      ! Extra gas pressure at surface. Added to surface pressure from atm.
-      ! In ergs/cm^3.
-
-      ! ::
-
-    surface_extra_Pgas = 0d0
-
-
-      ! use_atm_PT_at_center_of_surface_cell
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! The surface boundary conditions for pressure and temperature,
-      ! compare the model values at the center of the surface cell to
-      ! values derived from the P and T returned by the atm module.
-      ! If this flag is true, then the atm values are directly used.
-      ! If false, then the values from the atm are treated as being
-      ! for the outer boundary of the surface cell, and those values
-      ! are used to estimate corresponding values for the cell center
-      ! for comparison to the model values at the cell center.
-
-      ! Most cases will have this flag false.
-      ! An example that sets this flag true is a case in which are
-      ! using a special boundary condition (BC) routine to force
-      ! a certain entropy for the surface cell.  In that situation,
-      ! it is better to have the special BC directly return P and T
-      ! for the center of cell 1 to produce the desired entropy.
-
-      ! ::
-
-    use_atm_PT_at_center_of_surface_cell = .false.
-
-
       ! use_compression_outer_BC
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! gradient of compression vanishes at surface
-
-      ! ::
 
       !     see Grott, Chernigovski, Glatzel, 2005.
       !     d_dm(d_dm(r^2*v)) = 0 at surface
@@ -4449,26 +4486,6 @@
     use_zero_Pgas_outer_BC = .false.
 
 
-      ! use_zero_dLdm_outer_BC
-      ! ~~~~~~~~~~~~~~~~~~~~~~
-
-      ! use L(1) = L(2) for T outer BC
-
-      ! ::
-
-    use_zero_dLdm_outer_BC = .false.
-
-
-      ! use_T_black_body_outer_BC
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! ``T_surf`` is set to ``Tsurf_factor*T_black_body(L_surf,R_surf)``
-
-      ! ::
-
-    use_T_black_body_outer_BC = .false.
-
-
       ! use_fixed_vsurf_outer_BC
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! fixed_vsurf
@@ -4482,28 +4499,17 @@
     fixed_vsurf = 0
 
 
-      ! use_fixed_L_for_BB_outer_BC
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! fixed_L_for_BB_outer_BC
-      ! ~~~~~~~~~~~~~~~~~~~~~~~
+      ! use_fixed_Psurf_outer_BC
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! fixed_Psurf
+      ! ~~~~~~~~~~~
 
-      ! for ``use_T_black_body_outer_BC``
-
-      ! ::
-
-    use_fixed_L_for_BB_outer_BC = .false.
-    fixed_L_for_BB_outer_BC = 0
-
-
-      ! tau_for_L_BB
-      ! ~~~~~~~~~~~~
-
-      ! determines location where get L for use with BB outer BCs
-      ! use the L at outermost location where tau >= tau_for_L_BB
+      ! P at outer boundary of model is set to be fixed_Psurf
 
       ! ::
 
-    tau_for_L_BB = -1
+    use_fixed_Psurf_outer_BC = .false.
+    fixed_Psurf = 0
 
 
       ! Tsurf_factor
@@ -4582,26 +4588,23 @@
 
     mass_change = 0d0
 
+
+
+      ! mdot_omega_power
+      ! ~~~~~~~~~~~~~~~~
+      
       ! Enhanced mass loss due to rotation
       ! as in Heger, Langer, and Woosley, 2000, ApJ, 528:368-396.
-
-      ! ::
 
       !      Mdot = Mdot_no_rotation/(1 - Osurf/Osurf_crit)^mdot_omega_power
 
       ! where
-
-      ! ::
 
       !     Osurf = angular velocity at surface
       !     Osurf_crit^2 = (1 - Gamma_edd)*G*M/R^3
       !     Gamma_edd = kappa*L/(4 pi c G M), Eddington factor
 
       ! Typical value for ``mdot_omega_power = 0.43``.
-
-
-      ! mdot_omega_power
-      ! ~~~~~~~~~~~~~~~~
 
       ! Set to 0 to disable this feature.
 
@@ -4707,10 +4710,9 @@
       ! Here is an example of how to translate an existing inlist from the
       ! old style to the new:
 
-      ! ::
-
+      !     +----------------------------------+-----------------------------------+
       !     |        Before                    |             After                 |
-      !     |----------------------------------|-----------------------------------|
+      !     +==================================+===================================+
       !     | RGB_wind_scheme = 'Reimers'      |  cool_wind_RGB_scheme = 'Reimers' |
       !     | Reimers_wind_eta = 0.1           |  Reimers_scaling_factor = 0.1     |
       !     | AGB_wind_scheme = 'Blocker'      |  cool_wind_AGB_scheme = 'Blocker' |
@@ -4721,6 +4723,7 @@
       !     |                                  |  cool_wind_full_on_T = 1d10  !K   |
       !     |                                  |  hot_wind_full_on_T = 1.1d10 !K   |
       !     |                                  |  hot_wind_scheme = ''             |
+      !     +----------------------------------+-----------------------------------+
 
       ! suggested hot and cool wind schemes follow but any valid wind option
       ! will work for either hot or cool.
@@ -4984,11 +4987,11 @@
 
       ! For critical rotation mass loss
       ! Redo step as needed to find mdot that brings model to just below critical.
-      ! if ``max_mdot_redo_cnt`` > 0, and ``surf_w_div_w_crit`` > ``surf_w_div_w_crit_limit``,
+      ! if ``max_mdot_redo_cnt`` > 0, and ``surf_omega_div_omega_crit`` > ``surf_omega_div_omega_crit_limit``,
       ! then recompute the step while increasing mdot, until
-      ! ``surf_w_div_w_crit`` < ``surf_w_div_w_crit_limit``. Once an upper limit for mdot is found,
+      ! ``surf_omega_div_omega_crit`` < ``surf_omega_div_omega_crit_limit``. Once an upper limit for mdot is found,
       ! the solution for mdot is further refined by bisection until it is computed to a tolerance of
-      ! ``surf_w_div_w_crit_tol``. During iterations, mdot is adjusted alternately by multiplication
+      ! ``surf_omega_div_omega_crit_tol``. During iterations, mdot is adjusted alternately by multiplication
       ! by ``mdot_revise_factor``, and by adjusting it by ``implicit_mdot_boost*mdot_initial``, where
       ! ``mdot_initial`` is the value of mdot at the first iteration. This is done to deal with mass
       ! accreting stars, where mdot might need to change sign for the star to remain below critical.
@@ -4997,8 +5000,8 @@
 
     max_mdot_redo_cnt = 0
     min_years_dt_for_redo_mdot = 0
-    surf_w_div_w_crit_limit = 0.99d0
-    surf_w_div_w_crit_tol = 0.05d0
+    surf_omega_div_omega_crit_limit = 0.99d0
+    surf_omega_div_omega_crit_tol = 0.05d0
     mdot_revise_factor = 1.1d0
     implicit_mdot_boost = 0.1d0
 
@@ -5778,16 +5781,6 @@
     max_num_merge_cells = 2
 
 
-      ! mesh_adjust_use_quadratic
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! Linear or quadratic reconstruction polynomials for mesh adjustments.
-
-      ! ::
-
-    mesh_adjust_use_quadratic = .true.
-
-
       ! mesh_adjust_get_T_from_E
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -6267,11 +6260,14 @@
       ! split_merge_amr_log_zoning
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! split_merge_amr_hybrid_zoning
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! split_merge_amr_flipped_hybrid_zoning
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! if split_merge_amr_logtau_zoning, target is even grid spacing in logtau
       ! else if split_merge_amr_log_zoning, target is even grid spacing in logr
       ! else if split_merge_amr_hybrid_zoning, target is even r spacing for core, even logr outside
+      ! else if split_merge_amr_flipped_hybrid_zoning, target is even logr spacing for core, even r outside
       ! else target is even grid spacing in r
 
       ! ::
@@ -6279,36 +6275,39 @@
     split_merge_amr_logtau_zoning = .false.
     split_merge_amr_log_zoning = .true.
     split_merge_amr_hybrid_zoning = .false.
+    split_merge_amr_flipped_hybrid_zoning = .false.
 
 
       ! split_merge_amr_nz_baseline
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! split_merge_amr_nz_r_core
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! split_merge_amr_nz_r_core_fraction
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! split_merge_amr_mesh_delta_coeff
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! ::
 
     split_merge_amr_nz_baseline = 1000
-    split_merge_amr_nz_r_core = 200
+    split_merge_amr_nz_r_core = 0d0 ! ignore if <= 0
+    split_merge_amr_nz_r_core_fraction = 0d0 ! ignore if <= 0; else r_core = r_center + fraction*(r(1) - r_center)
+    split_merge_amr_mesh_delta_coeff = 1d0 ! like mesh_delta_coeff, but for amr
 
 
       ! split_merge_amr_MaxLong
       ! ~~~~~~~~~~~~~~~~~~~~~~~
+      ! split_merge_amr_MaxShort
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! split cell if ratio of actual/desired size is > this; ignore if <= 0
+      ! split cell if ratio of actual/desired size is > split_merge_amr_MaxLong; ignore if <= 0
+      ! merge cell if ratio of desired/actual size is < split_merge_amr_MaxShort; ignore if <= 0
+      ! be careful to avoid inconsistent limits such as when a required split triggers a required merge.
+      ! to be safe, make sure product of limits > 2.
 
       ! ::
 
     split_merge_amr_MaxLong = 1.5d0
-
-
-      ! split_merge_amr_MaxLong
-      ! ~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! merge cell if ratio of desired/actual size is > this; ignore if <= 0
-
-      ! ::
-
     split_merge_amr_MaxShort = 1.5d0
 
 
@@ -6439,15 +6438,15 @@
 
       ! + empty string means no screening
       ! + ``' extended'`` :
-      ! extends the Graboske (1973) method using results from Alastuey and Jancovici (1978),
-      ! along with plasma parameters from Itoh et al (1979) for strong screening.
+      !   extends the Graboske (1973) method using results from Alastuey and Jancovici (1978),
+      !   along with plasma parameters from Itoh et al (1979) for strong screening.
       ! + ``'salpeter'`` :
-      ! weak screening only.  following Salpeter (1954),
-      ! with equations (4-215) and (4-221) of Clayton (1968).
+      !   weak screening only.  following Salpeter (1954),
+      !   with equations (4-215) and (4-221) of Clayton (1968).
       ! + ``'chugunov'`` :
-      ! based on code from Sam Jones
-      ! Implements screening from Chugunov et al (2007) for weak and strong screening
-      ! MESA versions <=11435 used extended as the default value
+      !   based on code from Sam Jones
+      !   Implements screening from Chugunov et al (2007) for weak and strong screening
+      !   MESA versions <=11435 used extended as the default value
 
       ! ::
 
@@ -6868,8 +6867,8 @@
 
       ! ::
 
-    diffusion_gamma_full_off = 175
-    diffusion_gamma_full_on = 150
+    diffusion_gamma_full_off = 1d99
+    diffusion_gamma_full_on = 1d99
 
 
       ! diffusion_T_full_on
@@ -6966,6 +6965,25 @@
       ! ::
 
     diffusion_Vlimit = 0
+
+
+      ! D_mix_zero_region_bottom_q
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! D_mix_zero_region_top_q
+      ! ~~~~~~~~~~~~~~~~~~~~~~~
+      ! dq_D_mix_zero_at_H_He_crossover
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! dq_D_mix_zero_at_H_C_crossover
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+      ! ::
+
+   D_mix_zero_region_bottom_q = 1d99
+   D_mix_zero_region_top_q = -1d99
+   dq_D_mix_zero_at_H_He_crossover = -1d0
+   dq_D_mix_zero_at_H_C_crossover = -1d0
+
+
 
 
       ! diffusion_min_T_for_radaccel
@@ -7163,51 +7181,16 @@
 ! eos controls
 ! ============
 
+      ! fix_d_eos_dxa_partials
+      ! ~~~~~~~~~~~~~~~~~~~~~~
 
-      ! report_eos_settings_at_start_of_run
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! ::
-
-    report_eos_settings_at_start_of_run = .false.
-
-
-      ! use_fixed_XZ_for_eos
-      ! ~~~~~~~~~~~~~~~~~~~~
-
-      ! for debugging
+      ! The star solver uses the partial derivatives of lnPgas and lnE
+      ! with respect to composition.  When the EOS fails to provide
+      ! these, replace them with a finite-difference approximation.
 
       ! ::
 
-    use_fixed_XZ_for_eos = .false.
-
-
-      ! fixed_X_for_eos
-      ! ~~~~~~~~~~~~~~~
-
-      ! if ``use_fixed_XZ_for_eos``, then pass this value to eos instead of actual X.
-
-      ! ::
-
-    fixed_X_for_eos = -1
-
-
-      ! fixed_Z_for_eos
-      ! ~~~~~~~~~~~~~~~
-
-      ! if ``use_fixed_XZ_for_eos``, then pass this value to eos instead of actual Z.
-
-      ! ::
-
-    fixed_Z_for_eos = -1
-
-
-      ! use_d_eos_dxa
-      ! ~~~~~~~~~~~~~
-
-      ! ::
-
-    use_d_eos_dxa = .true.
+    fix_d_eos_dxa_partials = .true.
 
 ! opacity controls
 ! ================
@@ -7297,14 +7280,13 @@
       ! as modified by Haili Hu.  Since the tar.gz file is large (656 MB),
       ! it is not included in the standard mesa download.
 
-      ! You can get ``OP4STARS_1.3.tar.gz`` [here](http://sourceforge.net/projects/mesa/files)
+      ! You can get ``OP4STARS_1.3.tar.xz`` [here](http://sourceforge.net/projects/mesa/files)
 
       ! Put it any place you want on your disk.
 
       ! ::
 
-      !     gunzip OP4STARS_1.3.tar.gz
-      !     tar -xvf OP4STARS_1.3.tar
+      !     tar -xf OP4STARS_1.3.tar.xz
 
       ! Set the inlist controls for the "mono" directory with the data files.
       ! For example, in my case it looks like the following, but you can put
@@ -7379,7 +7361,7 @@
       !     log10T <= low_logT_op_mono_full_off
 
       ! partially on for other cases
-      ! Note: OP mono ignored if either high_logT_ control < 0
+      ! Note: OP mono ignored if either high_logT control < 0
 
       ! ::
 
@@ -7479,7 +7461,7 @@
 
 
       ! calculate_Brunt_B
-      ! ~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~
       ! calculate_Brunt_N2
       ! ~~~~~~~~~~~~~~~~~~
 
@@ -7515,7 +7497,7 @@
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! Threshold for weighted smoothing of ``brunt_B``. Only apply smoothing (controlled
-      ! by ``num_cells_for_smooth_bruntB``) for contiguous regions where |bruntB| exceeds
+      ! by ``num_cells_for_smooth_brunt_B``) for contiguous regions where :math:`|B|` exceeds
       ! this threshold. Might be useful for preventing narrow peaks from being excessively
       ! broadened by smoothing
 
@@ -7585,33 +7567,14 @@
     use_gravity_rotation_correction = .true.
 
 
-      ! use_mass_corrections
-      ! ~~~~~~~~~~~~~~~~~~~~
-
-      !   UNTESTED.   EXPERIMENTAL FEATURE.   NOT FOR GENERAL USE.
-
-      ! Gravitational vs baryonic mass corrections.
-      ! If false, then no distinction between gravitational and baryonic mass.
-      ! If true, then gravitational mass is calculated using mass corrections.
-      ! Note: may need to wait for pre-ms model to converged before turning this on.
-
-      ! ::
-
-    use_mass_corrections = .false.
-
-
       ! use_dedt_form_of_energy_eqn
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! always_use_dedt_form_of_energy_eqn
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! steps_before_always_use_dedt_form_of_energy_eqn
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
       ! ::
 
     use_dedt_form_of_energy_eqn = .false.
     always_use_dedt_form_of_energy_eqn = .true.
-    steps_before_always_use_dedt_form_of_energy_eqn = -1
 
 
       ! use_time_centered_eps_grav
@@ -7625,30 +7588,8 @@
     use_time_centered_eps_grav = .false.
 
 
-      ! max_eta_for_dedt_form_of_energy_eqn
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! if eta(k) > this, use eps_grav form for cell k
-
-      ! ::
-
-    max_eta_for_dedt_form_of_energy_eqn = 1d99
-
-
-      ! max_gamma_for_dedt_form_of_energy_eqn
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! if gamma(k) > this, do not use dedt form for cell k
-
-      ! ::
-
-    max_gamma_for_dedt_form_of_energy_eqn = 1d99
-
-
       ! no_dedt_form_during_relax
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! use_dedt_form_with_total_energy_conservation
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! always_use_eps_grav_form_of_energy_eqn
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! dedt_eqn_r_scale
@@ -7657,7 +7598,6 @@
       ! ::
 
     no_dedt_form_during_relax = .true.
-    use_dedt_form_with_total_energy_conservation = .true.
     always_use_eps_grav_form_of_energy_eqn = .false.
     dedt_eqn_r_scale = 1d8
 
@@ -7729,18 +7669,9 @@
       ! but they can be very different numerically depending on the situation.
 
       ! The standard default forms are used if you don't set any of the following flags.
-      ! The default when using lnd instead of lnPgas as primary variable is
-
       ! ::
 
       !     eps_grav = -T*cp*((1-grada)*chiT*dlnT_dt - grada*chiRho*dlnd_dt)
-
-      ! When using lnPgas instead of lnd, the default is
-
-      ! ::
-
-      !     eps_grav = -T*cp((1-grada*4*Prad/P)*dlnT_dt - grada*Pgas/P*dlnPgas_dt)
-
 
       ! include_composition_in_eps_grav
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -7929,14 +7860,18 @@
       ! inject_until_reach_delta_total_energy = 1d99
 
 
-      ! use_Fraley_time_centering
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! steps_before_use_Fraley_time_centering
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! include_P_in_Fraley_time_centering
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! include_L_in_Fraley_time_centering
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! steps_before_use_velocity_time_centering
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! include_P_in_velocity_time_centering
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! include_L_in_velocity_time_centering
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! use_P_d_1_div_rho_form_of_work_when_time_centering_velocity
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! P_theta_for_velocity_time_centering
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! L_theta_for_velocity_time_centering
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! for time weighting in energy and momentum equations
       ! to give intrinsic conservation of total energy (conservation -> perfect as residuals -> 0),
@@ -7944,22 +7879,26 @@
       ! as discussed in the 3rd mesa instrument paper (2015).
       ! time centering applies to velocities, pressures, and luminosities.
       ! not for u_flag.
+      ! steps_before_use_velocity_time_centering < 0 means no time centering.
+      ! P_theta and L_theta = 0.5 for time centered, = 1.0 for fully implicit.
 
       ! ::
 
-    use_Fraley_time_centering = .false.
-    steps_before_use_Fraley_time_centering = -1
-    include_P_in_Fraley_time_centering = .false.
-    include_L_in_Fraley_time_centering = .false.
+    steps_before_use_velocity_time_centering = -1
+    include_P_in_velocity_time_centering = .false.
+    P_theta_for_velocity_time_centering = 0.5d0
+    include_L_in_velocity_time_centering = .false.
+    L_theta_for_velocity_time_centering = 0.5d0
+    use_P_d_1_div_rho_form_of_work_when_time_centering_velocity = .false.
 
 
       ! use_dPrad_dm_form_of_T_gradient_eqn
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! use_gradT_actual_vs_gradT_MLT_for_T_gradient_eqn
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! These are for alternatives ways to determine the T gradient.
       ! The standard form of the equation is
-
-      ! ::
 
       !     dT/dm = dP/dm * T/P * grad_T, grad_T = dlnT/dlnP from MLT.
 
@@ -7972,23 +7911,28 @@
       ! the use of hydrostatic dP/dm is inappropriate.
       ! In order of priority,
 
-      ! ::
-
-      !     if (use_dPrad_dm_form_of_T_gradient_eqn)
-      !         if (gradT < gradr) then
-      !            use L_rad = L*gradT/gradr (see, e.g., Cox&Giuli 14.109)
-      !         else
-      !            use L_rad = L
+      !|     if (use_gradT_actual_vs_gradT_MLT_for_T_gradient_eqn)
+      !|        equation is gradT(k)*(lnPeos(k-1) - lnPeos(k)) = lnT(k-1) - lnT(k)
+      !|     recall that gradT(k) is expected dlnT/dlnPeos at face k from MLT.
+      !|
+      !|     if (use_dPrad_dm_form_of_T_gradient_eqn)
+      !|         if (gradT < gradr) then
+      !|            use L_rad = L*gradT/gradr (see, e.g., Cox&Giuli 14.109)
+      !|         else
+      !|            use L_rad = L
 
       ! With the resulting ``L_rad``, determine the expected dT/dm by
-
-      ! ::
 
       !     d_Prad/dm = -kap*L_rad/(clight*area^2) -- see, e.g., K&W (5.12)
 
       ! ::
 
     use_dPrad_dm_form_of_T_gradient_eqn = .false.
+    use_gradT_actual_vs_gradT_MLT_for_T_gradient_eqn = .false.
+    
+    
+    
+    
 
       ! for hydro comparison tests (e.g., Sedov)
 
@@ -8195,19 +8139,19 @@
       ! relax_tol_correction_norm
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_max_correction
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_residual_norm1
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_max_residual1
       ! ~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_iter_for_resid_tol2
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_residual_norm2
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_max_residual2
       ! ~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_iter_for_resid_tol3
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_residual_norm3
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! relax_tol_max_residual3
@@ -8245,20 +8189,47 @@
     relax_maxT_for_gold_tolerances = -1d0
 
 
-      ! include_L_in_error_est
-      ! ~~~~~~~~~~~~~~~~~~~~~~
-      ! include_v_in_error_est
-      ! ~~~~~~~~~~~~~~~~~~~~~~
-      ! include_u_in_error_est
-      ! ~~~~~~~~~~~~~~~~~~~~~~
+      ! include_L_in_correction_limits
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! include_v_in_correction_limits
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! include_u_in_correction_limits
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! include_w_in_correction_limits
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! Some variables can be excluded from calculation of correction norm and max.
+      ! These variables can be excluded from calculation of correction norm and max.
 
       ! ::
 
-    include_L_in_error_est = .false.
-    include_v_in_error_est = .false.
-    include_u_in_error_est = .false.
+    include_L_in_correction_limits = .true.
+    include_v_in_correction_limits = .true.
+    include_u_in_correction_limits = .true.
+    include_w_in_correction_limits = .true.
+
+
+
+      ! max_X_for_conv_timescale
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! min_X_for_conv_timescale
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! max_q_for_conv_timescale
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! min_q_for_conv_timescale
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! max_q_for_QHSE_timescale
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+      ! min_q_for_QHSE_timescale
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
+
+      ! ::
+    
+    max_X_for_conv_timescale = 1d0
+    min_X_for_conv_timescale = 0d0
+    max_q_for_conv_timescale = 1d0
+    min_q_for_conv_timescale = 0d0
+    max_q_for_QHSE_timescale = 1d0
+    min_q_for_QHSE_timescale = 0d0
 
 
       ! correction_xa_limit
@@ -8391,6 +8362,30 @@
       ! ::
 
     trace_solver_damping = .false.
+
+      ! do_normalize_dqs_as_part_of_set_qs
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      
+      ! normalize_dqs destroys bit-for-bit read as inverse of write for models.
+      ! ok for create pre ms etc., but not for read model
+      ! create_pre_ms calls normalize_dqs even if this flag is false.
+
+      ! ::
+
+   do_normalize_dqs_as_part_of_set_qs = .false.
+   
+
+      ! use_DGESVX_in_bcyclic
+      ! use_equilibration_in_DGESVX
+      ! report_min_rcond_from_DGESXV
+      
+      ! FOR DEBUGGING ONLY.   NOT FOR GENERAL USE.
+
+      ! ::
+
+    use_DGESVX_in_bcyclic = .false.
+    use_equilibration_in_DGESVX = .false.
+    report_min_rcond_from_DGESXV = .false.
 
 
       ! solver_max_tries_before_reject
@@ -8650,46 +8645,24 @@
     min_chem_eqn_scale = 1d0
 
 
-      ! hydro_mtx_max_allowed_{abs}{dlogT  | dlogRho | dlogPgas | logT | logRho | logPgas}
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! hydro_mtx_max_allowed_{abs}{dlogT | dlogRho | logT | logRho}
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! Force retry with smaller timestep if hydro solves change T, Rho, or Pgas by too much
+      ! Force retry with smaller timestep if hydro solves change T or Rho by too much
       ! or make them too large.
 
       ! ::
 
     hydro_mtx_max_allowed_abs_dlogT = 99d0
     hydro_mtx_max_allowed_abs_dlogRho = 99d0
-    hydro_mtx_max_allowed_abs_dlogPgas = 99d0
     min_logT_for_hydro_mtx_max_allowed = -1d99
     hydro_mtx_max_allowed_logT = 12d0
     hydro_mtx_max_allowed_logRho = 12d0
-    hydro_mtx_max_allowed_logPgas = 99d0
 
       ! ::
 
     hydro_mtx_min_allowed_logT = 1d0
     hydro_mtx_min_allowed_logRho = -1d2
-
-
-      ! solver_clip_dlogT
-      ! ~~~~~~~~~~~~~~~~~
-      ! solver_clip_dlogRho
-      ! ~~~~~~~~~~~~~~~~~~~
-      ! solver_clip_dlogPgas
-      ! ~~~~~~~~~~~~~~~~~~~~
-      ! solver_clip_dlogR
-      ! ~~~~~~~~~~~~~~~~~
-
-      ! Limit magnitude of relative changes per iteration in solver.
-      ! Ignore if limit is <= 0.
-
-      ! ::
-
-    solver_clip_dlogT = -1d0
-    solver_clip_dlogRho = -1d0
-    solver_clip_dlogPgas = -1d0
-    solver_clip_dlogR = -1d0
 
       ! level 1 of gold tolerances for solver solver
 
@@ -8715,7 +8688,7 @@
       ! gold_tol_residual_norm3
       ! ~~~~~~~~~~~~~~~~~~~~~~~
       ! gold_tol_max_residual3
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~
 
       ! ::
 
@@ -8767,7 +8740,7 @@
       ! gold2_tol_residual_norm3
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! gold2_tol_max_residual3
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~
 
       ! ::
 
@@ -8806,14 +8779,14 @@
       ! artificial viscosity
 
 
-      ! use_avQ_art_visc
-      ! ~~~~~~~~~~~~~~~~
-      ! avQ_cq
-      ! ~~~~~~
-      ! avQ_zsh
+      ! use_Pvsc_art_visc
+      ! ~~~~~~~~~~~~~~~~~
+      ! Pvsc_cq
       ! ~~~~~~~
+      ! Pvsc_zsh
+      ! ~~~~~~~~
 
-      ! avQ is artificial pressure to push back against compression
+      ! Pvsc is artificial pressure to push back against compression
       ! this is the form of artificial viscosity used in RSP
       ! if using this, do not set use_artificial_viscosity true.
 
@@ -8830,15 +8803,15 @@
 
       ! ::
 
-    use_avQ_art_visc = .false.
-    avQ_cq = 4.0d0
-    avQ_zsh = 0.1d0
+    use_Pvsc_art_visc = .false.
+    Pvsc_cq = 4.0d0
+    Pvsc_zsh = 0.1d0
 
 
       ! use_artificial_viscosity
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! use_artificial_viscosity has been replaced by use_avQ_art_visc.
+      ! use_artificial_viscosity has been replaced by use_Pvsc_art_visc.
 
 ! split burn
 ! ==========
@@ -8947,8 +8920,6 @@
       !          'XSi_cntr'             delta_XSi_cntr_limit
       !          'log_eps_nuc'          delta_log_eps_nuc_limit
       !          'max_dt'               max_years_for_timestep
-      !          'max dt change'        max_timestep_factor
-      !          'min dt change'        min_timestep_factor
       !          'neg_mass_frac'        (solver found neg mass frac)
       !          'adjust_J_q'           adjust_J_q_limit
       !          'solver iters'         solver_iters_timestep_limit
@@ -8964,13 +8935,15 @@
       ! ~~~~~~~~~~~~~~~~
 
       ! time_delta_coeff - smaller forces smaller timesteps giving better time resolution.
-      !    multiplier for all real number timestep limits and hard limits.
-      !    does not apply to integer valued limits such as
-      !       solver_iters_timestep_limit
-      !       burn_steps_limit
-      !       diffusion_steps_limit
-      !       diffusion_iters_limit
-      !    does not apply to varcontrol_target
+      ! multiplier for all real number timestep limits and hard limits.
+      ! does not apply to integer valued limits such as
+      
+      ! + solver_iters_timestep_limit
+      ! + burn_steps_limit
+      ! + diffusion_steps_limit
+      ! + diffusion_iters_limit
+      
+      ! does not apply to varcontrol_target.
       ! analogous to mesh_delta_coeff for better spatial resolution.
 
       ! ::
@@ -9034,6 +9007,29 @@
     min_timestep_factor = 0.8d0
 
 
+      ! force_timestep
+      ! ~~~~~~~~~~~~~~
+
+      ! In seconds.  ``force_timestep <= 0`` means no forced timestep.
+
+      ! ::
+
+    force_timestep = 0
+
+
+      ! force_timestep_years
+      ! ~~~~~~~~~~~~~~~~~~~~
+
+      ! Note: ``force_timestep`` is the control that is used by most of the code.
+      ! ``force_timestep_years`` is just provided as a convenience.
+      ! At the start of each step, the evolve routine checks if ``force_timestep_years > 0``,
+      ! and if so, it sets ``force_timestep = force_timestep_years*secyer``.
+
+      ! ::
+
+    force_timestep_years = 0
+
+
       ! force_timestep_min
       ! ~~~~~~~~~~~~~~~~~~
 
@@ -9047,7 +9043,6 @@
       ! force_timestep_min_years
       ! ~~~~~~~~~~~~~~~~~~~~~~~~
 
-      ! ``force_timestep_min_years <= 0`` means no forced lower limit.
       ! Note: ``force_timestep_min`` is the control that is used by most of the code.
       ! ``force_timestep_min_years`` is just provided as a convenience.
       ! At the start of each step, the evolve routine checks if ``force_timestep_min_years > 0``,
@@ -9175,7 +9170,7 @@
 
 
       ! never_skip_hard_limits
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~
 
       ! If true, then don't skip hard limits even immediately after a retry.
 
@@ -9566,7 +9561,7 @@
 
       ! Limit on magnitude of relative decrease in any cell nonH, nonHe abundance.
       ! ``dX_div_X`` here is abs(xa(j,k) - xa_old(j,k))/xa(j,k)
-      !    for any cell k and any species j other except hydrogen or helium.
+      ! for any cell k and any species j other except hydrogen or helium.
       ! Considers all cells except where have convective mixing.
 
 
@@ -10215,15 +10210,15 @@
 
 
       ! delta_lgL_power_photo_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~
-      ! delta_lgL_power_photo_hard_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! min_lgT_for_lgL_power_photo_limit
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! delta_lgL_power_photo_hard_limit
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! min_lgT_for_lgL_power_photo_limit
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! lgL_power_photo_burn_min
-      ! ~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! lgL_power_photo_drop_factor
-      ! ~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! Limit for magnitude of change in ``lgL_photo``.
       ! If max delta is greater than ``delta_lgL_power_photo_hard_limit``,
@@ -10292,9 +10287,9 @@
 
 
       ! dt_div_dt_cell_collapse_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! dt_div_dt_cell_collapse_hard_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! limit for dt compared to cell_collapse timescale (negative means no limit)
 
@@ -10316,23 +10311,32 @@
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       ! max_q_for_dt_div_min_dr_div_cs_limit
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! check_remnant_only_for_dt_div_min_dr_div_cs_limit
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! ::
 
     min_k_for_dt_div_min_dr_div_cs_limit = 20
     min_q_for_dt_div_min_dr_div_cs_limit = 0.005d0
     max_q_for_dt_div_min_dr_div_cs_limit = 0.995d0
+    check_remnant_only_for_dt_div_min_dr_div_cs_limit = .false.
 
 
       ! min_abs_du_div_cs_for_dt_div_min_dr_div_cs_limit
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! min_abs_u_div_cs_for_dt_div_min_dr_div_cs_limit
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! only use ``dt_div_min_dr_div_cs_limit`` at cells where
-      ! ``abs_du_div_cs`` > this limit.
+      ! ``abs_du_div_cs`` > ``min_abs_du_div_cs_for_dt_div_min_dr_div_cs_limit`` and
+      ! and
+      ! ``abs_u_div_cs`` > ``min_abs_u_div_cs_for_dt_div_min_dr_div_cs_limit``
+      ! 
       ! allow focus on regions near shock face.
 
       ! ::
 
+    min_abs_u_div_cs_for_dt_div_min_dr_div_cs_limit = 0.8d0
     min_abs_du_div_cs_for_dt_div_min_dr_div_cs_limit = 0.01d0
 
       ! limits based on changes in location on HR diagram
@@ -10419,7 +10423,7 @@
       ! delta_lgT_cntr_hard_limit
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~
       ! delta_lgT_cntr_limit_only_after_near_zams
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! limit for magnitude of change in log10 temperature at center
 
@@ -10640,7 +10644,7 @@
 
 
       ! delta_lg_XNe_cntr_min
-      ! ~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
 
       ! Ignore changes in ``lg_XNe_cntr`` if value is less than this.
 
@@ -10650,7 +10654,7 @@
 
 
       ! delta_lg_XNe_cntr_max
-      ! ~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
 
       ! Ignore changes in ``lg_XNe_cntr`` if value is more than this.
 
@@ -10660,7 +10664,7 @@
 
 
       ! delta_lg_XNe_cntr_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~
 
       ! If max delta is greater than ``delta_lg_XNe_cntr_limit``,
       ! reduce the next timestep by ``delta_lg_XNe_cntr_limit``/``max_delta``.
@@ -10671,7 +10675,7 @@
 
 
       ! delta_lg_XNe_cntr_hard_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! If max delta is greater than ``delta_lg_XNe_cntr_hard_limit``,
       ! retry with smaller timestep.
@@ -10723,7 +10727,7 @@
     delta_lg_XO_cntr_hard_limit = -1
 
       ! delta_lg_XSi_cntr_min
-      ! ~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
 
       ! Ignore changes in ``lg_XSi_cntr`` if value is less than this.
 
@@ -10733,7 +10737,7 @@
 
 
       ! delta_lg_XSi_cntr_max
-      ! ~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
 
       ! Ignore changes in ``lg_XSi_cntr`` if value is more than this.
 
@@ -10743,7 +10747,7 @@
 
 
       ! delta_lg_XSi_cntr_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~
 
       ! If max delta is greater than ``delta_lg_XSi_cntr_limit``,
       ! reduce the next timestep by ``delta_lg_XSi_cntr_limit``/``max_delta``.
@@ -10754,7 +10758,7 @@
 
 
       ! delta_lg_XSi_cntr_hard_limit
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! If max delta is greater than ``delta_lg_XSi_cntr_hard_limit``,
       ! retry with smaller timestep.
@@ -10784,7 +10788,7 @@
 
       ! ::
 
-    delta_XH_cntr_hard_limit = 0.05d0
+    delta_XH_cntr_hard_limit = -1
 
 
       ! delta_XHe_cntr_limit
@@ -10806,7 +10810,7 @@
 
       ! ::
 
-    delta_XHe_cntr_hard_limit = 0.05d0
+    delta_XHe_cntr_hard_limit = -1
 
 
       ! delta_XC_cntr_limit
@@ -10828,7 +10832,7 @@
 
       ! ::
 
-    delta_XC_cntr_hard_limit = 0.05d0
+    delta_XC_cntr_hard_limit = -1
 
 
       ! delta_XNe_cntr_limit
@@ -10850,7 +10854,7 @@
 
       ! ::
 
-    delta_XNe_cntr_hard_limit = 0.05d0
+    delta_XNe_cntr_hard_limit = -1
 
 
       ! delta_XO_cntr_limit
@@ -10872,7 +10876,7 @@
 
       ! ::
 
-    delta_XO_cntr_hard_limit = 0.05d0
+    delta_XO_cntr_hard_limit = -1
 
 
       ! delta_XSi_cntr_limit
@@ -10894,35 +10898,35 @@
 
       ! ::
 
-    delta_XSi_cntr_hard_limit = 0.05d0
+    delta_XSi_cntr_hard_limit = -1
 
 
       ! delta_dX_div_X_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~
       ! delta_lg_XH_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
       ! delta_lg_XHe_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~
       ! delta_lg_XC_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
       ! delta_lg_XNe_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~
       ! delta_lg_XO_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~
       ! delta_lg_XSi_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~
       ! delta_XH_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
       ! delta_XHe_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~
       ! delta_XC_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
       ! delta_XNe_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~
       ! delta_XO_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~
       ! delta_XSi_drop_only
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~
          
 
       ! If true, then only limit drops in abundance. 
@@ -10993,8 +10997,6 @@
       ! adjust_J_q_hard_limit
       ! ~~~~~~~~~~~~~~~~~~~~~
 
-      ! ::
-
       ! limit for mass coordinate down to which angular momentum is adjusted when
       ! using do_adjust_J_lost
 
@@ -11030,7 +11032,7 @@
 
 
       ! report_dt_hard_limit_retries
-      ! ~~~~~~~~~~~~~~~~~~~~
+      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
       ! If true, produce terminal output about choice of timestep.
 
@@ -11103,16 +11105,6 @@
     show_mesh_changes = .false.
 
 
-      ! mesh_dump_call_number
-      ! ~~~~~~~~~~~~~~~~~~~~~
-
-      ! When ``mesh_call_number == mesh_dump_call_number``, various plotting information is written..
-
-      ! ::
-
-    mesh_dump_call_number = -1
-
-
       ! trace_evolve
       ! ~~~~~~~~~~~~
 
@@ -11171,16 +11163,6 @@
       ! ::
 
     xa_clip_limit = 1d-99
-
-
-      ! trace_k
-      ! ~~~~~~~
-
-      ! Print out trace information about cell with number = ``trace_k``.
-
-      ! ::
-
-    trace_k = -1
 
 
       ! fill_arrays_with_NaNs
@@ -11329,10 +11311,9 @@
 
       ! ::
 
-    use_other_eos = .false.
     use_other_kap = .false.
     use_other_diffusion = .false.
-    use_other_mlt = .false.
+    use_other_mlt_results = .false.
 
       ! ::
 
@@ -11369,6 +11350,7 @@
     use_other_gradr_factor = .false.
     use_other_eval_fp_ft = .false.
     use_other_torque = .false.
+    use_other_screening = .false.
 
       ! ::
 
@@ -11378,6 +11360,8 @@
     use_other_before_struct_burn_mix = .false.
     use_other_surface_PT = .false.
     use_other_remove_surface = .false.
+    use_other_set_pgstar_controls = .false.
+    
       ! ::
 
     use_other_export_pulse_data = .false.
@@ -11529,23 +11513,6 @@
     read_extra_controls_inlist1 = .false.
     extra_controls_inlist1_name = 'undefined'
 
-      ! If you try one of the following prebuilt extras,
-      ! you must also set ``read_extra_star_job_inlist1`` true
-      ! and change the ``extra_star_job_inlist1_name`` to match ``extra_controls_inlist1_name``.
-
-      ! evolve 1 Msun from pre-ms to white dwarf
-
-      ! ::
-
-      !     read_extra_controls_inlist1 = .true.
-      !     extra_controls_inlist1_name = 'inlist_extras_1M_lifecycle'
-
-      ! for debugging
-
-      ! ::
-
-      !     extra_controls_inlist1_name = 'inlist_debug'
-
 
       ! read_extra_controls_inlist2
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -11558,50 +11525,6 @@
 
     read_extra_controls_inlist2 = .false.
     extra_controls_inlist2_name = 'undefined'
-
-
-      ! read_extra_controls_inlist1
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! extra_controls_inlist1_name
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! If ``read_extra_controls_inlist1`` is true, then read &controls from this namelist file.
-
-      ! ::
-
-    read_extra_controls_inlist1 = .false.
-    extra_controls_inlist1_name = 'undefined'
-
-      ! If you try one of the following prebuilt extras,
-      ! you must also set ``read_extra_star_job_inlist1`` true
-      ! and change the ``extra_star_job_inlist1_name`` to match ``extra_controls_inlist1_name``.
-
-      ! evolve 1 Msun from pre-ms to white dwarf
-
-      ! ::
-
-      !     read_extra_controls_inlist1 = .true.
-      !     extra_controls_inlist1_name = 'inlist_extras_1M_lifecycle'
-
-      ! for debugging
-
-      ! ::
-
-      !     extra_controls_inlist1_name = 'inlist_debug'
-
-
-      ! read_extra_controls_inlist2
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ! extra_controls_inlist2_name
-      ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-      ! If ``read_extra_controls_inlist2`` is true, then read &controls from this namelist file.
-
-      ! ::
-
-    read_extra_controls_inlist2 = .false.
-    extra_controls_inlist2_name = 'undefined'
-
 
       ! read_extra_controls_inlist3
       ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -31,7 +31,9 @@
          pgstar_model_lw, &
          pgstar_xaxis_label_lw, &
          pgstar_left_yaxis_label_lw, &
-         pgstar_right_yaxis_label_lw
+         pgstar_right_yaxis_label_lw, &
+         pgstar_profile_line_style, &
+         pgstar_history_line_style
 
       real :: &
          pgstar_grid_title_scale, &
@@ -73,7 +75,7 @@
          Text_Summary1_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary1_xleft, Text_Summary1_xright, &
-         Text_Summary1_ybot, Text_Summary1_ytop, Text_Summary1_txt_scale, &
+         Text_Summary1_ybot, Text_Summary1_ytop, Text_Summary1_txt_scale, Text_Summary1_dxval, &
          Text_Summary1_win_width, Text_Summary1_win_aspect_ratio, &
          prev_Text_Summary1_win_width, prev_Text_Summary1_win_ratio, &
          Text_Summary1_file_width, Text_Summary1_file_aspect_ratio, &
@@ -90,7 +92,7 @@
          Text_Summary2_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary2_xleft, Text_Summary2_xright, &
-         Text_Summary2_ybot, Text_Summary2_ytop, Text_Summary2_txt_scale, &
+         Text_Summary2_ybot, Text_Summary2_ytop, Text_Summary2_txt_scale, Text_Summary2_dxval, &
          Text_Summary2_win_width, Text_Summary2_win_aspect_ratio, &
          prev_Text_Summary2_win_width, prev_Text_Summary2_win_ratio, &
          Text_Summary2_file_width, Text_Summary2_file_aspect_ratio, &
@@ -107,7 +109,7 @@
          Text_Summary3_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary3_xleft, Text_Summary3_xright, &
-         Text_Summary3_ybot, Text_Summary3_ytop, Text_Summary3_txt_scale, &
+         Text_Summary3_ybot, Text_Summary3_ytop, Text_Summary3_txt_scale, Text_Summary3_dxval, &
          Text_Summary3_win_width, Text_Summary3_win_aspect_ratio, &
          prev_Text_Summary3_win_width, prev_Text_Summary3_win_ratio, &
          Text_Summary3_file_width, Text_Summary3_file_aspect_ratio, &
@@ -124,7 +126,7 @@
          Text_Summary4_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary4_xleft, Text_Summary4_xright, &
-         Text_Summary4_ybot, Text_Summary4_ytop, Text_Summary4_txt_scale, &
+         Text_Summary4_ybot, Text_Summary4_ytop, Text_Summary4_txt_scale, Text_Summary4_dxval, &
          Text_Summary4_win_width, Text_Summary4_win_aspect_ratio, &
          prev_Text_Summary4_win_width, prev_Text_Summary4_win_ratio, &
          Text_Summary4_file_width, Text_Summary4_file_aspect_ratio, &
@@ -140,7 +142,7 @@
          Text_Summary5_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary5_xleft, Text_Summary5_xright, &
-         Text_Summary5_ybot, Text_Summary5_ytop, Text_Summary5_txt_scale, &
+         Text_Summary5_ybot, Text_Summary5_ytop, Text_Summary5_txt_scale, Text_Summary5_dxval, &
          Text_Summary5_win_width, Text_Summary5_win_aspect_ratio, &
          prev_Text_Summary5_win_width, prev_Text_Summary5_win_ratio, &
          Text_Summary5_file_width, Text_Summary5_file_aspect_ratio, &
@@ -156,7 +158,7 @@
          Text_Summary6_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary6_xleft, Text_Summary6_xright, &
-         Text_Summary6_ybot, Text_Summary6_ytop, Text_Summary6_txt_scale, &
+         Text_Summary6_ybot, Text_Summary6_ytop, Text_Summary6_txt_scale, Text_Summary6_dxval, &
          Text_Summary6_win_width, Text_Summary6_win_aspect_ratio, &
          prev_Text_Summary6_win_width, prev_Text_Summary6_win_ratio, &
          Text_Summary6_file_width, Text_Summary6_file_aspect_ratio, &
@@ -172,7 +174,7 @@
          Text_Summary7_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary7_xleft, Text_Summary7_xright, &
-         Text_Summary7_ybot, Text_Summary7_ytop, Text_Summary7_txt_scale, &
+         Text_Summary7_ybot, Text_Summary7_ytop, Text_Summary7_txt_scale, Text_Summary7_dxval, &
          Text_Summary7_win_width, Text_Summary7_win_aspect_ratio, &
          prev_Text_Summary7_win_width, prev_Text_Summary7_win_ratio, &
          Text_Summary7_file_width, Text_Summary7_file_aspect_ratio, &
@@ -188,7 +190,7 @@
          Text_Summary8_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary8_xleft, Text_Summary8_xright, &
-         Text_Summary8_ybot, Text_Summary8_ytop, Text_Summary8_txt_scale, &
+         Text_Summary8_ybot, Text_Summary8_ytop, Text_Summary8_txt_scale, Text_Summary8_dxval, &
          Text_Summary8_win_width, Text_Summary8_win_aspect_ratio, &
          prev_Text_Summary8_win_width, prev_Text_Summary8_win_ratio, &
          Text_Summary8_file_width, Text_Summary8_file_aspect_ratio, &
@@ -204,7 +206,7 @@
          Text_Summary9_name(max_num_rows_Text_Summary, max_num_cols_Text_Summary)
       real :: &
          Text_Summary9_xleft, Text_Summary9_xright, &
-         Text_Summary9_ybot, Text_Summary9_ytop, Text_Summary9_txt_scale, &
+         Text_Summary9_ybot, Text_Summary9_ytop, Text_Summary9_txt_scale, Text_Summary9_dxval, &
          Text_Summary9_win_width, Text_Summary9_win_aspect_ratio, &
          prev_Text_Summary9_win_width, prev_Text_Summary9_win_ratio, &
          Text_Summary9_file_width, Text_Summary9_file_aspect_ratio, &
@@ -1162,7 +1164,7 @@
       logical :: do_History_Panels1_win, do_History_Panels1_file
       integer :: id_History_Panels1_win, id_History_Panels1_file, History_Panels1_file_interval
       character (len=strlen) :: History_Panels1_file_dir, History_Panels1_file_prefix
-      logical :: History_Panels1_xaxis_reversed,History_Panels1_xaxis_log
+      logical :: History_Panels1_xaxis_reversed, History_Panels1_automatic_star_age_units, History_Panels1_xaxis_log
       character (len=strlen) :: History_Panels1_xaxis_name, History_Panels1_title
       real :: &
          History_Panels1_xmin, History_Panels1_xmax, History_Panels1_dxmin,&
@@ -1192,7 +1194,7 @@
       logical :: do_History_Panels2_win, do_History_Panels2_file
       integer :: id_History_Panels2_win, id_History_Panels2_file, History_Panels2_file_interval
       character (len=strlen) :: History_Panels2_file_dir, History_Panels2_file_prefix
-      logical :: History_Panels2_xaxis_reversed,History_Panels2_xaxis_log
+      logical :: History_Panels2_xaxis_reversed, History_Panels2_automatic_star_age_units, History_Panels2_xaxis_log
       character (len=strlen) :: History_Panels2_xaxis_name, History_Panels2_title
       real :: &
          History_Panels2_xmin, History_Panels2_xmax, History_Panels2_dxmin,&
@@ -1222,7 +1224,7 @@
       logical :: do_History_Panels3_win, do_History_Panels3_file
       integer :: id_History_Panels3_win, id_History_Panels3_file, History_Panels3_file_interval
       character (len=strlen) :: History_Panels3_file_dir, History_Panels3_file_prefix
-      logical :: History_Panels3_xaxis_reversed,History_Panels3_xaxis_log
+      logical :: History_Panels3_xaxis_reversed, History_Panels3_automatic_star_age_units, History_Panels3_xaxis_log
       character (len=strlen) :: History_Panels3_xaxis_name, History_Panels3_title
       real :: &
          History_Panels3_xmin, History_Panels3_xmax, History_Panels3_dxmin,&
@@ -1252,7 +1254,7 @@
       logical :: do_History_Panels4_win, do_History_Panels4_file
       integer :: id_History_Panels4_win, id_History_Panels4_file, History_Panels4_file_interval
       character (len=strlen) :: History_Panels4_file_dir, History_Panels4_file_prefix
-      logical :: History_Panels4_xaxis_reversed,History_Panels4_xaxis_log
+      logical :: History_Panels4_xaxis_reversed, History_Panels4_automatic_star_age_units, History_Panels4_xaxis_log
       character (len=strlen) :: History_Panels4_xaxis_name, History_Panels4_title
       real :: &
          History_Panels4_xmin, History_Panels4_xmax, History_Panels4_dxmin,&
@@ -1281,7 +1283,7 @@
       logical :: do_History_Panels5_win, do_History_Panels5_file
       integer :: id_History_Panels5_win, id_History_Panels5_file, History_Panels5_file_interval
       character (len=strlen) :: History_Panels5_file_dir, History_Panels5_file_prefix
-      logical :: History_Panels5_xaxis_reversed,History_Panels5_xaxis_log
+      logical :: History_Panels5_xaxis_reversed, History_Panels5_automatic_star_age_units, History_Panels5_xaxis_log
       character (len=strlen) :: History_Panels5_xaxis_name, History_Panels5_title
       real :: &
          History_Panels5_xmin, History_Panels5_xmax, History_Panels5_dxmin,&
@@ -1310,7 +1312,7 @@
       logical :: do_History_Panels6_win, do_History_Panels6_file
       integer :: id_History_Panels6_win, id_History_Panels6_file, History_Panels6_file_interval
       character (len=strlen) :: History_Panels6_file_dir, History_Panels6_file_prefix
-      logical :: History_Panels6_xaxis_reversed,History_Panels6_xaxis_log
+      logical :: History_Panels6_xaxis_reversed, History_Panels6_automatic_star_age_units, History_Panels6_xaxis_log
       character (len=strlen) :: History_Panels6_xaxis_name, History_Panels6_title
       real :: &
          History_Panels6_xmin, History_Panels6_xmax, History_Panels6_dxmin,&
@@ -1339,7 +1341,7 @@
       logical :: do_History_Panels7_win, do_History_Panels7_file
       integer :: id_History_Panels7_win, id_History_Panels7_file, History_Panels7_file_interval
       character (len=strlen) :: History_Panels7_file_dir, History_Panels7_file_prefix
-      logical :: History_Panels7_xaxis_reversed,History_Panels7_xaxis_log
+      logical :: History_Panels7_xaxis_reversed, History_Panels7_automatic_star_age_units, History_Panels7_xaxis_log
       character (len=strlen) :: History_Panels7_xaxis_name, History_Panels7_title
       real :: &
          History_Panels7_xmin, History_Panels7_xmax, History_Panels7_dxmin,&
@@ -1368,7 +1370,7 @@
       logical :: do_History_Panels8_win, do_History_Panels8_file
       integer :: id_History_Panels8_win, id_History_Panels8_file, History_Panels8_file_interval
       character (len=strlen) :: History_Panels8_file_dir, History_Panels8_file_prefix
-      logical :: History_Panels8_xaxis_reversed,History_Panels8_xaxis_log
+      logical :: History_Panels8_xaxis_reversed, History_Panels8_automatic_star_age_units, History_Panels8_xaxis_log
       character (len=strlen) :: History_Panels8_xaxis_name, History_Panels8_title
       real :: &
          History_Panels8_xmin, History_Panels8_xmax, History_Panels8_dxmin,&
@@ -1397,7 +1399,7 @@
       logical :: do_History_Panels9_win, do_History_Panels9_file
       integer :: id_History_Panels9_win, id_History_Panels9_file, History_Panels9_file_interval
       character (len=strlen) :: History_Panels9_file_dir, History_Panels9_file_prefix
-      logical :: History_Panels9_xaxis_reversed,History_Panels9_xaxis_log
+      logical :: History_Panels9_xaxis_reversed, History_Panels9_automatic_star_age_units, History_Panels9_xaxis_log
       character (len=strlen) :: History_Panels9_xaxis_name, History_Panels9_title
       real :: &
          History_Panels9_xmin, History_Panels9_xmax, History_Panels9_dxmin,&

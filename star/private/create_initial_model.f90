@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2012-2019  Bill Paxton, Phil Arras & The MESA Team
+!   Copyright (C) 2012-2019  Phil Arras & The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -81,12 +81,12 @@
          use chem_lib, only: basic_composition_info, chem_Xsol
          use adjust_xyz, only: get_xa_for_standard_metals
          use alloc, only: allocate_star_info_arrays
+         use star_utils, only: store_r_in_xh, store_rho_in_xh, store_T_in_xh
 
          type (star_info), pointer :: s
          integer, intent(out) :: ierr
 
-         integer :: initial_zfracs, i_lnd, i_lnT, i_lnR, i_lum, i, j, k, itry, max_try, &
-            id0, id1, id2
+         integer :: initial_zfracs, i_lum, i, j, k, itry, max_try, id0, id1, id2
          real(dp) :: M, R, initial_y, initial_h1, initial_h2, initial_he3, initial_he4, &
             S0, Pc0, rhoc0, e0(2), S1, Pc1, e1(2), S2, Pc2, e2(2), det, dPc, dS, safefac, &
             initial_z, xsol_he3, xsol_he4, mass_correction, mat(2,2), minv(2,2), sumx
@@ -233,27 +233,18 @@
          s% star_mass = cs% mass/Msun
          s% xmstar = cs% mass
 
-         i_lnd = s% i_lnd
-         i_lnT = s% i_lnT
-         i_lnR = s% i_lnR
          i_lum = s% i_lum
-
-         if (i_lnT == 0) then
-            ierr = -1
-            write(*,*) 'must have lnT variables for create_initial_model'
-            return
-         end if
 
          do k=1, s% nz
             i = s% nz - k + 2 ! skip center point
-            s% xh(i_lnd, k) = log(cs% rhog(i))
-            s% xh(i_lnT, k) = log(cs% Tg(i))
-            s% xh(i_lnR, k) = log(cs% rg(i))
+            call store_rho_in_xh(s, k, cs% rhog(i))
+            call store_T_in_xh(s, k, cs% Tg(i))
+            call store_r_in_xh(s, k, cs% rg(i))
             if (i_lum /= 0) s% xh(i_lum, k) = cs% Lg(i)
             do j=1,species
                s% xa(j,k) = xa(j)
             end do
-            s% q(k) = cs% mg(i)/cs% mg(s% nz)
+            s% q(k) = cs% mg(i)/s% xmstar
          end do
          s% dq(s% nz) = s% q(s% nz)
          do k=1, s% nz - 1
@@ -401,6 +392,9 @@
             cs% Lg(k)=cs% luminosity*cs% intdmTg(k)/cs% intdmTg(nz)
          end do
          write(*,"(a20,2x,es15.8)") "log10(L/Lsun)=", log10(cs%luminosity/Lsun)
+         write(*,"(a20,2x,es15.8)") "Mass=", cs% mass
+         write(*,"(a20,2x,es15.8)") "Radius=", cs% radius
+         write(*,*) ''
 
          errvec(1)=(cs% mass-M)/M
          errvec(2)=(cs% radius-R)/R
@@ -484,7 +478,8 @@
 
          real(dp) :: logT_result,log10Rho,dlnRho_dlnPgas_const_T,dlnRho_dlnT_const_Pgas
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnRho_const_T, d_dlnT_const_Rho, d_dabar_const_TRho, d_dzbar_const_TRho
+            res, d_dlnRho_const_T, d_dlnT_const_Rho
+         real(dp), dimension(num_eos_d_dxa_results, species) :: d_dxa_const_TRho
          integer, parameter :: max_iter = 100
          integer :: eos_calls,ierr
          real(dp), parameter :: logT_tol = 1.d-6, other_tol = 1.d-6, logT_guess = 4.d0, &
@@ -492,14 +487,14 @@
             other_at_bnd1= arg_not_provided, other_at_bnd2= arg_not_provided
 
          call eosPT_get_T( &
-            eos_handle, Z, X, abar, zbar, &
+            eos_handle, &
             species, chem_id, net_iso, xa, &
             log10(P), i_lnS, log(S), &
             logT_tol, other_tol, max_iter, logT_guess, &
             logT_bnd1, logT_bnd2, other_at_bnd1, other_at_bnd2, &
             logT_result, rho, log10Rho, dlnRho_dlnPgas_const_T, dlnRho_dlnT_const_Pgas, &
             res, d_dlnRho_const_T, d_dlnT_const_Rho, &
-            d_dabar_const_TRho, d_dzbar_const_TRho, &
+            d_dxa_const_TRho, &
             eos_calls, ierr)
          if (ierr /=0) then
             print *,"failure in eosPT_get_T"

@@ -4,9 +4,6 @@
 
       character (len=1000) :: mesa_dir, &
          eosDT_cache_dir, &
-         eosPT_cache_dir, &
-         eosDE_cache_dir, &
-         ionization_cache_dir, &
          kap_cache_dir, &
          rates_cache_dir
 
@@ -21,7 +18,9 @@
 
       logical :: show_eqns_and_vars_names
 
-      logical :: pgstar_flag, save_pgstar_files_when_terminate
+      logical :: pgstar_flag, save_pgstar_files_when_terminate, &
+         clear_initial_pgstar_history, clear_pgstar_history, &
+         disable_pgstar_during_relax_flag
 
       logical :: save_photo_when_terminate
       logical :: write_profile_when_terminate
@@ -53,8 +52,8 @@
       
       character (len=strlen) :: echo_at_start, echo_at_end
 
-      logical :: load_saved_model, load_saved_model_for_RSP
-      character (len=strlen) :: saved_model_name
+      logical :: load_saved_model
+      character (len=strlen) :: load_model_filename
 
       logical :: create_merger_model
       character (len=strlen) :: saved_model_for_merger_1
@@ -73,6 +72,7 @@
       logical :: relax_M_center, relax_initial_M_center
      
       logical :: relax_mass_to_remove_H_env, relax_initial_mass_to_remove_H_env
+      real(dp) :: extra_mass_retained_by_remove_H_env
 
       logical :: relax_core, relax_initial_core
       real(dp) :: new_core_mass, dlg_core_mass_per_step, &
@@ -105,6 +105,7 @@
       real(dp) :: remove_center_by_radius_cm, remove_initial_center_by_radius_cm
       real(dp) :: remove_center_by_radius_Rsun, remove_initial_center_by_radius_Rsun
       real(dp) :: remove_center_by_he4, remove_initial_center_by_he4
+      real(dp) :: remove_center_by_c12_o16, remove_initial_center_by_c12_o16
       real(dp) :: remove_center_by_si28, remove_initial_center_by_si28
       real(dp) :: remove_center_to_reduce_co56_ni56, remove_initial_center_to_reduce_co56_ni56
       real(dp) :: remove_center_by_ye, remove_initial_center_by_ye
@@ -146,9 +147,6 @@
       logical :: relax_eps_nuc_factor, relax_initial_eps_nuc_factor
       real(dp) :: new_eps_nuc_factor
       real(dp) :: eps_nuc_factor_multiplier
-
-      logical :: relax_fixed_L_for_BB_outer_BC, relax_initial_fixed_L_for_BB_outer_BC
-      integer :: steps_for_relax_fixed_L
 
       logical :: relax_opacity_max, relax_initial_opacity_max
       real(dp) :: new_opacity_max
@@ -195,7 +193,6 @@
       logical :: change_am_nu_rot_flag, change_initial_am_nu_rot_flag, &
          new_am_nu_rot_flag, use_D_omega_for_am_nu_rot
       real(dp) :: center_ye_limit_for_v_flag
-      real(dp) :: gamma1_integral_for_v_flag
       logical :: change_u_flag, change_initial_u_flag, new_u_flag
       logical :: change_reconstruction_flag, change_initial_reconstruction_flag, &
          new_reconstruction_flag
@@ -335,13 +332,13 @@
          max_Z_for_add, max_N_for_add, max_A_for_add
 
       integer :: save_model_number
-      character (len=strlen) :: save_model_filename, required_termination_code_string
+      character (len=strlen) :: save_model_filename
       logical :: save_model_when_terminate
+
+      character (len=strlen) :: required_termination_code_string(num_termination_code_strings)
 
       logical :: profile_starting_model
       integer :: profile_model_number
-
-      integer :: internals_num
 
       logical :: report_retries
 
@@ -372,7 +369,6 @@
       character (len=strlen) :: chem_isotopes_filename
 
       character(len=strlen) :: eos_file_prefix
-      character(len=strlen) :: ionization_file_prefix, ionization_Z1_suffix
 
       integer :: extras_lipar, extras_lrpar, extras_lcpar, extras_llpar
       integer :: extras_ipar(max_extras_params)

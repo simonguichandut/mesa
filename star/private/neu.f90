@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2013  Bill Paxton
+!   Copyright (C) 2013  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -134,12 +134,6 @@
                stop 'do_neu_for_cell'
             end if
             return
-         end if
-
-         if (k == s% trace_k) then
-            write(*,5) 'non_nuc_neu', k, &
-               s% solver_iter, s% model_number, s% solver_adjust_iter, &
-                        s% non_nuc_neu(k)
          end if
 
       end subroutine do_neu_for_cell

@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton, Josiah Schwab & The MESA Team
+!   Copyright (C) 2010-2019  Josiah Schwab & The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -25,7 +25,9 @@
 ! ***********************************************************************
 
       module net_derivs_support
-      use net_def, only: Net_General_Info, Net_Info
+      use net_def, only: Net_General_Info, Net_Info, net_test_partials, &
+         net_test_partials_val, net_test_partials_dval_dx, net_test_partials_i, &
+         net_test_partials_iother
       use const_def
       use chem_def
       use rates_def

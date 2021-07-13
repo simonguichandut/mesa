@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -133,6 +133,7 @@
          use rates_def
          use rates_initialize, only: free_reaction_arrays, free_raw_rates_records
          use reaclib_input, only: reaclib
+         use screening_chugunov, only: free_chugunov
          use utils_lib
 
          call integer_dict_free(skip_warnings_dict)
@@ -144,6 +145,8 @@
          call free_reaction_data(reaclib_rates)
          call free_reaction_arrays()
          call free_raw_rates_records()
+
+         call free_chugunov()
          
       end subroutine rates_shutdown
          
@@ -516,53 +519,6 @@
          get_ecapture_info_list_id = i
       end function get_ecapture_info_list_id
 
-      subroutine psi_Iec_and_Jec(beta, zeta, eta, deta_dlnT, deta_dlnRho, &
-             I, dI_dlnT, dI_dlnRho, J, dJ_dlnT, dJ_dlnRho)
-
-         use eval_psi, only : do_psi_Iec_and_Jec
-
-         ! calulate the phase space integral for electron capture
-
-         implicit none
-
-         real(dp), intent(in) :: beta   ! mec2 / kT
-         real(dp), intent(in) :: zeta   ! Q_n / kT
-         real(dp), intent(in) :: eta    ! chemical potential / kT
-         real(dp), intent(in) :: deta_dlnT, deta_dlnRho ! and derivs
-
-         real(dp), intent(out) :: I, J    ! phase space integral
-         real(dp), intent(out) :: dI_dlnT, dI_dlnRho ! and derivatives
-         real(dp), intent(out) :: dJ_dlnT, dJ_dlnRho ! and derivatives
-
-         call do_psi_Iec_and_Jec(beta, zeta, eta, deta_dlnT, deta_dlnRho, &
-                I, dI_dlnT, dI_dlnRho, J, dJ_dlnT, dJ_dlnRho)
-
-      end subroutine psi_Iec_and_Jec
-
-      subroutine psi_Iee_and_Jee(beta, zeta, eta, deta_dlnT, deta_dlnRho, &
-             I, dI_dlnT, dI_dlnRho, J, dJ_dlnT, dJ_dlnRho)
-
-         use eval_psi, only : do_psi_Iee_and_Jee
-
-         ! calulate the phase space integral for electron emission (beta-decay)
-
-         implicit none
-
-         real(dp), intent(in) :: beta   ! mec2 / kT
-         real(dp), intent(in) :: zeta   ! Q_n / kT
-         real(dp), intent(in) :: eta    ! chemical potential / kT
-         real(dp), intent(in) :: deta_dlnT, deta_dlnRho ! and derivs
-
-         real(dp), intent(out) :: I, J    ! phase space integral
-         real(dp), intent(out) :: dI_dlnT, dI_dlnRho ! and derivatives
-         real(dp), intent(out) :: dJ_dlnT, dJ_dlnRho ! and derivatives
-
-         call do_psi_Iee_and_Jee(beta, zeta, eta, deta_dlnT, deta_dlnRho, &
-                I, dI_dlnT, dI_dlnRho, J, dJ_dlnT, dJ_dlnRho)
-
-      end subroutine psi_Iee_and_Jee
-      
-      
       ! reaclib
       
       subroutine reaclib_parse_handle(handle, num_in, num_out, iso_ids, op, ierr)
@@ -693,8 +649,11 @@
          integer, intent(out) :: ierr
          character (len=64) :: option
          ierr = 0
-         option = StrLowCase(which_screening_option)         
-         if (option == 'no_screening' .or. len_trim(option) == 0) then
+
+         option = StrLowCase(which_screening_option)  
+         if (associated(rates_other_screening)) then
+            screening_option = other_screening
+         else if (option == 'no_screening' .or. len_trim(option) == 0) then
             screening_option = no_screening                   
          else if (option == 'extended') then
             screening_option = extended_screening           
@@ -713,8 +672,11 @@
          integer, intent(in) :: which_screening_option
          character (len=*), intent(out) :: screening_option
          integer, intent(out) :: ierr
-         ierr = 0         
-         if (which_screening_option == no_screening) then
+         ierr = 0    
+         
+         if (which_screening_option == other_screening) then
+            screening_option = 'other_screening'
+         else if (which_screening_option == no_screening) then
             screening_option = 'no_screening'                    
          else if (which_screening_option == extended_screening) then
             screening_option = 'extended'            
@@ -767,7 +729,7 @@
          ! with equations (4-215) and (4-221) of Clayton (1968).
          use rates_def
          use math_lib
-         type (Screen_Info), pointer :: sc ! previously setup 
+         type (Screen_Info) :: sc ! previously setup 
          real(dp), intent(in) :: z1, z2
          real(dp), intent(out) :: scor ! screening factor
          real(dp), intent(out) :: scordt ! partial wrt temperature
@@ -851,7 +813,7 @@
             screening_mode, num_isos, y, iso_z158)
          use rates_def
          use screen, only: do_screen_set_context
-         type (Screen_Info), pointer :: sc
+         type (Screen_Info) :: sc
          integer, intent(in) :: num_isos
          real(dp), intent(in) ::  &
                temp, den, logT, logRho, zbar, abar, z2bar, y(:), iso_z158(:)
@@ -869,24 +831,34 @@
       ! make calls in exactly the same order as for screen_init_AZ_info   
       subroutine screen_pair( &
                sc, a1, z1, a2, z2, screening_mode, &
-               zs13, zhat, zhat2, lzav, aznut, zs13inv, &
+               zs13, zhat, zhat2, lzav, aznut, zs13inv, low_logT_lim, &
                scor, scordt, scordd, ierr)
          use rates_def
          use screen5, only: fxt_screen5
          use screening_chugunov, only: eval_screen_chugunov
          
-         type (Screen_Info), pointer :: sc ! previously setup 
+         type (Screen_Info) :: sc ! previously setup 
          real(dp), intent(in) :: a1, z1, a2, z2
          integer, intent(in) :: screening_mode ! see screen_def.
          ! cached info
          real(dp), intent(in) :: zs13, zhat, zhat2, lzav, aznut, zs13inv
+         real(dp), intent(in) :: low_logT_lim ! scor==0 for T < low_logT_lim
          ! outputs
          real(dp), intent(out) :: scor ! screening factor
          real(dp), intent(out) :: scordt ! partial wrt temperature
          real(dp), intent(out) :: scordd ! partial wrt density
          integer, intent(out) :: ierr
          
-         if (screening_mode == extended_screening) then
+         if(sc% logT < low_logT_lim ) then
+            scor = 0d0
+            scordt=0d0
+            scordd=0d0
+            return
+         end if
+
+         if(screening_mode == other_screening) then
+            call rates_other_screening(sc, z1, z2, a1, a2, scor, scordt, scordd, ierr)
+         else if (screening_mode == extended_screening) then
             call fxt_screen5( &
                sc, zs13, zhat, zhat2, lzav, aznut, zs13inv,  &
                a1, z1, a2, z2, scor, scordt, scordd, ierr)
@@ -965,19 +937,14 @@
       ! call this once before calling eval_ecapture
       ! sets info that depends only on temp, den, and overall composition         
       subroutine coulomb_set_context( &
-            cc, temp, den, logT, logRho, zbar, abar, z2bar,  &
-             num_isos, y, iso_z52)
+            cc, temp, den, logT, logRho, zbar, abar, z2bar)
          use rates_def, only: Coulomb_Info
          use coulomb, only: do_coulomb_set_context
          type (Coulomb_Info), pointer :: cc
-         integer, intent(in) :: num_isos
          real(dp), intent(in) ::  &
-               temp, den, logT, logRho, zbar, abar, z2bar, y(:), iso_z52(:)
-            ! y(:) = x(:)/chem_A(chem_id(:))
-            ! iso_z52(:) = chem_Z(chem_id(:))**5/2
+               temp, den, logT, logRho, zbar, abar, z2bar
          call do_coulomb_set_context( &
-            cc, temp, den, logT, logRho, zbar, abar, z2bar, &
-            num_isos, y, iso_z52)
+            cc, temp, den, logT, logRho, zbar, abar, z2bar)
       end subroutine coulomb_set_context
 
 

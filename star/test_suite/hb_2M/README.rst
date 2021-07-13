@@ -1,10 +1,16 @@
+.. _hb_2M:
+
+*****
+hb_2M
+*****
+
 This test case shows a 2 solar mass stellar model evolving on the Horizontal Branch, from ZACHeB (Zero Age Core Helium Burning) to TACHeB (Terminal Age Core Helium Burning). The convective core boundary is determined using predictive mixing (see |MESA IV|). We also provide in this doc  figures comparing the results obtained using Predictive Mixing with results obtained using CPM (see |MESA V|) schemes (see section `Comparing results obtained with CPM and Predictive mixing`_ below).
 
 
 Building the TAMS model
 =======================
 
-The inital model is created by evolving a model from the pre-main sequence to the end of the main sequence (TAMS) using the inlist ``ìnlist_to_TAMS`` , then from the TAMS to the ZACHeB using the inlist ``ìnlist_to_ZACHeB``.
+The initial model is created by evolving a model from the pre-main sequence to the end of the main sequence (TAMS) using the inlist ``ìnlist_to_TAMS`` , then from the TAMS to the ZACHeB using the inlist ``ìnlist_to_ZACHeB``.
 
 Inlists for MESA are composed of three main sections labelled ``&star_job``, ``&controls``.
 and ``&pgstar``. The ``&star_job`` section contains instructions about which MESA modules should be used, while the ``&controls`` section is where the star module options are specified.

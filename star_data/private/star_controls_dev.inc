@@ -1,24 +1,42 @@
-      
-         real(dp) :: Eturb_Lsurf_factor
-         real(dp) :: Eturb_alfa
-         real(dp) :: Eturb_alfap
-         real(dp) :: Eturb_alfat
-         real(dp) :: Eturb_alfam
-         real(dp) :: Eturb_alfar
-         real(dp) :: accretion_entropy_at_surface
-         
-         real(dp) :: D_mix_zero_region_bottom_q, D_mix_zero_region_top_q, &
-            dq_D_mix_zero_at_H_He_crossover, dq_D_mix_zero_at_H_C_crossover
-                  
 
-         logical :: use_DGESVX_in_bcyclic, use_equilibration_in_DGESVX
-         logical :: report_min_rcond_from_DGESXV
+         real(dp) :: alpha_TDC_DAMP   ! ~ RSP2_alfad
+         real(dp) :: alpha_TDC_DAMPR  ! ~ RSP2_alfar
+         real(dp) :: alpha_TDC_PtdVdt  ! RSP2_alfap
          
+         real(dp) :: max_X_for_gradT_eqn
+         logical :: compare_TDC_to_MLT
+ 
+         real(dp) :: RSP2_Lsurf_factor
+         real(dp) :: RSP2_alfap
+         real(dp) :: RSP2_alfat
+         real(dp) :: RSP2_alfam
+         real(dp) :: RSP2_alfar
+         real(dp) :: RSP2_alfad
          
+         real(dp) :: RSP2_min_Lt_div_L_for_overshooting_mixing_type
+         real(dp) :: RSP2_min_Lc_div_L_for_convective_mixing_type
+         
+         real(dp) :: RSP2_w_fix_if_neg, RSP2_w_min_for_damping, RSP2_source_seed
+         
+         logical :: RSP2_use_L_eqn_at_surface, RSP2_assume_HSE, RSP2_report_adjust_w
+         logical :: RSP2_use_RSP_eqn_for_Y_face, include_w_in_correction_limits
+         logical :: RSP2_use_mass_interp_face_values
+         logical :: RSP2_use_Stellingwerf_Lr
+         integer :: RSP2_num_outermost_cells_forced_nonturbulent, &
+            RSP2_num_innermost_cells_forced_nonturbulent
+         
+         logical :: RSP2_remesh_when_load
+         integer :: RSP2_nz, RSP2_nz_outer, RSP2_nz_div_IBOTOM
+         real(dp) :: RSP2_T_anchor, RSP2_dq_1_factor         
 
-         logical :: mlt_make_surface_no_mixing
-         
-         logical :: do_normalize_dqs_as_part_of_set_qs
+         integer :: RSP2_target_steps_per_cycle, RSP2_max_num_periods, RSP2_work_period, &
+            RSP2_map_first_period, RSP2_map_last_period, RSP2_map_zone_interval
+         real(dp) :: RSP2_min_max_R_for_periods, RSP2_GREKM_avg_abs_frac_new, &
+            RSP2_GREKM_avg_abs_limit
+         character(256) :: RSP2_work_filename, RSP2_map_columns_filename, &
+            RSP2_map_filename, RSP2_map_history_filename
+         logical :: RSP2_write_map
+
             
             
          

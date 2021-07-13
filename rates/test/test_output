@@ -339,11 +339,6 @@
 
  done
 
- do_test_psi_derivs
-    intentionally skipping test
- done
-
-
  do_test_coulomb
         mu      -43.7453051893886027      -37.5095737212022584   169926.1797009507135954
         vs        0.0079074257877945
@@ -352,12 +347,18 @@
 
  do_test_special_weak
  weaklib weak rates
-      mg24  na24      4.4797491275210752E-03
-      na24  mg24      3.7018793325371620E-40
+      mg24  na24      1.4421177069786498E-20
+      na24  mg24      2.3600389877416182E-58
 
  special weak rates
-      mg24  na24      3.8699849471476970E-03
-      na24  mg24      5.1451546670900257E-40
+      mg24  na24      3.8507552351991037E-03
+      na24  mg24      5.3938055004878743E-40
+
+
+ do_test_suzuki
+ suzuki weak rates
+      mg24  na24      4.4797491275210752E-03
+      na24  mg24      3.7018793325371620E-40
 
  done
 

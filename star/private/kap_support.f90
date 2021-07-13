@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -427,6 +427,16 @@ contains
           return
        end if
 
+       if (is_bad(kap_op)) then
+         ierr = 1
+         return
+       end if
+
+       if (kap_op <= 0d0) then
+         ierr = 1
+         return
+       end if
+
        lnkap_op = log(kap_op)
        lnkap_op% d1val1 = dlnkap_op_dlnRho
        lnkap_op% d1val2 = dlnkap_op_dlnT
@@ -481,12 +491,6 @@ contains
     kap = exp(lnkap% val)
     dlnkap_dlnd = lnkap% d1val1
     dlnkap_dlnT = lnkap% d1val2
-
-    if (k == s% trace_k) then
-       write(*,5) 'opacity', &
-            k, s% solver_iter, s% model_number, s% solver_adjust_iter, &
-            kap
-    end if
 
   end subroutine get_kap
 

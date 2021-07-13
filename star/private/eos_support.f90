@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -86,18 +86,10 @@ contains
     if (s% doing_timing) &
        s% timing_num_get_eos_calls = s% timing_num_get_eos_calls + 1
 
-    if (s% use_other_eos) then
-       call s% other_eosDT_get( &
-            s% id, k, &
-            s% eos_handle, s% species, s% chem_id, s% net_iso, xa, &
-            Rho, logRho, T, logT, &
-            res, dres_dlnRho, dres_dlnT, dres_dxa, ierr)
-    else
-       call eosDT_get( &
-            s% eos_handle, s% species, s% chem_id, s% net_iso, xa, &
-            Rho, logRho, T, logT, &
-            res, dres_dlnRho, dres_dlnT, dres_dxa, ierr)
-    end if
+    call eosDT_get( &
+       s% eos_handle, s% species, s% chem_id, s% net_iso, xa, &
+       Rho, logRho, T, logT, &
+       res, dres_dlnRho, dres_dlnT, dres_dxa, ierr)
 
     if (ierr /= 0) then
        s% retry_message = 'get_eos failed'
@@ -124,9 +116,9 @@ contains
   ! Solve for temperature & eos results data given density & energy
 
   subroutine solve_eos_given_DE( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logRho, logE, logT_guess, logT_tol, logE_tol, &
-       logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logT, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
     use eos_def
@@ -135,49 +127,30 @@ contains
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logRho, logE, &
+         xa(:), logRho, logE, &
          logT_guess, logT_tol, logE_tol
     real(dp), intent(out) :: logT
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
     integer :: eos_calls
-    real(dp) :: eos_x, eos_z
 
     include 'formats'
 
     ierr = 0
 
-    if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + 1
+    call eosDT_get_T( &
+       s% eos_handle, &
+       s% species, s% chem_id, s% net_iso, xa, &
+       logRho, i_lnE, logE*ln10, &
+       logT_tol, logE_tol*ln10, MAX_ITER_FOR_SOLVE, logT_guess,  &
+       arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
+       logT, res, dres_dlnRho, dres_dlnT, dres_dxa, &
+       eos_calls, ierr)
 
-    if (s% use_fixed_XZ_for_eos) then
-       eos_x = s% fixed_X_for_eos
-       eos_z = s% fixed_Z_for_eos
-    else
-       eos_x = xh
-       eos_z = z
-    end if
-
-    if (s% use_other_eos) then
-       call s% other_eosDT_get_T( &
-            s% id, k, s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logRho, i_lnE, logE*ln10, &
-            logT_tol, logE_tol*ln10, MAX_ITER_FOR_SOLVE, logT_guess, &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
-            eos_calls, ierr)
-    else
-       call eosDT_get_T( &
-            s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logRho, i_lnE, logE*ln10, &
-            logT_tol, logE_tol*ln10, MAX_ITER_FOR_SOLVE, logT_guess,  &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
-            eos_calls, ierr)
-    end if
+    if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + eos_calls
 
   end subroutine solve_eos_given_DE
   
@@ -186,26 +159,26 @@ contains
   ! Solve for temperature & eos results data given density & gas energy
 
   subroutine solve_eos_given_DEgas( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logRho, egas, logT_guess, logT_tol, egas_tol, &
-       logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logT, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
     use eos_def
-    use eos_lib, only: eosDT_get_T_given_egas
+    use eos_lib, only: eosDT_get_T
 
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logRho, egas, &
+         xa(:), logRho, egas, &
          logT_guess, logT_tol, egas_tol
     real(dp), intent(out) :: logT
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
     integer :: eos_calls
-    real(dp) :: eos_x, eos_z
 
     include 'formats'
 
@@ -213,27 +186,13 @@ contains
 
     if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + 1
 
-    if (s% use_fixed_XZ_for_eos) then
-       eos_x = s% fixed_X_for_eos
-       eos_z = s% fixed_Z_for_eos
-    else
-       eos_x = xh
-       eos_z = z
-    end if
-
-    if (s% use_other_eos) then
-       write(*,*) 'cannot call solve_eos_given_DEgas with use_other_eos'
-       ierr = -1
-       return
-    else
-      call eosDT_get_T_given_egas( &
-         s% eos_handle, eos_z, eos_x, abar, zbar, &
-         s% species, s% chem_id, s% net_iso, xa, &            
-         logRho, egas, logT_tol, egas_tol, MAX_ITER_FOR_SOLVE, logT_guess, &
-         arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-         logT, res, dres_dlnRho, dres_dlnT, &
-         dres_dabar, dres_dzbar, eos_calls, ierr)
-    end if
+    call eosDT_get_T( &
+       s% eos_handle, &
+       s% species, s% chem_id, s% net_iso, xa, &            
+       logRho, i_egas, egas, logT_tol, egas_tol, MAX_ITER_FOR_SOLVE, logT_guess, &
+       arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
+       logT, res, dres_dlnRho, dres_dlnT, &
+       dres_dxa, eos_calls, ierr)
 
   end subroutine solve_eos_given_DEgas
 
@@ -242,22 +201,23 @@ contains
   ! Solve for temperature & eos results data given density & pressure
 
   subroutine solve_eos_given_DP( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logRho, logP, logT_guess, logT_tol, logP_tol, &
-       logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logT, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
     use eos_def
-    use eos_lib, only: eosDT_get_T_given_Ptotal
+    use eos_lib, only: eosDT_get_T
 
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logRho, logP, &
+         xa(:), logRho, logP, &
          logT_guess, logT_tol, logP_tol
     real(dp), intent(out) :: logT
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
     integer :: eos_calls
@@ -269,27 +229,13 @@ contains
 
     if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + 1
 
-    if (s% use_fixed_XZ_for_eos) then
-       eos_x = s% fixed_X_for_eos
-       eos_z = s% fixed_Z_for_eos
-    else
-       eos_x = xh
-       eos_z = z
-    end if
-
-    if (s% use_other_eos) then
-       write(*,*) 'cannot call solve_eos_given_DP with use_other_eos set'
-       ierr = -1
-       return
-    else
-       call eosDT_get_T_given_Ptotal( &
-            s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logRho, logP, logT_tol, logP_tol, MAX_ITER_FOR_SOLVE, logT_guess, &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logT, res, dres_dlnRho, dres_dlnT, &
-            dres_dabar, dres_dzbar, eos_calls, ierr)
-    end if
+    call eosDT_get_T( &
+       s% eos_handle, &
+       s% species, s% chem_id, s% net_iso, xa, &
+       logRho, i_logPtot, logP, logT_tol, logP_tol, MAX_ITER_FOR_SOLVE, logT_guess, &
+       arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
+       logT, res, dres_dlnRho, dres_dlnT, &
+       dres_dxa, eos_calls, ierr)
           
   end subroutine solve_eos_given_DP
 
@@ -299,9 +245,9 @@ contains
   ! entropy
 
   subroutine solve_eos_given_DS( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logRho, logS, logT_guess, logT_tol, logS_tol, &
-       logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logT, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
     use eos_def
@@ -310,11 +256,12 @@ contains
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logRho, logS, &
+         xa(:), logRho, logS, &
          logT_guess, logT_tol, logS_tol
     real(dp), intent(out) :: logT
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
     integer :: eos_calls
@@ -324,33 +271,16 @@ contains
 
     ierr = 0
     
-    if (s% use_fixed_XZ_for_eos) then
-       eos_x = s% fixed_X_for_eos
-       eos_z = s% fixed_Z_for_eos
-    else
-       eos_x = xh
-       eos_z = z
-    end if
+    call eosDT_get_T( &
+       s% eos_handle, &
+       s% species, s% chem_id, s% net_iso, xa, &
+       logRho, i_lnS, logS*ln10, &
+       logT_tol, logS_tol*ln10, MAX_ITER_FOR_SOLVE, logT_guess,  &
+       arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
+       logT, res, dres_dlnRho, dres_dlnT, dres_dxa, &
+       eos_calls, ierr)
 
-    if (s% use_other_eos) then
-       call s% other_eosDT_get_T( &
-            s% id, k, s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logRho, i_lnS, logS*ln10, &
-            logT_tol, logS_tol*ln10, MAX_ITER_FOR_SOLVE, logT_guess, &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
-            eos_calls, ierr)
-    else
-       call eosDT_get_T( &
-            s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logRho, i_lnS, logS*ln10, &
-            logT_tol, logS_tol*ln10, MAX_ITER_FOR_SOLVE, logT_guess,  &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logT, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
-            eos_calls, ierr)
-    end if
+    if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + eos_calls
 
   end subroutine solve_eos_given_DS
 
@@ -359,26 +289,26 @@ contains
   ! Solve for density & eos results data given pressure & temperature
 
   subroutine solve_eos_given_PT( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logT, logP, logRho_guess, logRho_tol, logP_tol, &
-       logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
     use eos_def
-    use eos_lib, only: eosDT_get_Rho_given_Ptotal
+    use eos_lib, only: eosDT_get_Rho
 
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logT, logP, &
+         xa(:), logT, logP, &
          logRho_guess, logRho_tol, logP_tol
     real(dp), intent(out) :: logRho
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
     integer :: eos_calls
-    real(dp) :: eos_x, eos_z
 
     include 'formats'
 
@@ -386,27 +316,13 @@ contains
 
     if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + 1
 
-    if (s% use_fixed_XZ_for_eos) then
-       eos_x = s% fixed_X_for_eos
-       eos_z = s% fixed_Z_for_eos
-    else
-       eos_x = xh
-       eos_z = z
-    end if
-
-    if (s% use_other_eos) then
-       write(*,*) 'cannot call solve_eos_given_PT with use_other_eos set'
-       ierr = -1
-       return
-    else
-       call eosDT_get_Rho_given_Ptotal( &
-            s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logT, logP, logRho_tol, logP_tol, MAX_ITER_FOR_SOLVE, logRho_guess, &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logRho, res, dres_dlnRho, dres_dlnT, &
-            dres_dabar, dres_dzbar, eos_calls, ierr)
-    end if
+    call eosDT_get_Rho( &
+       s% eos_handle, &
+       s% species, s% chem_id, s% net_iso, xa, &
+       logT, i_logPtot, logP, logRho_tol, logP_tol, MAX_ITER_FOR_SOLVE, logRho_guess, &
+       arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
+       logRho, res, dres_dlnRho, dres_dlnT, &
+       dres_dxa, eos_calls, ierr)
 
   end subroutine solve_eos_given_PT
 
@@ -416,9 +332,9 @@ contains
   ! temperature
 
   subroutine solve_eos_given_PgasT( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logT, logPgas, logRho_guess, logRho_tol, logPgas_tol, &
-       logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
     use eos_def
@@ -427,59 +343,36 @@ contains
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logT, logPgas, &
+         xa(:), logT, logPgas, &
          logRho_guess, logRho_tol, logPgas_tol
     real(dp), intent(out) :: logRho
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
     integer :: eos_calls
-    real(dp) :: eos_x, eos_z
 
     include 'formats'
 
     ierr = 0
 
-    if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + 1
-
-    if (s% use_fixed_XZ_for_eos) then
-       eos_x = s% fixed_X_for_eos
-       eos_z = s% fixed_Z_for_eos
-    else
-       eos_x = xh
-       eos_z = z
+    call eosDT_get_Rho( &
+       s% eos_handle, &
+       s% species, s% chem_id, s% net_iso, xa, &
+       logT, i_lnPgas, logPgas*ln10, &
+       logRho_tol, logPgas_tol*ln10, MAX_ITER_FOR_SOLVE, logRho_guess, &
+       arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
+       logRho, res, dres_dlnRho, dres_dlnT, &
+       dres_dxa, eos_calls, ierr)
+    if (ierr /= 0 .and. s% report_ierr) then
+       write(*,*) 'Call to eosDT_get_Rho failed in solve_eos_given_PgasT'
+       write(*,2) 'logPgas', k, logPgas
+       write(*,2) 'logT', k, logT
+       write(*,2) 'logRho_guess', k, logRho_guess
     end if
 
-    if (s% use_other_eos) then
-       call s% other_eosDT_get_Rho( &
-            s% id, k, s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logT, i_lnPgas, logPgas*ln10, &
-            logRho_tol, logPgas_tol*ln10, MAX_ITER_FOR_SOLVE, logRho_guess, &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logRho, res, dres_dlnRho, dres_dlnT, &
-            dres_dabar, dres_dzbar, eos_calls, ierr)
-    else if (is_bad(logPgas)) then
-       write(*,*) 'bad logPgas for solve_eos_given_PgasT', logPgas
-       ierr = -1
-       return
-    else
-       call eosDT_get_Rho( &
-            s% eos_handle, eos_z, eos_x, abar, zbar, &
-            s% species, s% chem_id, s% net_iso, xa, &
-            logT, i_lnPgas, logPgas*ln10, &
-            logRho_tol, logPgas_tol*ln10, MAX_ITER_FOR_SOLVE, logRho_guess, &
-            arg_not_provided, arg_not_provided, arg_not_provided, arg_not_provided, &
-            logRho, res, dres_dlnRho, dres_dlnT, &
-            dres_dabar, dres_dzbar, eos_calls, ierr)
-       if (ierr /= 0 .and. s% report_ierr) then
-          write(*,*) 'Call to eosDT_get_Rho failed in solve_eos_given_PgasT'
-          write(*,2) 'logPgas', k, logPgas
-          write(*,2) 'logT', k, logT
-          write(*,2) 'logRho_guess', k, logRho_guess
-       end if
-    end if
+    if (s% doing_timing) s% timing_num_solve_eos_calls = s% timing_num_solve_eos_calls + eos_calls
 
   end subroutine solve_eos_given_PgasT
 
@@ -490,28 +383,35 @@ contains
   ! initial call to eos_gamma_PT_get
 
   subroutine solve_eos_given_PgasT_auto( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logT, logPgas, logRho_tol, logPgas_tol, &
-       logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
+    use chem_lib, only: basic_composition_info
     use eos_def
     use eos_lib, only: eos_gamma_PT_get
 
     type (star_info), pointer :: s
     integer, intent(in) :: k ! 0 indicates not for a particular cell.
     real(dp), intent(in) :: &
-         z, xh, abar, zbar, xa(:), logT, logPgas, &
+         xa(:), logT, logPgas, &
          logRho_tol, logPgas_tol
     real(dp), intent(out) :: logRho
     real(dp), dimension(num_eos_basic_results), intent(out) :: &
-         res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar
+         res, dres_dlnRho, dres_dlnT
+    real(dp), intent(out) :: dres_dxa(num_eos_d_dxa_results,s% species)
     integer, intent(out) :: ierr
 
-    real(dp) :: dres_dxa(num_eos_d_dxa_results,s% species)
-    
     real(dp) :: rho_guess, logRho_guess, gamma, &
          dlnRho_dlnPgas_const_T, dlnRho_dlnT_const_Pgas
+
+    ! compute composition info
+    real(dp) :: Y, Z, X, abar, zbar, z2bar, z53bar, ye, mass_correction, sumx
+
+    call basic_composition_info( &
+       s% species, s% chem_id, xa, X, Y, Z, &
+       abar, zbar, z2bar, z53bar, ye, mass_correction, sumx)
     
     gamma = 5d0/3d0
     call eos_gamma_PT_get( &
@@ -524,9 +424,9 @@ contains
     end if
 
     call solve_eos_given_PgasT( &
-       s, k, z, xh, abar, zbar, xa, &
+       s, k, xa, &
        logT, logPgas, logRho_guess, logRho_tol, logPgas_tol, &
-       logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+       logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
        ierr)
 
   end subroutine solve_eos_given_PgasT_auto

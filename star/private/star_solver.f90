@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2013-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2013-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -30,10 +30,8 @@
       use const_def, only: dp
       use num_def
       use mtx_def
-      use mtx_lib, only: band_multiply_xa, block_multiply_xa
-
-      use hydro_solver_procs
-
+      use mtx_lib, only: block_multiply_xa
+      use solver_support
 
       implicit none
 
@@ -45,23 +43,17 @@
 
 
       subroutine solver( &
-            s, nz, nvar, dx, skip_global_corr_coeff_limit, &
+            s, nvar, skip_global_corr_coeff_limit, &
             gold_tolerances_level, tol_max_correction, tol_correction_norm, &
-            xscale, equ, work, lwork, iwork, liwork, AF, &
+            work, lwork, iwork, liwork, &
             convergence_failure, ierr)
          use alloc, only: non_crit_get_quad_array, non_crit_return_quad_array
          use utils_lib, only: realloc_if_needed_1, quad_realloc_if_needed_1, fill_with_NaNs
 
          type (star_info), pointer :: s
          ! the primary variables
-         integer, intent(in) :: nz ! number of zones
          integer, intent(in) :: nvar ! number of variables per zone
-         real(dp), pointer, dimension(:) :: dx ! =(nvar,nz)
          logical, intent(in) :: skip_global_corr_coeff_limit
-         real(dp), pointer, dimension(:) :: xscale ! =(nvar,nz)
-         real(dp), pointer, dimension(:) :: equ ! =(nvar,nz)
-         ! equ(i) has the residual for equation i, i.e., the difference between
-         ! the left and right hand sides of the equation.
 
          ! work arrays. required sizes provided by the routine solver_work_sizes.
          ! for standard use, set work and iwork to 0 before calling.
@@ -70,8 +62,6 @@
          integer, intent(in) :: lwork, liwork
          real(dp), intent(inout), target :: work(:) ! (lwork)
          integer, intent(inout), target :: iwork(:) ! (liwork)
-         real(dp), pointer, dimension(:) :: AF ! for factored jacobian
-            ! will be allocated or reallocated as necessary.
 
          ! convergence criteria
          integer, intent(in) :: gold_tolerances_level ! 0, 1, or 2
@@ -93,97 +83,41 @@
          logical, intent(out) :: convergence_failure
          integer, intent(out) :: ierr ! 0 means okay.
 
-         integer :: ldAF, neqns, mljac, mujac
-         real(dp), pointer :: AF_copy(:) ! =(ldAF, neq)
-
-         integer(8) :: test_time1, clock_rate
+         integer :: ldAF, neqns
 
          include 'formats'
 
          ierr = 0
 
-         neqns = nvar*nz
+         neqns = nvar*s% nz
          ldAF = 3*nvar
 
-         call realloc_if_needed_1(AF,ldAF*neqns,(ldAF+2)*200,ierr)
+         call realloc_if_needed_1(s% AF1,ldAF*neqns,(ldAF+2)*200,ierr)
          if (ierr /= 0) return
-         AF_copy => AF
 
-         if (s% fill_arrays_with_NaNs) call fill_with_NaNs(AF_copy)
+         if (s% fill_arrays_with_NaNs) call fill_with_NaNs(s% AF1)
 
          call do_solver( &
-            s, nz, nvar, dx, AF_copy, ldAF, neqns, skip_global_corr_coeff_limit, &
+            s, nvar, s% AF1, ldAF, neqns, skip_global_corr_coeff_limit, &
             gold_tolerances_level, tol_max_correction, tol_correction_norm, &
-            xscale, equ, work, lwork, iwork, liwork, &
+            work, lwork, iwork, liwork, &
             convergence_failure, ierr)
-
-         contains
-
-
-         logical function bad_isize(a,sz,str)
-            integer :: a(:)
-            integer, intent(in) :: sz
-            character (len=*), intent(in) :: str
-            bad_isize = (size(a,dim=1) < sz)
-            if (.not. bad_isize) return
-            ierr = -1
-            write(*,*) 'interpolation: bad sizes for ' // trim(str)
-            return
-         end function bad_isize
-
-
-         logical function bad_size(a,sz,str)
-            real(dp) :: a(:)
-            integer, intent(in) :: sz
-            character (len=*), intent(in) :: str
-            bad_size = (size(a,dim=1) < sz)
-            if (.not. bad_size) return
-            ierr = -1
-            write(*,*) 'interpolation: bad sizes for ' // trim(str)
-            return
-         end function bad_size
-
-
-         logical function bad_size_dble(a,sz,str)
-            real(dp) :: a(:)
-            integer, intent(in) :: sz
-            character (len=*), intent(in) :: str
-            bad_size_dble = (size(a,dim=1) < sz)
-            if (.not. bad_size_dble) return
-            ierr = -1
-            write(*,*) 'interpolation: bad sizes for ' // trim(str)
-            return
-         end function bad_size_dble
-
-
-         logical function bad_sizes(a,sz1,sz2,str)
-            real(dp) :: a(:,:)
-            integer, intent(in) :: sz1,sz2
-            character (len=*), intent(in) :: str
-            bad_sizes = (size(a,dim=1) < sz1 .or. size(a,dim=2) < sz2)
-            if (.not. bad_sizes) return
-            ierr = -1
-            write(*,*) 'interpolation: bad sizes for ' // trim(str)
-            return
-         end function bad_sizes
-
 
       end subroutine solver
 
 
       subroutine do_solver( &
-            s, nz, nvar, dx1, AF1, ldAF, neq, skip_global_corr_coeff_limit, &
+            s, nvar, AF1, ldAF, neq, skip_global_corr_coeff_limit, &
             gold_tolerances_level, tol_max_correction, tol_correction_norm, &
-            xscale1, equ1, work, lwork, iwork, liwork, &
+            work, lwork, iwork, liwork, &
             convergence_failure, ierr)
 
          type (star_info), pointer :: s
 
-         integer, intent(in) :: nz, nvar, ldAF, neq
+         integer, intent(in) :: nvar, ldAF, neq
          logical, intent(in) :: skip_global_corr_coeff_limit
 
          real(dp), pointer, dimension(:) :: AF1 ! =(ldAF, neq)
-         real(dp), pointer, dimension(:) :: dx1, equ1, xscale1
 
          ! controls
          integer, intent(in) :: gold_tolerances_level
@@ -209,7 +143,7 @@
             ddx, xgg, ddxd, ddxdd, xder, equsave
 
          integer, dimension(:), pointer :: ipiv_blk1
-         character (len=nz) :: equed1
+         character (len=s%nz) :: equed1
 
          real(dp), dimension(:,:), pointer :: A, Acopy
          real(dp), dimension(:), pointer :: A1, Acopy1
@@ -226,28 +160,29 @@
             tol_residual_norm3, tol_max_residual3, &
             tol_abs_slope_min, tol_corr_resid_product, &
             min_corr_coeff, max_corr_min, max_resid_min, max_abs_correction
-         integer :: iter, max_tries, zone, tiny_corr_cnt, i, j, k, info, &
-            last_jac_iter, max_iterations_for_jacobian, force_iter_value, &
-            reuse_count, iter_for_resid_tol2, iter_for_resid_tol3, &
+         integer :: nz, iter, max_tries, zone, tiny_corr_cnt, i, j, k, &
+            force_iter_value, iter_for_resid_tol2, iter_for_resid_tol3, &
             max_corr_k, max_corr_j, max_resid_k, max_resid_j
          integer(8) :: test_time1, time0, time1, clock_rate
          character (len=strlen) :: err_msg
          logical :: first_try, dbg_msg, passed_tol_tests, &
-            doing_extra, okay
+            doing_extra, okay, disabled_resid_tests, pass_resid_tests, &
+            pass_corr_tests_without_coeff, pass_corr_tests_with_coeff
+
          integer, parameter :: num_tol_msgs = 15
          character (len=32) :: tol_msg(num_tol_msgs)
          character (len=64) :: message
 
-         real(dp), pointer, dimension(:,:) :: dx, equ, xscale ! (nvar,nz)
+         real(dp), pointer, dimension(:) :: equ1
+         real(dp), pointer, dimension(:,:) :: equ ! (nvar,nz)
          real(dp), pointer, dimension(:,:) :: AF ! (ldAF,neq)
          real(dp), pointer, dimension(:,:,:) :: ublk, dblk, lblk ! (nvar,nvar,nz)
          real(dp), dimension(:,:,:), pointer :: lblkF, dblkF, ublkF ! (nvar,nvar,nz)
 
          include 'formats'
+         
+         nz = s% nz
 
-         dx(1:nvar,1:nz) => dx1(1:neq)
-         equ(1:nvar,1:nz) => equ1(1:neq)
-         xscale(1:nvar,1:nz) => xscale1(1:neq)
          AF(1:ldAF,1:neq) => AF1(1:ldAF*neq)
 
          tol_msg(1) = 'avg corr'
@@ -322,7 +257,6 @@
          passed_tol_tests = .false. ! goes true when pass the tests
          convergence_failure = .false. ! goes true when time to give up
          coeff = 1.d0
-         xscale = 1.d0
 
          residual_norm=0
          max_residual=0
@@ -334,7 +268,7 @@
          f=0d0
          slope=0d0
 
-         call set_xscale_info(s, nvar, nz, xscale, ierr)
+         call set_xscale_info(s, nvar, ierr)
          if (ierr /= 0) then
             if (dbg_msg) &
                write(*, *) 'solver failure: set_xscale_info returned ierr', ierr
@@ -342,7 +276,7 @@
             return
          end if
          
-         call eval_equations(s, iter, nvar, nz, dx, xscale, equ, ierr)         
+         call do_equations(ierr)                 
          if (ierr /= 0) then
             if (dbg_msg) &
                write(*, *) 'solver failure: eval_equations returned ierr', ierr
@@ -350,9 +284,7 @@
             return
          end if
          
-         call sizequ(s, &
-            iter, nvar, nz, equ, &
-            residual_norm, max_residual, max_resid_k, max_resid_j, ierr)
+         call sizequ(s, nvar, residual_norm, max_residual, max_resid_k, max_resid_j, ierr)
          if (ierr /= 0) then
             if (dbg_msg) &
                write(*, *) 'solver failure: sizequ returned ierr', ierr
@@ -376,9 +308,8 @@
          else
             max_tries = s% solver_max_tries_before_reject
          end if
-         last_jac_iter = 0
          tiny_corr_cnt = 0
-         max_iterations_for_jacobian = 1
+
          s% num_solver_iterations = 0
          
       iter_loop: do while (.not. passed_tol_tests)
@@ -410,33 +341,35 @@
                write(*,1) 'tol1 residual tolerances: norm, max', &
                   tol_residual_norm, tol_max_residual
             end if
-
-            call setmatrix(neq, dx, xscale, dxsave, ddxsave, ierr)
+            
+            call solver_test_partials(nvar, xder, size(A,dim=1), A1, ierr)
             if (ierr /= 0) then
-               call write_msg('setmatrix returned ierr /= 0')
+               call write_msg('solver_test_partials returned ierr /= 0')
                convergence_failure = .true.
                exit iter_loop
             end if
-            last_jac_iter = iter
-            s% num_solver_iterations = s% num_solver_iterations + 1
             
-         reuse_mtx_loop: do reuse_count = 0, s% num_times_solver_reuse_mtx
+            s% num_solver_iterations = s% num_solver_iterations + 1
+            if (s% model_number == 1 .and. &
+                s% num_solver_iterations > 60 .and. &
+                mod(s% num_solver_iterations,10) == 0) &
+                  write(*,*) 'first model is slow to converge: num tries', &
+                     s% num_solver_iterations
          
-            if (.not. solve_equ(reuse_count)) then ! either singular or horribly ill-conditioned
+            if (.not. solve_equ()) then ! either singular or horribly ill-conditioned
                write(err_msg, '(a, i5, 3x, a)') 'info', ierr, 'bad_matrix'
                call oops(err_msg)
                exit iter_loop
             end if
 
-            ! inform caller about the correction
-            call inspectB(s, iter, nvar, nz, dx, soln, xscale, ierr)
+            call inspectB(s, nvar, soln, ierr)
             if (ierr /= 0) then
                call oops('inspectB returned ierr')
                exit iter_loop
             end if
 
             ! compute size of scaled correction B
-            call sizeB(s, iter, nvar, nz, soln, xscale, &
+            call sizeB(s, nvar, soln, &
                   max_correction, correction_norm, max_corr_k, max_corr_j, ierr)
             if (ierr /= 0) then
                call oops('correction rejected by sizeB')
@@ -493,8 +426,7 @@
             correction_factor = min(correction_factor, temp_correction_factor)
 
             ! fix B if out of definition domain
-            call Bdomain(s, &
-               iter, nvar, nz, soln, dx, xscale, correction_factor, ierr)
+            call Bdomain(s, nvar, soln, correction_factor, ierr)
             if (ierr /= 0) then ! correction cannot be fixed
                call oops('correction rejected by Bdomain')
                exit iter_loop
@@ -539,9 +471,7 @@
 
             ! check the residuals for the equations
 
-            call sizequ(s, &
-               iter, nvar, nz, equ, &
-               residual_norm, max_residual, max_resid_k, max_resid_j, ierr)
+            call sizequ(s, nvar, residual_norm, max_residual, max_resid_k, max_resid_j, ierr)
             if (ierr /= 0) then
                call oops('sizequ returned ierr')
                exit iter_loop
@@ -572,56 +502,56 @@
             resid_norm_min = min(residual_norm, resid_norm_min)
             max_resid_min = min(max_residual, max_resid_min)
             
-            if (max_abs_correction > tol_max_correction*coeff .or. &
-                  max_residual > tol_max_residual*coeff) then
-               passed_tol_tests = .false.
-            else
-               passed_tol_tests = &
-                     (correction_norm <= tol_correction_norm*coeff .and.  &
-                      residual_norm <= tol_residual_norm*coeff) &
-                   .or.       &
-                     (abs(slope) <= tol_abs_slope_min .and.  &
-                      correction_norm*residual_norm <= tol_corr_resid_product*coeff*coeff)
-            end if
+            disabled_resid_tests = &
+               tol_max_residual > 1d2 .and. tol_residual_norm > 1d2
+            pass_resid_tests = &
+               .not. disabled_resid_tests .and. &
+               max_residual <= tol_max_residual .and. &
+               residual_norm <= tol_residual_norm
+            pass_corr_tests_without_coeff = &
+               max_abs_correction <= tol_max_correction .and. &
+               correction_norm <= tol_correction_norm
+            pass_corr_tests_with_coeff = &
+               max_abs_correction <= tol_max_correction*coeff .and. &
+               correction_norm <= tol_correction_norm*coeff
 
+            passed_tol_tests = &
+               (pass_resid_tests .and. pass_corr_tests_with_coeff) .or. &
+               (disabled_resid_tests .and. pass_corr_tests_without_coeff)
+            
             if (.not. passed_tol_tests) then
 
                if (iter >= max_tries) then
-                  if (max_abs_correction*coeff > tol_max_correction .and. &
-                      max_abs_correction*coeff <= s% tol_bad_max_correction) then
-                     passed_tol_tests = &
-                           (correction_norm <= tol_correction_norm*coeff .and.  &
-                            residual_norm <= tol_residual_norm*coeff) &
-                         .or.       &
-                           (abs(slope) <= tol_abs_slope_min .and.  &
-                            correction_norm*residual_norm <= tol_corr_resid_product*coeff*coeff)
-                     if (passed_tol_tests) then
-                        s% bad_max_corr_cnt = s% bad_max_corr_cnt + 1
-                        exit iter_loop
-                     end if
-                  end if
                   call get_message
                   message = trim(message) // ' -- give up'
                   if (len_trim(s% retry_message) == 0) &
                      s% retry_message = trim(message) // ' in solver'
                   if (dbg_msg) call write_msg(message)
-
-                     if (.true.) then
-                        if (correction_norm > tol_correction_norm*coeff) &
-                           write(*,2) 'correction_norm > tol_correction_norm*coeff', &
-                              s% model_number, correction_norm, tol_correction_norm*coeff, coeff
-                        if (max_abs_correction > tol_max_correction*coeff) &
-                           write(*,2) 'max_abs_correction > tol_max_correction*coeff', &
-                              s% model_number, max_abs_correction, tol_max_correction*coeff, coeff
-                        if (residual_norm > tol_residual_norm*coeff) &
-                           write(*,2) 'residual_norm > tol_residual_norm*coeff', &
-                              s% model_number, residual_norm, tol_residual_norm*coeff, coeff
-                        if (max_residual > tol_max_residual*coeff) &
-                           write(*,2) 'max_residual > tol_max_residual*coeff', &
-                              s% model_number, max_residual, tol_max_residual*coeff, coeff
-                     end if
-
-                  convergence_failure = .true.; exit iter_loop
+                  if (.not. pass_resid_tests .and. .not. disabled_resid_tests) then
+                     if (residual_norm > tol_residual_norm) &
+                        write(*,2) 'residual_norm > tol_residual_norm', &
+                           s% model_number, residual_norm, tol_residual_norm
+                     if (max_residual > tol_max_residual) &
+                        write(*,2) 'max_residual > tol_max_residual', &
+                           s% model_number, max_residual, tol_max_residual
+                  end if
+                  if (disabled_resid_tests) then ! no coeff for corrections
+                     if (correction_norm > tol_correction_norm) &
+                        write(*,2) 'correction_norm > tol_correction_norm', &
+                           s% model_number, correction_norm, tol_correction_norm, coeff
+                     if (max_abs_correction > tol_max_correction) &
+                        write(*,2) 'max_abs_correction > tol_max_correction', &
+                           s% model_number, max_abs_correction, tol_max_correction, coeff
+                  else ! include coeff for corrections
+                     if (correction_norm > tol_correction_norm*coeff) &
+                        write(*,2) 'correction_norm > tol_correction_norm*coeff', &
+                           s% model_number, correction_norm, tol_correction_norm*coeff, coeff
+                     if (max_abs_correction > tol_max_correction*coeff) &
+                        write(*,2) 'max_abs_correction > tol_max_correction*coeff', &
+                           s% model_number, max_abs_correction, tol_max_correction*coeff, coeff
+                  end if
+                  convergence_failure = .true.
+                  exit iter_loop
                else if (.not. first_try .and. .not. s% doing_first_model_of_run) then
                   if (correction_norm > s% corr_norm_jump_limit*corr_norm_min) then
                      call oops('avg correction jumped')
@@ -661,9 +591,6 @@
                end if
             end if
 
-            if (passed_tol_tests .and. max_abs_correction <= tol_max_correction*coeff) &
-               s% bad_max_corr_cnt = 0
-
             if (passed_tol_tests .and. (iter+1 < max_tries)) then
                ! about to declare victory... but may want to do another iteration
                force_iter_value = force_another_iteration(s, iter, s% solver_itermin)
@@ -691,8 +618,6 @@
                   exit iter_loop
                end if
             end if
-            
-            end do reuse_mtx_loop
 
             iter=iter+1
             s% solver_iter = iter
@@ -706,7 +631,66 @@
 
 
          contains
+         
+         
+         subroutine solver_test_partials(nvar, xder, ldA, A1, ierr)
+            ! create jacobian by using numerical differences for partial derivatives
+            integer, intent(in) :: nvar
+            real(dp), pointer, dimension(:,:) :: xder ! (nvar, nz)
+            integer, intent(in) :: ldA ! leading dimension of A
+            real(dp), pointer, dimension(:) :: A1
+            integer, intent(out) :: ierr
+            
+            integer :: j, k, i_var, i_var_sink, i_equ, k_off, cnt_00, cnt_m1, cnt_p1, k_lo, k_hi
+            real(dp), dimension(:,:), pointer :: save_equ, save_dx
+            real(dp) :: dvar, dequ, dxtra, &
+               dx_0, dvardx, dvardx_0, xdum, err
+            logical :: testing_partial
 
+            include 'formats'
+
+            ierr = 0
+            testing_partial = & ! check inlist parameters
+               s% solver_test_partials_dx_0 > 0d0 .and. &
+               s% solver_test_partials_k > 0 .and. &
+               s% solver_call_number == s% solver_test_partials_call_number .and. &
+               s% solver_test_partials_iter_number == iter
+            if (.not. testing_partial) return
+
+            call do_equations(ierr)
+            if (ierr /= 0) return
+
+            allocate(save_dx(nvar,nz), save_equ(nvar,nz))
+
+            do k=1,nz
+               do j=1,nvar
+                  save_dx(j,k) = s% solver_dx(j,k)
+                  save_equ(j,k) = equ(j,k)
+               end do
+            end do
+            
+            s% doing_check_partials = .true. ! let set_vars_for_solver know
+            k_lo = s% solver_test_partials_k_low
+            if (k_lo > 0 .and. k_lo <= s% nz) then
+               k_hi = s% solver_test_partials_k_high
+               if (k_hi <= 0) then
+                  k_hi = s% nz
+               else
+                  k_hi = min(k_hi,s% nz)
+               end if
+               do k = k_lo, k_hi
+                  call test_cell_partials(s, k, save_dx, save_equ, ierr)
+                  if (ierr /= 0) stop 'failed solver_test_partials'
+               end do
+            else
+               k = s% solver_test_partials_k
+               call test_cell_partials(s, k, save_dx, save_equ, ierr) 
+               if (ierr /= 0) stop 'failed solver_test_partials'
+            end if
+            deallocate(save_dx, save_equ)
+            stop 'done solver_test_partials'
+
+         end subroutine solver_test_partials
 
 
          subroutine get_message
@@ -725,14 +709,10 @@
 
 
          subroutine set_param_defaults
-
-
-
             if (s% corr_param_factor == 0) s% corr_param_factor = 10d0
             if (s% scale_max_correction == 0) s% scale_max_correction = 1d99
             if (s% corr_norm_jump_limit == 0) s% corr_norm_jump_limit = 1d99
             if (s% max_corr_jump_limit == 0) s% max_corr_jump_limit = 1d99
-
          end subroutine set_param_defaults
 
 
@@ -745,6 +725,41 @@
             call write_msg(full_msg)
             convergence_failure = .true.
          end subroutine oops
+         
+         
+         subroutine do_equations(ierr)
+            integer, intent(out) :: ierr
+            call prepare_solver_matrix(nvar, xder, size(A,dim=1), A1, ierr)
+            if (ierr /= 0) return
+            call eval_equations(s, nvar, ierr)
+            if (ierr /= 0) return
+            call s% other_after_solver_setmatrix(s% id, ierr)
+         end subroutine do_equations
+
+
+         subroutine prepare_solver_matrix(nvar, xder, ldA, A1, ierr)
+            integer, intent(in) :: nvar
+            real(dp), pointer, dimension(:,:) :: xder ! (nvar, nz)
+            integer, intent(in) :: ldA ! leading dimension of A
+            real(dp), pointer, dimension(:) :: A1
+            integer, intent(out) :: ierr
+            real(dp), pointer, dimension(:,:) :: A ! (ldA, neqns)
+            integer :: i, j, nz, neqns
+            include 'formats'
+            ierr = 0
+            nz = s% nz
+            neqns = nvar*nz
+            A(1:ldA,1:neqns) => A1(1:ldA*neqns)         
+            i = nvar*nvar*nz
+            if (size(A1,dim=1) < 3*i) then
+               write(*,*) 'prepare_solver_matrix: size(A1,dim=1) < 3*i', size(A1,dim=1), 3*i
+               ierr = -1
+               return
+            end if
+            s% ublk(1:nvar,1:nvar,1:nz) => A1(1:i)
+            s% dblk(1:nvar,1:nvar,1:nz) => A1(i+1:2*i)
+            s% lblk(1:nvar,1:nvar,1:nz) => A1(2*i+1:3*i)
+         end subroutine prepare_solver_matrix
 
 
          subroutine adjust_correction( &
@@ -780,7 +795,7 @@
 
             ierr = 0
             coeff = 0
-            dbg_adjust = .false.  !  (s% trace_k > 0 .and. s% trace_k <= nz)
+            dbg_adjust = .false.
 
             skip_eval_f = (min_corr_coeff_in == 1)
             if (skip_eval_f) then
@@ -788,7 +803,7 @@
             else
                do k=1,nz
                   do i=1,nvar
-                     dxsave(i,k) = dx(i,k)
+                     dxsave(i,k) = s% solver_dx(i,k)
                      ddxsave(i,k) = ddx(i,k)
                   end do
                end do
@@ -825,8 +840,9 @@
                coeff = max(min_corr_coeff, alam)
                s% solver_adjust_iter = iter
 
-               call apply_coeff(nvar, nz, dx, dxsave, soln, xscale, coeff, skip_eval_f)
-               call eval_equations(s, iter, nvar, nz, dx, xscale, equ, ierr)
+               call apply_coeff(nvar, nz, dxsave, soln, coeff, skip_eval_f)
+               
+               call do_equations(ierr)               
                if (ierr /= 0) then
                   if (alam > min_corr_coeff .and. s% model_number == 1) then
                      ! try again with smaller correction vector.
@@ -955,7 +971,7 @@
 
             do k=1,nz
                do i=1,nvar
-                  dx(i,k) = dxsave(i,k)
+                  s% solver_dx(i,k) = dxsave(i,k)
                   ddx(i,k) = ddxsave(i,k)
                end do
             end do
@@ -963,10 +979,9 @@
          end subroutine adjust_correction
 
 
-         subroutine apply_coeff(nvar, nz, dx, dxsave, soln, xscale, coeff, just_use_dx)
+         subroutine apply_coeff(nvar, nz, dxsave, soln, coeff, just_use_dx)
             integer, intent(in) :: nvar, nz
-            real(dp), intent(inout), dimension(:,:) :: dx
-            real(dp), intent(in), dimension(:,:) :: dxsave, soln, xscale
+            real(dp), intent(in), dimension(:,:) :: dxsave, soln
             real(dp), intent(in) :: coeff
             logical, intent(in) :: just_use_dx
             integer :: i, k
@@ -976,13 +991,13 @@
                if (coeff == 1d0) then
                   do k=1,nz
                      do i=1,nvar
-                        dx(i,k) = dx(i,k) + xscale(i,k)*soln(i,k)
+                        s% solver_dx(i,k) = s% solver_dx(i,k) + s% x_scale(i,k)*soln(i,k)
                      end do
                   end do
                else
                   do k=1,nz
                      do i=1,nvar
-                        dx(i,k) = dx(i,k) + coeff*xscale(i,k)*soln(i,k)
+                        s% solver_dx(i,k) = s% solver_dx(i,k) + coeff*s% x_scale(i,k)*soln(i,k)
                      end do
                   end do
                end if
@@ -992,39 +1007,37 @@
             if (coeff == 1d0) then
                do k=1,nz
                   do i=1,nvar
-                     dx(i,k) = dxsave(i,k) + xscale(i,k)*soln(i,k)
+                     s% solver_dx(i,k) = dxsave(i,k) + s% x_scale(i,k)*soln(i,k)
                   end do
                end do
                return
             end if
             do k=1,nz
                do i=1,nvar
-                  dx(i,k) = dxsave(i,k) + coeff*xscale(i,k)*soln(i,k)
+                  s% solver_dx(i,k) = dxsave(i,k) + coeff*s% x_scale(i,k)*soln(i,k)
                end do
             end do
          end subroutine apply_coeff
 
 
-         logical function solve_equ(reuse_count)
+         logical function solve_equ()
             use star_utils, only: start_time, update_time
             use rsp_def, only: NV, MAX_NZN
-            integer, intent(in) :: reuse_count
-            integer ::  i, k
+            integer ::  i, k, ierr
             real(dp) :: ferr, berr, total_time
 
             include 'formats'
-
-            solve_equ=.true.
-            !$omp simd
-            do i=1,neq
-               b1(i) = -equ1(i)
-            end do
-
-            info = 0
+            ierr = 0
+            solve_equ = .true.
 
             if (s% doing_timing) then
                call start_time(s, time0, total_time)
             end if
+            
+            !$omp simd
+            do i=1,neq
+               b1(i) = -equ1(i)
+            end do
             
             if (s% use_DGESVX_in_bcyclic) then
                !$omp simd
@@ -1035,8 +1048,8 @@
                end do
             end if
             
-            if (reuse_count == 0) call factor_mtx
-            if (info == 0) call solve_mtx
+            call factor_mtx(ierr)
+            if (ierr == 0) call solve_mtx(ierr)
             
             if (s% use_DGESVX_in_bcyclic) then
                !$omp simd
@@ -1050,128 +1063,39 @@
             if (s% doing_timing) then
                call update_time(s, time0, total_time, s% time_solver_matrix)
             end if
-
-            if (info /= 0) then
-               solve_equ=.false.
-               b(1:nvar,1:nz)=0
+            if (ierr /= 0) then
+               solve_equ = .false.
+               b(1:nvar,1:nz) = 0d0
             end if
 
          end function solve_equ
 
 
-         subroutine factor_mtx
+         subroutine factor_mtx(ierr)
             use star_bcyclic, only: bcyclic_factor
-            include 'formats'
+            integer, intent(out) :: ierr
             call bcyclic_factor( &
                s, nvar, nz, lblk1, dblk1, ublk1, lblkF1, dblkF1, ublkF1, ipiv_blk1, &
                B1, row_scale_factors1, col_scale_factors1, &
-               equed1, iter, info)
+               equed1, iter, ierr)
          end subroutine factor_mtx
 
 
-         subroutine solve_mtx
+         subroutine solve_mtx(ierr)
             use star_bcyclic, only: bcyclic_solve
-            include 'formats'
+            integer, intent(out) :: ierr
             call bcyclic_solve( &
                s, nvar, nz, lblk1, dblk1, ublk1, lblkF1, dblkF1, ublkF1, ipiv_blk1, &
                B1, soln1, row_scale_factors1, col_scale_factors1, equed1, &
-               iter, info)
+               iter, ierr)
          end subroutine solve_mtx
 
 
-         logical function do_enter_setmatrix(neq, dx, xscale, ierr)
-            ! create jacobian by using numerical differences for partial derivatives
-            implicit none
-            integer, intent(in) :: neq
-            real(dp), pointer, dimension(:,:) :: dx, ddx, xscale
-            integer, intent(out) :: ierr
-            logical :: need_solver_to_eval_jacobian
-            integer :: i, j, k
-            include 'formats'
-            need_solver_to_eval_jacobian = .true.
-            call enter_setmatrix(s, iter,  &
-                  nvar, nz, neq, dx, xscale, xder, need_solver_to_eval_jacobian, &
-                  size(A,dim=1), A1, ierr)
-            do_enter_setmatrix = need_solver_to_eval_jacobian
-         end function do_enter_setmatrix
-
-
-         subroutine setmatrix( &
-               neq, dx, xscale, dxsave, ddxsave, ierr)
-            ! create jacobian by using numerical differences for partial derivatives
-            use star_utils, only: e00, em1, ep1
-            integer, intent(in) :: neq
-            real(dp), pointer, dimension(:,:) :: dx, xscale, dxsave, ddxsave
-            integer, intent(out) :: ierr
-
-            integer :: j, k, i_var, i_var_sink, i_equ, k_off, cnt_00, cnt_m1, cnt_p1, k_lo, k_hi
-            real(dp), dimension(:,:), pointer :: save_equ, save_dx
-            real(dp) :: dvar, dequ, dxtra, &
-               dx_0, dvardx, dvardx_0, xdum, err
-            logical :: need_solver_to_eval_jacobian, testing_partial
-
-            include 'formats'
-
-            ierr = 0
-            testing_partial = & ! check inlist parameters
-               s% solver_test_partials_dx_0 > 0d0 .and. &
-               s% solver_test_partials_k > 0 .and. &
-               s% solver_call_number == s% solver_test_partials_call_number .and. &
-               s% solver_test_partials_iter_number == iter
-            need_solver_to_eval_jacobian = do_enter_setmatrix(neq, dx, xscale, ierr)
-            if (ierr /= 0) return
-
-            if (.not. testing_partial) return
-
-            if (testing_partial) then 
-               ! get solver_test_partials_var and solver_test_partials_dval_dx
-               call eval_partials(s, nvar, xscale, ierr)
-               if (ierr /= 0) return
-            else
-               call eval_equations(s, iter, nvar, nz, dx, xscale, equ, ierr)
-               if (ierr /= 0) then
-                  write(*,3) '1st call eval_equations failed'
-                  stop 'setmatrix'
-               end if
-            end if
-
-            allocate(save_dx(nvar,nz), save_equ(nvar,nz))
-
-            do k=1,nz
-               do j=1,nvar
-                  save_dx(j,k) = dx(j,k)
-                  save_equ(j,k) = equ(j,k)
-               end do
-            end do
-            
-            s% doing_check_partials = .true. ! let set_vars_for_solver know
-            k_lo = s% solver_test_partials_k_low
-            if (k_lo > 0 .and. k_lo <= s% nz) then
-               k_hi = s% solver_test_partials_k_high
-               if (k_hi <= 0) then
-                  k_hi = s% nz
-               else
-                  k_hi = min(k_hi,s% nz)
-               end if
-               do k = k_lo, k_hi
-                  call test_cell_partials(k, dx, xscale, save_dx, save_equ, ierr)
-                  if (ierr /= 0) stop 'failed solver_test_partials'
-               end do
-            else
-               k = s% solver_test_partials_k
-               call test_cell_partials(k, dx, xscale, save_dx, save_equ, ierr) 
-               if (ierr /= 0) stop 'failed solver_test_partials'
-            end if
-            deallocate(save_dx, save_equ)
-            stop 'done solver_test_partials'
-
-         end subroutine setmatrix
-
-
-         subroutine test_cell_partials(k, dx, xscale, save_dx, save_equ, ierr) 
+         subroutine test_cell_partials(s, k, save_dx, save_equ, ierr) 
             use star_utils, only: lookup_nameofvar, lookup_nameofequ
+            type (star_info), pointer :: s
             integer, intent(in) :: k
-            real(dp), pointer, dimension(:,:) :: dx, xscale, save_dx, save_equ
+            real(dp), pointer, dimension(:,:) :: save_dx, save_equ
             integer, intent(out) :: ierr
             integer :: i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             include 'formats'
@@ -1220,26 +1144,27 @@
             end if
             if (s% solver_test_partials_equ_name == 'all') then
                do i_equ = 1, s% nvar_hydro
-                  call test_equ_partials( &
+                  call test_equ_partials(s, &
                      i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                     k, dx, xscale, save_dx, save_equ, ierr)   
+                     k, save_dx, save_equ, ierr)   
                   if (ierr /= 0) stop 'failed solver_test_partials'
                end do
             else
-               call test_equ_partials( &
+               call test_equ_partials(s, &
                   i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                  k, dx, xscale, save_dx, save_equ, ierr)   
+                  k, save_dx, save_equ, ierr)   
                if (ierr /= 0) stop 'failed solver_test_partials'
             end if     
          end subroutine test_cell_partials               
 
 
-         subroutine test_equ_partials( &
+         subroutine test_equ_partials(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, dx, xscale, save_dx, save_equ, ierr)
+               k, save_dx, save_equ, ierr)
+            type (star_info), pointer :: s
             integer, intent(in) :: &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, k
-            real(dp), pointer, dimension(:,:) :: dx, xscale, save_dx, save_equ
+            real(dp), pointer, dimension(:,:) :: save_dx, save_equ
             integer, intent(out) :: ierr
             real(dp) :: dvardx_0
             integer :: i, j_var_xa_index, j_var_sink_xa_index
@@ -1247,25 +1172,25 @@
             if (i_equ /= 0) then
                if (s% solver_test_partials_var_name == 'all') then
                   do i = 1, s% nvar_hydro
-                     call test3_partials( &
+                     call test3_partials(s, &
                         i_equ, i, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                        k, dx, xscale, save_dx, save_equ, ierr)
+                        k, save_dx, save_equ, ierr)
                      if (ierr /= 0) stop 'failed solver_test_partials'
                      write(*,*)
                   end do
                else if (i_var == 0) then
                   write(*,*) 'failed to recognize variable name'
                else
-                  call test3_partials( &
+                  call test3_partials(s, &
                      i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                     k, dx, xscale, save_dx, save_equ, ierr)
+                     k, save_dx, save_equ, ierr)
                   if (ierr /= 0) stop 'failed solver_test_partials'               
                end if
             else ! i_equ == 0
                if (i_var /= 0) then
-                  call test1_partial( &
+                  call test1_partial(s, &
                      i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                     k, 0, s% solver_test_partials_dval_dx, dx, xscale, save_dx, save_equ, ierr)
+                     k, 0, s% solver_test_partials_dval_dx, save_dx, save_equ, ierr)
                else ! i_var == 0
                   if (s% solver_test_partials_var <= 0) then
                      write(*,2) 'need to set solver_test_partials_var', s% solver_test_partials_var
@@ -1285,10 +1210,10 @@
                      j_var_xa_index = 0
                      j_var_sink_xa_index = 0
                   end if
-                  call test1_partial( &
+                  call test1_partial(s, &
                      i_equ, s% solver_test_partials_var, s% solver_test_partials_dx_sink, &
                      j_var_xa_index, j_var_sink_xa_index, &                     
-                     k, 0, s% solver_test_partials_dval_dx, dx, xscale, save_dx, save_equ, ierr)
+                     k, 0, s% solver_test_partials_dval_dx, save_dx, save_equ, ierr)
                end if
                if (ierr /= 0) stop 'failed solver_test_partials'
             end if               
@@ -1296,10 +1221,11 @@
          end subroutine test_equ_partials
          
          
-         subroutine get_lnE_partials( &
+         subroutine get_lnE_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
             use eos_def, only: i_lnE
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
@@ -1314,15 +1240,16 @@
          end subroutine get_lnE_partials
          
          
-         subroutine get_lnP_partials( &
+         subroutine get_lnP_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
             use eos_def, only: i_lnPgas
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
             if (i_var_xa_index > 0) then 
-               dvardx0_00 = s% Pgas(k)/s% P(k) * &
+               dvardx0_00 = s% Pgas(k)/s% Peos(k) * &
                   (s% d_eos_dxa(i_lnPgas,i_var_xa_index,k) - s% d_eos_dxa(i_lnPgas,i_var_sink_xa_index,k))
             else if (i_var == s% i_lnd) then
                dvardx0_00 = s% chiRho_for_partials(k)
@@ -1332,10 +1259,11 @@
          end subroutine get_lnP_partials
          
          
-         subroutine get_grad_ad_partials( &
+         subroutine get_grad_ad_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
             use eos_def, only: i_grad_ad
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
@@ -1350,9 +1278,10 @@
          end subroutine get_grad_ad_partials
          
          
-         subroutine get_eps_nuc_partials( &
+         subroutine get_eps_nuc_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
@@ -1366,9 +1295,10 @@
          end subroutine get_eps_nuc_partials
          
          
-         subroutine get_non_nuc_neu_partials( &
+         subroutine get_non_nuc_neu_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
@@ -1382,57 +1312,60 @@
          end subroutine get_non_nuc_neu_partials
          
          
-         subroutine get_gradT_partials( &
+         subroutine get_gradT_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
             if (i_var > s% nvar_hydro) then 
                dvardx0_00 = 0d0
             else if (i_var == s% i_lnd) then
-               dvardx0_m1 = s% d_gradT_dlndm1(k)
-               dvardx0_00 = s% d_gradT_dlnd00(k)
+               dvardx0_m1 = s% gradT_ad(k)%d1Array(i_lnd_m1)
+               dvardx0_00 = s% gradT_ad(k)%d1Array(i_lnd_00)
             else if (i_var == s% i_lnT) then
-               dvardx0_m1 = s% d_gradT_dlnTm1(k)
-               dvardx0_00 = s% d_gradT_dlnT00(k)
+               dvardx0_m1 = s% gradT_ad(k)%d1Array(i_lnT_m1)
+               dvardx0_00 = s% gradT_ad(k)%d1Array(i_lnT_00)
             else if (i_var == s% i_lnR) then
-               dvardx0_00 = s% d_gradT_dlnR(k)
+               dvardx0_00 = s% gradT_ad(k)%d1Array(i_lnR_00)
             else if (i_var == s% i_lum) then
-               dvardx0_00 = s% d_gradT_dL(k)
+               dvardx0_00 = s% gradT_ad(k)%d1Array(i_L_00)
             else if (i_var == s% i_ln_cvpv0) then
-               dvardx0_00 = s% d_gradT_dln_cvpv0(k)
+               dvardx0_00 = s% gradT_ad(k)%d1Array(i_xtra1_00)
             else if (i_var == s% i_w_div_wc) then
-               dvardx0_00 = s% d_gradT_dw_div_wc(k)
+               dvardx0_00 = s% gradT_ad(k)%d1Array(i_xtra2_00)
             end if
          end subroutine get_gradT_partials
          
          
-         subroutine get_mlt_vc_partials( &
+         subroutine get_mlt_vc_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
             if (i_var > s% nvar_hydro) then 
                dvardx0_00 = 0d0
             else if (i_var == s% i_lnd) then
-               dvardx0_m1 = s% d_mlt_vc_dlndm1(k)
-               dvardx0_00 = s% d_mlt_vc_dlnd00(k)
+               dvardx0_m1 = s% mlt_vc_ad(k)%d1Array(i_lnd_m1)
+               dvardx0_00 = s% mlt_vc_ad(k)%d1Array(i_lnd_00)
             else if (i_var == s% i_lnT) then
-               dvardx0_m1 = s% d_mlt_vc_dlnTm1(k)
-               dvardx0_00 = s% d_mlt_vc_dlnT00(k)
+               dvardx0_m1 = s% mlt_vc_ad(k)%d1Array(i_lnT_m1)
+               dvardx0_00 = s% mlt_vc_ad(k)%d1Array(i_lnT_00)
             else if (i_var == s% i_lnR) then
-               dvardx0_00 = s% d_mlt_vc_dlnR(k)
+               dvardx0_00 = s% mlt_vc_ad(k)%d1Array(i_lnR_00)
             else if (i_var == s% i_lum) then
-               dvardx0_00 = s% d_mlt_vc_dL(k)
+               dvardx0_00 = s% mlt_vc_ad(k)%d1Array(i_L_00)
             end if
          end subroutine get_mlt_vc_partials
          
          
-         subroutine get_opacity_partials( &
+         subroutine get_opacity_partials(s, &
                k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                dvardx0_m1, dvardx0_00, dvardx0_p1)
+            type (star_info), pointer :: s
             integer, intent(in) :: k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index
             real(dp), intent(out) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0; dvardx0_00 = 0d0; dvardx0_p1 = 0d0
@@ -1446,12 +1379,13 @@
          end subroutine get_opacity_partials
 
 
-         subroutine test3_partials( &
+         subroutine test3_partials(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, dx, xscale, save_dx, save_equ, ierr)
+               k, save_dx, save_equ, ierr)
+            type (star_info), pointer :: s
             integer, intent(in) :: &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, k
-            real(dp), pointer, dimension(:,:) :: dx, xscale, save_dx, save_equ
+            real(dp), pointer, dimension(:,:) :: save_dx, save_equ
             integer, intent(out) :: ierr
             real(dp) :: dvardx0_m1, dvardx0_00, dvardx0_p1
             dvardx0_m1 = 0d0
@@ -1459,74 +1393,78 @@
             dvardx0_p1 = 0d0
             if (i_equ > 0) then
                if (i_var > s% nvar_hydro) then ! testing abundance
-                  if (k > 1) dvardx0_m1 = s% lblk(i_equ,i_var,k)/xscale(i_var,k-1) - s% lblk(i_equ,i_var_sink,k)/xscale(i_var_sink,k-1)
-                  dvardx0_00 = s% dblk(i_equ,i_var,k)/xscale(i_var,k) - s% dblk(i_equ,i_var_sink,k)/xscale(i_var_sink,k)
-                  if (k < s% nz) dvardx0_p1 = s% ublk(i_equ,i_var,k)/xscale(i_var,k+1) - s% ublk(i_equ,i_var_sink,k)/xscale(i_var_sink,k+1)
+                  if (k > 1) dvardx0_m1 = &
+                     s% lblk(i_equ,i_var,k)/s% x_scale(i_var,k-1) - s% lblk(i_equ,i_var_sink,k)/s% x_scale(i_var_sink,k-1)
+                  dvardx0_00 = &
+                     s% dblk(i_equ,i_var,k)/s% x_scale(i_var,k) - s% dblk(i_equ,i_var_sink,k)/s% x_scale(i_var_sink,k)
+                  if (k < s% nz) dvardx0_p1 = &
+                     s% ublk(i_equ,i_var,k)/s% x_scale(i_var,k+1) - s% ublk(i_equ,i_var_sink,k)/s% x_scale(i_var_sink,k+1)
                else
-                  if (k > 1) dvardx0_m1 = s% lblk(i_equ,i_var,k)/xscale(i_var,k-1)
-                  dvardx0_00 = s% dblk(i_equ,i_var,k)/xscale(i_var,k)
-                  if (k < s% nz) dvardx0_p1 = s% ublk(i_equ,i_var,k)/xscale(i_var,k+1)
+                  if (k > 1) dvardx0_m1 = s% lblk(i_equ,i_var,k)/s% x_scale(i_var,k-1)
+                  dvardx0_00 = s% dblk(i_equ,i_var,k)/s% x_scale(i_var,k)
+                  if (k < s% nz) dvardx0_p1 = s% ublk(i_equ,i_var,k)/s% x_scale(i_var,k+1)
                end if
             else if (i_equ == -1) then ! 'lnE'
-               call get_lnE_partials( &
+               call get_lnE_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1)
             elseif (i_equ == -2) then ! 'eps_nuc'
-               call get_eps_nuc_partials( &
+               call get_eps_nuc_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1)
             else if (i_equ == -3) then ! 'opacity'
-               call get_opacity_partials( &
+               call get_opacity_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1)
             else if (i_equ == -4) then ! 'lnP'
-               call get_lnP_partials( &
+               call get_lnP_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1) 
             else if (i_equ == -5) then ! 'non_nuc_neu'
-               call get_non_nuc_neu_partials( &
+               call get_non_nuc_neu_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1) 
             else if (i_equ == -6) then ! 'gradT'
-               call get_gradT_partials( &
+               call get_gradT_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1) 
             else if (i_equ == -7) then ! 'mlt_vc'
-               call get_mlt_vc_partials( &
+               call get_mlt_vc_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1) 
             else if (i_equ == -8) then ! 'grad_ad'
-               call get_grad_ad_partials( &
+               call get_grad_ad_partials(s, &
                   k, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
                   dvardx0_m1, dvardx0_00, dvardx0_p1) 
             end if 
             if (k > 1) then
-               call test1_partial( &
+               call test1_partial(s, &
                   i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                  k, -1, dvardx0_m1, dx, xscale, save_dx, save_equ, ierr)
+                  k, -1, dvardx0_m1, save_dx, save_equ, ierr)
                if (ierr /= 0) stop 'test3_partials'
             end if
-            call test1_partial( &
+            call test1_partial(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, 0, dvardx0_00, dx, xscale, save_dx, save_equ, ierr)
+               k, 0, dvardx0_00, save_dx, save_equ, ierr)
             if (ierr /= 0) stop 'test3_partials'
             if (k < s% nz) then
-               call test1_partial( &
+               call test1_partial(s, &
                   i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                  k, 1, dvardx0_p1, dx, xscale, save_dx, save_equ, ierr)
+                  k, 1, dvardx0_p1, save_dx, save_equ, ierr)
                if (ierr /= 0) stop 'test3_partials'
             end if
          end subroutine test3_partials
          
 
-         subroutine test1_partial(&
+         subroutine test1_partial(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, k_off, dvardx_0, dx, xscale, save_dx, save_equ, ierr)
+               k, k_off, dvardx_0, save_dx, save_equ, ierr)
             use chem_def, only: chem_isos
+            type (star_info), pointer :: s
             integer, intent(in) :: &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, k, k_off
             real(dp), intent(in) :: dvardx_0
-            real(dp), pointer, dimension(:,:) :: dx, xscale, save_dx, save_equ
+            real(dp), pointer, dimension(:,:) :: save_dx, save_equ
             character (len=3) :: k_off_str
             integer, intent(out) :: ierr 
             character (len = 32) :: equ_str
@@ -1536,20 +1474,20 @@
 
             if (i_var > s% nvar_hydro) then ! testing abundance
                dx_0 = s% solver_test_partials_dx_0 * &
-                  max(abs(s% xa_start(i_var_xa_index,k) + dx(i_var,k)), &
+                  max(abs(s% xa_start(i_var_xa_index,k) + s% solver_dx(i_var,k)), &
                       abs(s% xa_start(i_var_xa_index,k)), &
                       1d-99)
                write(*,1) 'var name ' // chem_isos% name(s% chem_id(i_var_xa_index))
                write(*,1) 'sink name ' // chem_isos% name(s% chem_id(i_var_sink_xa_index))
             else
                dx_0 = s% solver_test_partials_dx_0 * &
-                  max(abs(s% xh_start(i_var,k) + dx(i_var,k)), &
+                  max(abs(s% xh_start(i_var,k) + s% solver_dx(i_var,k)), &
                       abs(s% xh_start(i_var,k)))
                if (dx_0 == 0d0) dx_0 = s% solver_test_partials_dx_0
             end if
-            dvardx = dfridr( &
+            dvardx = dfridr(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, k_off, dx_0, dx, save_dx, err)
+               k, k_off, dx_0, save_dx, err)
             if (dvardx == 0d0 .and. abs(dvardx_0) < 1d-14) then
                xdum = 0d0
             else if (dvardx_0 == 0d0 .and. abs(dvardx) < 1d-14) then
@@ -1604,12 +1542,17 @@
                else
                   equ_str = 'unknown'
                end if
-               write(*,'(a70,2x,i5,f10.3,3x,a,f10.3,99(3x,a,1pe26.16))') &
-                  'log dfridr rel_diff partials wrt  '  // trim(s% nameofvar(i_var)) // &
-                  '(k' // k_off_str // ' of ' // trim(equ_str) // '(k)', &
-                  k, safe_log10(xdum), 'log uncertainty', safe_log10(uncertainty), &
-                  'analytic', dvardx_0, 'numeric', dvardx, &
-                  'analytic/numeric', abs(dvardx_0)/max(1d-99,abs(dvardx))
+               write(*,'(a25,3x,i5,4x,a,f12.5,4x,a,f12.5,99(4x,a,1pe22.12))') &
+                  'd_' // trim(equ_str) // '(k)/d_' // trim(s% nameofvar(i_var)) // &
+                  '(k' // trim(k_off_str), &
+                  k, 'lg rel diff', safe_log10(xdum), 'lg uncertainty', safe_log10(uncertainty), &
+                  'Analytic', dvardx_0, 'Numeric', dvardx
+!               write(*,'(a70,2x,i5,f10.3,3x,a,f10.3,99(3x,a,1pe26.16))') &
+!                  'log dfridr rel_diff partials wrt  '  // trim(s% nameofvar(i_var)) // &
+!                  '(k' // k_off_str // ' of ' // trim(equ_str) // '(k)', &
+!                  k, safe_log10(xdum), 'log uncertainty', safe_log10(uncertainty), &
+!                  'analytic', dvardx_0, 'numeric', dvardx, &
+!                  'analytic/numeric', abs(dvardx_0)/max(1d-99,abs(dvardx))
                   
             else
                write(*,*)
@@ -1622,15 +1565,16 @@
          end subroutine test1_partial
             
             
-         real(dp) function dfridr_func( &
+         real(dp) function dfridr_func(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, k_off, delta_x, dx, save_dx) result(val)
+               k, k_off, delta_x, save_dx) result(val)
+            type (star_info), pointer :: s
             integer, intent(in) :: &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, k, k_off
             real(dp), intent(in) :: delta_x
-            real(dp), pointer, dimension(:,:) :: dx, save_dx
+            real(dp), pointer, dimension(:,:) :: save_dx
             include 'formats'
-            dx(i_var,k+k_off) = save_dx(i_var,k+k_off) + delta_x
+            s% solver_dx(i_var,k+k_off) = save_dx(i_var,k+k_off) + delta_x
             if (i_var_xa_index > 0) then ! changing abundance
                !write(*,2) 'new dx, x for abundance', i_var, &
                !     dx(i_var,k+k_off), s% xa(i_var - s% nvar_hydro,k+k_off)
@@ -1638,9 +1582,9 @@
                   write(*,2) 'bad i_var_sink_xa_index', i_var_sink_xa_index
                   stop 'star_solver dfridr_func'
                end if
-               dx(i_var_sink,k+k_off) = save_dx(i_var_sink,k+k_off) - delta_x
+               s% solver_dx(i_var_sink,k+k_off) = save_dx(i_var_sink,k+k_off) - delta_x
             end if
-            call eval_equations(s, iter, nvar, nz, dx, xscale, equ, ierr)            
+            call do_equations(ierr)
             if (ierr /= 0) then
                !exit
                write(*,3) 'call eval_equations failed in dfridr_func'
@@ -1657,7 +1601,7 @@
             else if (i_equ == -3) then
                val = s% opacity(k)
             else if (i_equ == -4) then
-               val = s% lnP(k)
+               val = s% lnPeos(k)
             else if (i_equ == -5) then
                val = s% non_nuc_neu(k)
             else if (i_equ == -6) then
@@ -1669,19 +1613,20 @@
             else
                val = 0d0
             end if
-            dx(i_var,k+k_off) = save_dx(i_var,k+k_off)
+            s% solver_dx(i_var,k+k_off) = save_dx(i_var,k+k_off)
             if (i_var_sink > 0) & ! restore sink abundance
-               dx(i_var_sink,k+k_off) = save_dx(i_var_sink,k+k_off)
+               s% solver_dx(i_var_sink,k+k_off) = save_dx(i_var_sink,k+k_off)
          end function dfridr_func
 
 
-         real(dp) function dfridr( &
+         real(dp) function dfridr(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, k_off, hx, dx, save_dx, err)
+               k, k_off, hx, save_dx, err)
+            type (star_info), pointer :: s
             integer, intent(in) :: &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, k, k_off
             real(dp), intent(in) :: hx
-            real(dp), pointer, dimension(:,:) :: dx, save_dx
+            real(dp), pointer, dimension(:,:) :: save_dx
             real(dp), intent(out) :: err
             !  this routine returns the first derivative of a function func(x)
             !  at the point x, by ridders method of polynomial extrapolation.
@@ -1696,13 +1641,13 @@
             dfridr = 0d0
             hh = hx
             ! 2nd order central difference
-            f1 = dfridr_func( &
+            f1 = dfridr_func(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, k_off, hh, dx, save_dx)
+               k, k_off, hh, save_dx)
             !write(*,2) 'f1', 1, f1, save_dx(i_var,k) + hh
-            f2 = dfridr_func( &
+            f2 = dfridr_func(s, &
                i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-               k, k_off, -hh, dx, save_dx)
+               k, k_off, -hh, save_dx)
             !write(*,2) 'f2', 1, f2, save_dx(i_var,k) - hh
             a(1,1) = (f1 - f2)/(2d0*hh)
             !write(*,2) 'dfdx', 1, a(1,1), &
@@ -1713,13 +1658,13 @@
             ! and higher orders of extrapolation
             do i=2,ntab
                hh = hh/con
-               f1 = dfridr_func( &
+               f1 = dfridr_func(s, &
                   i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                  k, k_off, hh, dx, save_dx)
+                  k, k_off, hh, save_dx)
                !write(*,2) 'f1', i, f1, save_dx(i_var,k) + hh
-               f2 = dfridr_func( &
+               f2 = dfridr_func(s, &
                   i_equ, i_var, i_var_sink, i_var_xa_index, i_var_sink_xa_index, &
-                  k, k_off, -hh, dx, save_dx)
+                  k, k_off, -hh, save_dx)
                !write(*,2) 'f2', i, f2, save_dx(i_var,k) - hh
                a(1,i) = (f1 - f2)/(2d0*hh)
                !write(*,2) 'dfdx', i, a(1,i), &
@@ -1759,14 +1704,14 @@
                return
             end if
             do k=1,nz
-               x(1,k) = s% u_face(k)
+               x(1,k) = s% u_face_ad(k)%val
                if (is_bad_num(x(1,k))) then
                   write(*,2) 'exit_setmatrix x(1,k)', k, x(1,k)
                   stop
                end if
             end do
             do k=1,nz
-               x(2,k) = s% P_face(k)
+               x(2,k) = s% P_face_ad(k)%val
                if (is_bad_num(x(2,k))) then
                   write(*,2) 'exit_setmatrix x(2,k)', k, x(2,k)
                   stop
@@ -1807,9 +1752,7 @@
             if (.not. dbg_msg) return
             
             if (max_resid_j < 0) then
-               call sizequ(s, &
-                  iter, nvar, nz, equ, &
-                  residual_norm, max_residual, max_resid_k, max_resid_j, ierr)
+               call sizequ(s, nvar, residual_norm, max_residual, max_resid_k, max_resid_j, ierr)
             end if
             
             if (max_resid_j > 0) then
@@ -1819,7 +1762,7 @@
             end if
             
             if (max_corr_j < 0) then
-               call sizeB(s, iter, nvar, nz, B, xscale, &
+               call sizeB(s, nvar, B, &
                   max_correction, correction_norm, max_corr_k, max_corr_j, ierr)
             end if
             
@@ -1844,20 +1787,29 @@
             call store_mix_type_str(max_resid_mix_type_str, integer_string, 4, k+1)
             call store_mix_type_str(max_resid_mix_type_str, integer_string, 5, k+2)
 
-  111       format(i6, 2x, i3, 2x, a, f8.4, &
-               2x, a, 1x, e10.3, 2x, a19, 1x, i5, e11.3, 2x, a, &
-               2x, a, 1x, e10.3, 2x, a14, 1x, i5, e11.3, 2x, a, &
-               2x, a)
+  111       format(i6, i3, 2x, a, f7.4, &
+               1x, a, 1x, e10.3, 2x, a18, 1x, i5, e13.5, a, &
+               1x, a, 1x, e10.3, 2x, a16, 1x, i5, e13.5, a, &
+               1x, a)
+!  111       format(i6, 2x, i3, 2x, a, f8.4, &
+!               2x, a, 1x, e10.3, 2x, a19, 1x, i5, e11.3, 2x, a, &
+!               2x, a, 1x, e10.3, 2x, a14, 1x, i5, e11.3, 2x, a, &
+!               2x, a)
             write(*,111) &
                s% model_number, iter, &
                'coeff', coeff,  &
-               '   avg resid', residual_norm,  &
+               'avg resid', residual_norm,  &
+!               '   avg resid', residual_norm,  &
                trim(max_resid_str), max_resid_k, max_residual, &
-               'mix type ' // trim(max_resid_mix_type_str),  &
-               '   avg corr', correction_norm,  &
+               ' mix type ' // trim(max_resid_mix_type_str),  &
+               'avg corr', correction_norm,  &
+!               'mix type ' // trim(max_resid_mix_type_str),  &
+!               '   avg corr', correction_norm,  &
                trim(max_corr_str), max_corr_k, max_correction,  &
-               'mix type ' // trim(max_corr_mix_type_str),  &
-               '   ' // trim(msg)
+               ' mix type ' // trim(max_corr_mix_type_str),  &
+               ' ' // trim(msg)
+!               'mix type ' // trim(max_corr_mix_type_str),  &
+!               '   ' // trim(msg)
                
             if (is_bad(slope)) stop 'write_msg'
 
@@ -1872,35 +1824,27 @@
 
             ierr = 0
 
-            i = num_work_params+1
-
+            i = 1
             A1(1:3*nvar*neq) => work(i:i+3*nvar*neq-1); i = i+3*nvar*neq
-
+            s% equ1(1:neq) => work(i:i+neq-1); i = i+neq
+            s% equ(1:nvar,1:nz) => s% equ1(1:neq)
+            equ1 => s% equ1
+            equ => s% equ
             dxsave1(1:neq) => work(i:i+neq-1); i = i+neq
             dxsave(1:nvar,1:nz) => dxsave1(1:neq)
-
             ddxsave1(1:neq) => work(i:i+neq-1); i = i+neq
             ddxsave(1:nvar,1:nz) => ddxsave1(1:neq)
-
             B1 => work(i:i+neq-1); i = i+neq
             B(1:nvar,1:nz) => B1(1:neq)
-
             soln1 => work(i:i+neq-1); i = i+neq
             soln(1:nvar,1:nz) => soln1(1:neq)
-
             grad_f1(1:neq) => work(i:i+neq-1); i = i+neq
             grad_f(1:nvar,1:nz) => grad_f1(1:neq)
-
             rhs(1:nvar,1:nz) => work(i:i+neq-1); i = i+neq
-
             xder(1:nvar,1:nz) => work(i:i+neq-1); i = i+neq
-
             ddx(1:nvar,1:nz) => work(i:i+neq-1); i = i+neq
-
             row_scale_factors1(1:neq) => work(i:i+neq-1); i = i+neq
-
             col_scale_factors1(1:neq) => work(i:i+neq-1); i = i+neq
-
             save_ublk1(1:nvar*neq) => work(i:i+nvar*neq-1); i = i+nvar*neq
             save_dblk1(1:nvar*neq) => work(i:i+nvar*neq-1); i = i+nvar*neq
             save_lblk1(1:nvar*neq) => work(i:i+nvar*neq-1); i = i+nvar*neq
@@ -1914,7 +1858,7 @@
                return
             end if
 
-            i = num_iwork_params+1
+            i = 1
             ipiv1(1:neq) => iwork(i:i+neq-1); i = i+neq
             if (i-1 > liwork) then
                ierr = -1
@@ -1976,7 +1920,6 @@
             eval_f = eval_f/2
          end function eval_f
 
-
       end subroutine do_solver
 
 
@@ -1984,16 +1927,11 @@
          type (star_info), pointer :: s
          integer, intent(in) :: nvar, nz
          integer, intent(out) :: lwork, liwork, ierr
-
          integer :: neq
-
-         include 'formats'
-
          ierr = 0
          neq = nvar*nz
-         liwork = num_iwork_params + neq
-         lwork = num_work_params + neq*(6*nvar + 10)
-
+         liwork = neq
+         lwork = neq*(7*nvar + 10)
       end subroutine get_solver_work_sizes
 
 

@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2016-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2016-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -29,6 +29,7 @@
       use const_def
       use chem_def, only: ih1, ihe3, ihe4
       use utils_lib
+      use auto_diff_support
 
       implicit none
 
@@ -46,17 +47,17 @@
          integer :: ierr
 
          include 'formats'
+         
+         if (s% RSP2_flag) then
+            stop 'need to add mlt_vc and Hp_face to remesh_split_merge'
+         end if
 
          s% amr_split_merge_has_undergone_remesh(:) = .false.
 
          remesh_split_merge = keep_going
          if (.not. s% okay_to_remesh) return
 
-         !if (.not. s% u_flag) stop 'remesh_split_merge requires u_flag = true'
-
-         if (s% rotation_flag) then
-            old_J = total_angular_momentum(s)
-         end if
+         if (s% rotation_flag) old_J = total_angular_momentum(s)
 
          call amr(s,ierr)
          if (ierr /= 0) then
@@ -87,6 +88,7 @@
       subroutine amr(s,ierr)
          use chem_def, only: ih1
          use hydro_rotation, only: w_div_w_roche_jrot, update1_i_rot_from_xh
+         use star_utils, only: get_r_from_xh
          type (star_info), pointer :: s
          integer, intent(out) :: ierr
          real(dp) :: TooBig, TooSmall, MaxTooBig, MaxTooSmall, dr, minE
@@ -167,10 +169,9 @@
             write(*,*) '                 split', num_split
             write(*,*) '                merged', num_merge
          end if
-         if (s% rotation_flag) then
-            !update moments of inertia and omega
+         if (s% rotation_flag) then !update moments of inertia and omega
             do k=1, s% nz
-               r00 = exp(s% xh(s% i_lnR, k))
+               r00 = get_r_from_xh(s,k)
                if (s% fitted_fp_ft_i_rot) then
                   s% w_div_w_crit_roche(k) = &
                      w_div_w_roche_jrot(r00,s% m(k),s% j_rot(k),s% cgrav(k), &
@@ -257,8 +258,10 @@
          real(dp) :: &
             oversize_ratio, undersize_ratio, abs_du_div_cs, outer_fraction, &
             xmin, xmax, dx_actual, xR, xL, dq_min, dq_max, dx_baseline, &
-            outer_dx_baseline, inner_dx_baseline, inner_outer_q, r_core_cm
-         logical :: hydrid_zoning, log_zoning, logtau_zoning, du_div_cs_limit_flag
+            outer_dx_baseline, inner_dx_baseline, inner_outer_q, r_core_cm, &
+            target_dr_core, target_dlnR_envelope, target_dlnR_core, target_dr_envelope
+         logical :: hydrid_zoning, flipped_hydrid_zoning, log_zoning, logtau_zoning, &
+            du_div_cs_limit_flag
          integer :: nz, nz_baseline, k, kmin, nz_r_core
          real(dp), pointer :: v(:), r_for_v(:)
 
@@ -266,11 +269,23 @@
          
          nz = s% nz
          hydrid_zoning = s% split_merge_amr_hybrid_zoning
+         flipped_hydrid_zoning = s% split_merge_amr_flipped_hybrid_zoning
          log_zoning = s% split_merge_amr_log_zoning
          logtau_zoning = s% split_merge_amr_logtau_zoning
          nz_baseline = s% split_merge_amr_nz_baseline         
          nz_r_core = s% split_merge_amr_nz_r_core
-         r_core_cm = s% split_merge_amr_r_core_cm
+         if (s% split_merge_amr_mesh_delta_coeff /= 1d0) then
+            nz_baseline = int(dble(nz_baseline)/s% split_merge_amr_mesh_delta_coeff)
+            nz_r_core = int(dble(nz_r_core)/s% split_merge_amr_mesh_delta_coeff)
+         end if
+         if (s% split_merge_amr_r_core_cm > 0d0) then
+            r_core_cm = s% split_merge_amr_r_core_cm
+         else if (s% split_merge_amr_nz_r_core_fraction > 0d0) then
+            r_core_cm = s% R_center + &
+               s% split_merge_amr_nz_r_core_fraction*(s% r(1) - s% R_center)
+         else
+            r_core_cm = s% R_center
+         end if
          dq_min = s% split_merge_amr_dq_min
          dq_max = s% split_merge_amr_dq_max
          inner_outer_q = 0d0
@@ -285,7 +300,12 @@
          end if
          
          if (hydrid_zoning) then
-            stop 'hydrid_zoning not ready'
+            target_dr_core = (r_core_cm - s% R_center)/nz_r_core
+            target_dlnR_envelope = &
+               (s% lnR(1) - log(max(1d0,r_core_cm)))/(nz_baseline - nz_r_core)
+         else if (flipped_hydrid_zoning) then
+            target_dlnR_core = (log(max(1d0,r_core_cm)) - s% R_center)/(nz_baseline - nz_r_core)
+            target_dr_envelope = (s% r(1) - r_core_cm)/nz_r_core
          else if (logtau_zoning) then
             k = nz
             xmin = log(tau_center)
@@ -314,19 +334,57 @@
          
             xL = xR
             dx_baseline = inner_dx_baseline
-            if (logtau_zoning) then
+            if (hydrid_zoning) then
+               if (s% r(k) < r_core_cm) then
+                  xR = s% r(k)
+                  if (k == nz) then
+                     xL = s% R_center
+                  else
+                     xL = s% r(k+1)
+                  end if
+                  dx_baseline = target_dr_core
+               else
+                  xR = log(s% r(k))
+                  if (k == nz) then
+                     xL = log(max(1d0,s% R_center))
+                  else
+                     xL = log(s% r(k+1))
+                  end if
+                  dx_baseline = target_dlnR_envelope
+               end if
+            else if (flipped_hydrid_zoning) then
+               if (s% r(k) <= r_core_cm) then
+                  xR = log(s% r(k))
+                  if (k == nz) then
+                     xL = log(max(1d0,s% R_center))
+                  else
+                     xL = log(s% r(k+1))
+                  end if
+                  dx_baseline = target_dlnR_core
+               else
+                  xR = s% r(k)
+                  if (k == nz) then
+                     xL = s% R_center
+                  else
+                     xL = s% r(k+1)
+                  end if
+                  dx_baseline = target_dr_core
+               end if
+            else if (logtau_zoning) then
                xR = log(s% tau(k))
             else if (log_zoning) then
                xR = log(s% r(k)) ! s% lnR(k) may not be set since making many changes
             else
                xR = s% r(k)
             end if
+            
             if (s% split_merge_amr_avoid_repeated_remesh .and. &
                   (s% split_merge_amr_avoid_repeated_remesh .and. &
                      s% amr_split_merge_has_undergone_remesh(k))) cycle
             dx_actual = xR - xL
             if (logtau_zoning) dx_actual = -dx_actual ! make dx_actual > 0
             
+            ! first check for cells that are too big and need to be split
             oversize_ratio = dx_actual/dx_baseline
             if (TooBig < oversize_ratio .and. s% dq(k) > 5d0*dq_min) then
                if (k < nz .or. s% split_merge_amr_okay_to_split_nz) then
@@ -335,16 +393,34 @@
                   end if
                end if
             end if
+            
+            ! next check for cells that are too small and need to be merged
 
-            if (s% merge_amr_ignore_surface_cells .and. k<=s% merge_amr_k_for_ignore_surface_cells) then
-               cycle
-            end if
+            if (s% merge_amr_ignore_surface_cells .and. &
+                  k<=s% merge_amr_k_for_ignore_surface_cells) cycle
 
-            if(abs(dx_actual)>0d0) then
+            if (abs(dx_actual)>0d0) then
                undersize_ratio = max(dx_baseline/dx_actual, dq_min/s% dq(k))
             else
                undersize_ratio = dq_min/s% dq(k)
             end if
+            
+            if (s% merge_amr_max_abs_du_div_cs >= 0d0) then
+               call check_merge_limits
+            else if (TooSmall < undersize_ratio .and. s% dq(k) < dq_max/5d0) then
+               TooSmall = undersize_ratio; iTooSmall = k
+            end if
+            
+         end do
+         
+         
+         contains
+         
+         subroutine check_merge_limits
+            ! Pablo's additions to modify when merge
+            ! merge_amr_max_abs_du_div_cs
+            ! merge_amr_du_div_cs_limit_only_for_compression
+            ! merge_amr_inhibit_at_jumps
 
             du_div_cs_limit_flag = .false.
 
@@ -375,7 +451,7 @@
             else
                abs_du_div_cs = 0d0
             end if
-            
+         
             if (du_div_cs_limit_flag) then
                if (s% merge_amr_inhibit_at_jumps) then 
                   ! reduce undersize_ratio for large jumps
@@ -396,8 +472,8 @@
                   TooSmall = undersize_ratio; iTooSmall = k
                end if
             end if
-            
-         end do
+         end subroutine check_merge_limits
+         
          
       end subroutine biggest_smallest
 
@@ -413,17 +489,14 @@
          integer :: i, ip, i0, im, k, q, nz, qi_max, qim_max, op_err
          real(dp) :: &
             rR, rL, drR, drL, rC, rho, P, v, &
-            dm, dm_i, dm_ip, m_old, &
-            star_PE0, star_PE1, &
-            cell_mom, cell_ie, min_IE, d_IE, d_KE, d_Esum, &
-            Esum_i, KE_i, PE_i, IE_i, &
-            Esum_ip, KE_ip, PE_ip, IE_ip, &
-            Esum, KE, PE, IE, cell_IE_plus_KE, &
-            Esum1, KE1, PE1, IE1, &
+            dm, dm_i, dm_ip, m_old, star_PE0, star_PE1, &
+            cell_mom, cell_ie, cell_etrb, min_IE, d_IE, d_KE, d_Esum, &
+            Esum_i, KE_i, PE_i, IE_i, Etrb_i, &
+            Esum_ip, KE_ip, PE_ip, IE_ip, Etrb_ip, &
+            Esum, KE, PE, IE, Esum1, KE1, PE1, IE1, &
             Etot0, KEtot0, PEtot0, IEtot0, &
             Etot1, KEtot1, PEtot1, IEtot1, &
-            Et, Et_i, Et_ip, vt_i, vt_ip, &
-            j_rot_new, j_rot_p1_new, J_old, &
+            vt_i, vt_ip, j_rot_new, j_rot_p1_new, J_old, &
             dmbar_old, dmbar_p1_old, dmbar_p2_old, &
             dmbar_new, dmbar_p1_new
          include 'formats'
@@ -452,13 +525,12 @@
             end if
          end if
 
-         merge_center = (i == nz)
-
-         
+         merge_center = (i == nz)         
          if (merge_center) i = i-1
          ip = i+1
          if (s% split_merge_amr_avoid_repeated_remesh .and. &
-               (s% amr_split_merge_has_undergone_remesh(i) .or. s% amr_split_merge_has_undergone_remesh(ip))) then
+               (s% amr_split_merge_has_undergone_remesh(i) .or. &
+                  s% amr_split_merge_has_undergone_remesh(ip))) then
             s% amr_split_merge_has_undergone_remesh(i) = .true.
             s% amr_split_merge_has_undergone_remesh(ip) = .true.
             
@@ -467,9 +539,8 @@
 
          ! merge contents of zone ip into zone i; remove zone ip
          ! get energies for i and ip before merge
-         call get_cell_energies(s, i, Esum_i, KE_i, PE_i, IE_i)
-         call get_cell_energies(s, ip, Esum_ip, KE_ip, PE_ip, IE_ip)
-         cell_IE_plus_KE = KE_i + KE_ip + IE_i + IE_ip
+         call get_cell_energies(s, i, Esum_i, KE_i, PE_i, IE_i, Etrb_i)
+         call get_cell_energies(s, ip, Esum_ip, KE_ip, PE_ip, IE_ip, Etrb_ip)
 
          if (s% rotation_flag) then
             ! WARNING! this is designed to conserve angular momentum, but not to explicitly conserve energy
@@ -540,6 +611,11 @@
 
          cell_ie = IE_i + IE_ip
          s% energy(i) = cell_ie/dm
+         
+         if (s% RSP2_flag) then
+            cell_etrb = Etrb_i + Etrb_ip
+            s% w(i) = sqrt(cell_etrb/dm)
+         end if
 
          if (s% rotation_flag) then
             s% j_rot(i) = j_rot_new
@@ -569,13 +645,17 @@
             else if (s% v_flag) then
                s% v(im) = s% v(i0)
             end if
+            if (s% RSP2_flag) then
+               s% w(im) = s% w(i0)
+               s% Hp_face(im) = s% Hp_face(i0)
+            end if
             s% energy(im) = s% energy(i0)
             s% dPdr_dRhodr_info(im) = s% dPdr_dRhodr_info(i0)
             s% cgrav(im) = s% cgrav(i0)
             s% alpha_mlt(im) = s% alpha_mlt(i0)
             s% lnT(im) = s% lnT(i0)
             s% D_mix(im) = s% D_mix(i0)
-            s% conv_vel(im) = s% conv_vel(i0)
+            s% mlt_vc(im) = s% mlt_vc(i0)
             s% csound(im) = s% csound(i0)
             s% tau(im) = s% tau(i0)
             s% opacity(im) = s% opacity(i0)
@@ -596,7 +676,10 @@
          
          if (s% RTI_flag) s% xh(s% i_alpha_RTI,i) = s% alpha_RTI(i)
          
-         if (s% conv_vel_flag) s% xh(s% i_ln_cvpv0,i) = log(s% conv_vel(i)+s% conv_vel_v0)
+         if (s% RSP2_flag) then
+            s% xh(s% i_w,i) = s% w(i)
+            s% xh(s% i_Hp,i) = s% Hp_face(i)
+         end if
 
          ! do this after move cells since need new r(ip) to calc new rho(i).
          call update_xh_eos_and_kap(s,i,species,new_xa,ierr)
@@ -613,6 +696,7 @@
       
       
       subroutine revise_star_radius(s, star_PE0, star_PE1)
+         use star_utils, only: store_r_in_xh, get_lnR_from_xh
          type (star_info), pointer :: s
          real(dp), intent(in) :: star_PE0, star_PE1
          integer :: k
@@ -626,8 +710,8 @@
          do k=1,s% nz
             s% r(k) = s% r(k)*frac
             if (s% model_number == -6918) write(*,2) 's% r(k)', k, s% r(k)
-            s% lnR(k) = log(s% r(k))
-            s% xh(s% i_lnR,k) = s% lnR(k)
+            call store_r_in_xh(s, k, s% r(k))
+            s% lnR(k) = get_lnR_from_xh(s,k)
          end do
          s% r_center = frac*s% r_center
       end subroutine revise_star_radius
@@ -653,11 +737,11 @@
       end function get_star_PE
 
 
-      subroutine get_cell_energies(s, k, Etot, KE, PE, IE)
+      subroutine get_cell_energies(s, k, Etot, KE, PE, IE, Etrb)
          type (star_info), pointer :: s
          integer, intent(in) :: k
-         real(dp), intent(out) :: Etot, KE, PE, IE
-         real(dp) :: dm, mC, v0, v1, P, rL, rC
+         real(dp), intent(out) :: Etot, KE, PE, IE, Etrb
+         real(dp) :: dm, mC, v0, v1, rL, rC
          include 'formats'
          dm = s% dm(k)
          if (s% u_flag) then
@@ -670,9 +754,15 @@
                v1 = s% v_center
             end if
             KE = 0.25d0*dm*(v0**2 + v1**2)
+         else
+            KE = 0d0
          end if
-         P = s% P(k)
          IE = s% energy(k)*dm
+         if (s% RSP2_flag) then
+            Etrb = pow2(s% w(k))*dm
+         else
+            Etrb = 0d0
+         end if
          if (s% cgrav(k) == 0) then
             PE = 0
          else
@@ -725,7 +815,7 @@
 
       subroutine do_split(s, i_split, species, tau_center, grad_xa, new_xa, ierr)
          use alloc, only: reallocate_star_info_arrays
-         use star_utils, only: set_rmid
+         use star_utils, only: set_rmid, store_r_in_xh
          type (star_info), pointer :: s
          integer, intent(in) :: i_split, species
          real(dp) :: tau_center, grad_xa(species), new_xa(species)
@@ -733,15 +823,15 @@
          integer :: i, ip, j, jp, q, nz, nz_old, &
             iR, iC, iL, imin, imax, op_err
          real(dp) :: &
-            cell_Esum_old, cell_KE_old, cell_PE_old, cell_IE_old, rho_RR, rho_iR, &
-            rR, rL, dr, dr_old, rC, dV, dVR, dVL, dM, dML, dMR, rho, v, v2, energy, &
-            v2_R, energy_R, rho_R, v2_C, energy_C, rho_C, v2_L, energy_L, rho_L, &
+            cell_Esum_old, cell_KE_old, cell_PE_old, cell_IE_old, cell_Etrb_old, &
+            rho_RR, rho_iR, rR, rL, dr, dr_old, rC, dV, dVR, dVL, dM, dML, dMR, rho, &
+            v, v2, energy, v2_R, energy_R, rho_R, v2_C, energy_C, rho_C, v2_L, energy_L, rho_L, &
             dLeft, dRght, dCntr, grad_rho, grad_energy, grad_v2, &
             sumx, sumxp, new_xaL, new_xaR, star_PE0, star_PE1, got_cell_Esum, &
             got_cell_Esum_R, got_cell_KE_R, got_cell_PE_R, got_cell_IE_R, &
             got_cell_Esum_L, got_cell_KE_L, got_cell_PE_L, got_cell_IE_L, &
             grad_alpha, f, new_alphaL, new_alphaR, v_R, v_C, v_L, min_dm, &
-            conv_velL, conv_velR, tauL, tauR, Et, Et_L, Et_C, Et_R, grad_Et, &
+            mlt_vcL, mlt_vcR, tauL, tauR, etrb, etrb_L, etrb_C, etrb_R, grad_etrb, &
             j_rot_new, dmbar_old, dmbar_p1_old, dmbar_new, dmbar_p1_new, dmbar_p2_new, J_old
          logical :: okay, done, use_new_grad_rho
          include 'formats'
@@ -758,7 +848,7 @@
          ip = i+1
 
          call get_cell_energies( &
-            s, i, cell_Esum_old, cell_KE_old, cell_PE_old, cell_IE_old)
+            s, i, cell_Esum_old, cell_KE_old, cell_PE_old, cell_IE_old, cell_Etrb_old)
 
          if (s% rotation_flag .and. i<nz) then
             ! WARNING! this is designed to conserve angular momentum, but not to explicitly conserve energy
@@ -778,14 +868,14 @@
          end if
 
          rR = s% r(i)
-         conv_velR = s% conv_vel(i)
+         mlt_vcR = s% mlt_vc(i)
          if (i == nz) then
             rL = s% R_center
-            conv_velL = 0d0
+            mlt_vcL = 0d0
             tauL = tau_center
          else
             rL = s% r(ip)
-            conv_velL = s% conv_vel(ip)
+            mlt_vcL = s% mlt_vc(ip)
             tauL = s% tau(ip)
          end if
          
@@ -815,12 +905,16 @@
          dm = s% dm(i)
          rho = dm/dV
          
-         v = s% u(i)
-         v2 = v*v
+         if (s% u_flag) then
+            v = s% u(i)
+            v2 = v*v
+         else ! not used
+            v = 0
+            v2 = 0
+         end if
          
          energy = s% energy(i)
-            
-         ! estimate values of energy and velocity^2 at cell boundaries
+         if (s% RSP2_flag) etrb = pow2(s% w(i))
 
          ! use iR, iC, and iL for getting values to determine slopes
          if (i > 1 .and. i < nz_old) then
@@ -874,6 +968,13 @@
             
          if (s% RTI_flag) grad_alpha = get1_grad( &
             s% alpha_RTI(iL), s% alpha_RTI(iC), s% alpha_RTI(iR), dLeft, dCntr, dRght)
+         
+         if (s% RSP2_flag) then
+            etrb_R = pow2(s% w(iR))
+            etrb_C = pow2(s% w(iC))
+            etrb_L = pow2(s% w(iL))
+            grad_etrb = get1_grad(etrb_L, etrb_C, etrb_R, dLeft, dCntr, dRght)
+         end if
          
          if (s% u_flag) then
             v_R = s% u(iR)
@@ -937,7 +1038,7 @@
                s% alpha_mlt(jp) = s% alpha_mlt(j)
                s% lnT(jp) = s% lnT(j)
                s% D_mix(jp) = s% D_mix(j)
-               s% conv_vel(jp) = s% conv_vel(j)
+               s% mlt_vc(jp) = s% mlt_vc(j)
                s% csound(jp) = s% csound(j)
                s% tau(jp) = s% tau(j)
                s% opacity(jp) = s% opacity(j)
@@ -1033,6 +1134,17 @@
          
          s% energy(i) = energy_R
          s% energy(ip) = energy_L
+         
+         if (s% RSP2_flag) then
+            etrb_R = etrb + grad_etrb*dr/4
+            etrb_L = (dm*etrb - dmR*etrb_R)/dmL
+            if (etrb_R < 0d0 .or. etrb_L < 0d0) then
+               etrb_R = etrb
+               etrb_L = etrb
+            end if
+            s% w(i) = sqrt(max(0d0,etrb_R))
+            s% w(ip) = sqrt(max(0d0,etrb_L))
+         end if
 
          if (s% u_flag) then
             v2_R = v2 + grad_v2*dr/4
@@ -1064,12 +1176,10 @@
             s% dPdr_dRhodr_info(ip) = s% dPdr_dRhodr_info(i)
          end if
          
-         if (s% conv_vel_flag) then ! set new conv_vel
-            if (i == 1) then
-               s% conv_vel(ip) = s% conv_vel(i)
-            else
-               s% conv_vel(ip) = (conv_velL*dML + conv_velR*dMR)/dM
-            end if
+         if (i == 1) then
+            s% mlt_vc(ip) = s% mlt_vc(i)
+         else
+            s% mlt_vc(ip) = (mlt_vcL*dML + mlt_vcR*dMR)/dM
          end if
          
          s% tau(ip) = tauR + (tauL - tauR)*dMR/dM
@@ -1113,7 +1223,8 @@
             end do
          end if
          
-         if (s% u_flag) s% u_face(ip) = 0.5d0*(s% u(i) + s% u(ip))
+         if (s% u_flag) s% u_face_ad(ip)%val = 0.5d0*(s% u(i) + s% u(ip))
+            ! just for setting u_face_start so don't need partials
 
          ! r, q, m, u_face unchanged for face i
          dVR = dV - dVL
@@ -1132,7 +1243,7 @@
          s% lnT(ip) = s% lnT(i)
          s% T(ip) = s% T(i)
          s% D_mix(ip) = s% D_mix(i)
-         s% conv_vel(ip) = s% conv_vel(i)
+         s% mlt_vc(ip) = s% mlt_vc(i)
          s% csound(ip) = s% csound(i)
          s% opacity(ip) = s% opacity(i)
          if (s% RTI_flag) s% alpha_RTI(ip) = s% alpha_RTI(i)
@@ -1179,8 +1290,8 @@
                   0.5d0*(s% xh(s% i_lum,i) + s% L_center)
             end if
          end if
-
-         s% xh(s% i_lnR,ip) = log(s% r(ip))
+         
+         call store_r_in_xh(s, ip, s% r(ip))
          if (s% u_flag) then
             s% xh(s% i_u,i) = s% u(i)
             s% xh(s% i_u,ip) = s% u(ip)
@@ -1191,10 +1302,6 @@
          if (s% RTI_flag) then
             s% xh(s% i_alpha_RTI,i) = s% alpha_RTI(i)
             s% xh(s% i_alpha_RTI,ip) = s% alpha_RTI(ip)
-         end if
-         if (s% conv_vel_flag) then
-            s% xh(s% i_ln_cvpv0,i) = log(s% conv_vel(i)+s% conv_vel_v0)
-            s% xh(s% i_ln_cvpv0,ip) = log(s% conv_vel(ip)+s% conv_vel_v0)
          end if
 
          call update_xh_eos_and_kap(s,i,species,new_xa,ierr)
@@ -1219,6 +1326,8 @@
          use micro, only: do_kap_for_cell
          use eos_lib, only: eos_gamma_DE_get_PT
          use chem_lib, only: basic_composition_info
+         use star_utils, only: store_lnT_in_xh, get_T_and_lnT_from_xh, &
+            store_rho_in_xh, get_rho_and_lnd_from_xh
          type (star_info), pointer :: s
          integer, intent(in) :: i, species
          real(dp) :: new_xa(species)
@@ -1228,9 +1337,8 @@
          include 'formats'
          ierr = 0
          rho = s% dm(i)/get_dV(s,i)
-         s% rho(i) = rho
-         s% lnd(i) = log(rho)
-         s% xh(s% i_lnd,i) = s% lnd(i)
+         call store_rho_in_xh(s, i, rho)
+         call get_rho_and_lnd_from_xh(s, i, s% rho(i), s% lnd(i))
          logRho = s% lnd(i)/ln10
          do q=1,species
             new_xa(q) = s% xa(q,i)
@@ -1240,9 +1348,8 @@
             species, new_xa, rho, logRho, s% energy(i), s% lnT(i), &
             new_lnT, revised_energy, ierr)
          if (ierr /= 0) return
-         s% xh(s% i_lnT,i) = new_lnT
-         s% lnT(i) = new_lnT
-         s% T(i) = exp(new_lnT)
+         call store_lnT_in_xh(s, i, new_lnT)
+         call get_T_and_lnT_from_xh(s, i, s% T(i), s% lnT(i))
       end subroutine update_xh_eos_and_kap
 
 

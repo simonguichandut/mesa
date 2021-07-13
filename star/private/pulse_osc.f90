@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -189,7 +189,7 @@ contains
 
     ! at the centre d²P/dr² = -4πGρ²/3
     d2P_dr2_c = -four_thirds*pi*s% cgrav(s% nz)*rho_c**2
-    P_c = s%P(s% nz) - 0.5*d2P_dr2_c*s% rmid(s% nz)**2
+    P_c = s%Peos(s% nz) - 0.5*d2P_dr2_c*s% rmid(s% nz)**2
     global_data(9) = r_outer**2*d2P_dr2_c/P_c
     global_data(10) = r_outer**2*eval_center_d2(s%rmid, s%rho, k_a(n_sg), k_b(n_sg)) / rho_c
 
@@ -416,7 +416,7 @@ contains
         r = s%r(k)
         lnq = log(s%m_grav(k)/m_outer)
         T = eval_face(s%dq, s%T, k, 1, s%nz)
-        P = eval_face(s%dq, s%P, k, 1, s%nz)
+        P = eval_face(s%dq, s%Peos, k, 1, s%nz)
         if (s%interpolate_rho_for_pulse_data) then
            rho = eval_face(s%dq, s%rho, k, k_a, k_b)
         else
@@ -425,7 +425,7 @@ contains
         nabla = s%gradT(k) ! Not quite right; gradT can be discontinuous
         L = s%L(k)
         kap = eval_face(s%dq, s%opacity, k, k_a, k_b)
-        eps = eval_face(s%dq, s%eps_nuc, k, k_a, k_b) + eval_face(s%dq, s%eps_grav, k, k_a, k_b)
+        eps = eval_face(s%dq, s%eps_nuc, k, k_a, k_b) + eval_face(s%dq, s%eps_grav_ad%val, k, k_a, k_b)
         Gamma_1 = eval_face(s%dq, s%gamma1, k, k_a, k_b)
         nabla_ad = eval_face(s%dq, s%grada, k, k_a, k_b)
         delta = eval_face(s%dq, s%chiT, k, k_a, k_b)/eval_face(s%dq, s%chiRho, k, k_a, k_b)
@@ -441,7 +441,7 @@ contains
         kap_rho = eval_face(s%dq, s%d_opacity_dlnd, k, k_a, k_b)/kap
         eps_T = eval_face(s%dq, s%d_epsnuc_dlnT, k, k_a, k_b)
         eps_rho = eval_face(s%dq, s%d_epsnuc_dlnd, k, k_a, k_b)
-        P_tot_gas = eval_face(s%dq, s%P, k, 1, s%nz)/eval_face(s%dq, s%Pgas, k, k_a, k_b)
+        P_tot_gas = eval_face(s%dq, s%Peos, k, 1, s%nz)/eval_face(s%dq, s%Pgas, k, k_a, k_b)
         nabla_rad = s%gradr(k)  ! Not quite right; gradr can be discontinuous
         X_H1 = eval_face_X(s, h1, k, k_a, k_b)
         X_H2 = eval_face_X(s, h2, k, k_a, k_b)
@@ -522,7 +522,7 @@ contains
         nabla = eval_center(s%r, s%gradT, k_a, k_b)
         L = 0d0
         kap = eval_center(s%rmid, s%opacity, k_a, k_b)
-        eps = eval_center(s%rmid, s%eps_nuc, k_a, k_b) + eval_center(s%rmid, s%eps_grav, k_a, k_b)
+        eps = eval_center(s%rmid, s%eps_nuc, k_a, k_b) + eval_center(s%rmid, s%eps_grav_ad%val, k_a, k_b)
         Gamma_1 = eval_center(s%rmid, s%gamma1, k_a, k_b)
         nabla_ad = eval_center(s%rmid, s%grada, k_a, k_b)
         delta = eval_center(s%rmid, s%chiT, k_a, k_b)/eval_center(s%rmid, s%chiRho, k_a, k_b)
@@ -538,7 +538,7 @@ contains
         kap_rho = eval_center(s%rmid, s%d_opacity_dlnd, k_a, k_b)/kap
         eps_T = eval_center(s%rmid, s%d_epsnuc_dlnT, k_a, k_b)
         eps_rho = eval_center(s%rmid, s%d_epsnuc_dlnd, k_a, k_b)
-        P_tot_gas = eval_center(s%rmid, s%P, 1, s%nz)/eval_center(s%rmid, s%Pgas, k_a, k_b)
+        P_tot_gas = eval_center(s%rmid, s%Peos, 1, s%nz)/eval_center(s%rmid, s%Pgas, k_a, k_b)
         nabla_rad = eval_center(s%r, s%gradr, k_a, k_b)
         X_H1 = eval_center_X(s, h1, k_a, k_b)
         X_H2 = eval_center_X(s, h2, k_a, k_b)

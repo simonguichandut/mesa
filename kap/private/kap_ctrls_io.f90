@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-! Copyright (C) 2020 Bill Paxton and The MESA Team
+! Copyright (C) 2020 The MESA Team
 !
 ! MESA is free software; you can use it and/or modify
 ! it under the combined terms and restrictions of the MESA MANIFESTO
@@ -65,6 +65,7 @@
    logical :: cubic_interpolation_in_X
    logical :: cubic_interpolation_in_Z
    logical :: include_electron_conduction
+   logical :: use_blouin_conductive_opacities
 
    logical :: use_Zbase_for_Type1
    logical :: use_Type2_opacities
@@ -75,7 +76,8 @@
    logical :: show_info
 
    ! hooks
-   logical :: use_other_elect_cond_opacity, use_other_compton_opacity
+   logical :: use_other_elect_cond_opacity, &
+      use_other_compton_opacity, use_other_radiative_opacity
 
    ! debugging
    logical :: dbg
@@ -119,7 +121,7 @@
 
       cubic_interpolation_in_X, cubic_interpolation_in_Z, &
 
-      include_electron_conduction, &
+      include_electron_conduction, use_blouin_conductive_opacities, &
 
       use_Zbase_for_Type1, use_Type2_opacities, &
 
@@ -128,7 +130,9 @@
 
       show_info, &
 
-      use_other_elect_cond_opacity, use_other_compton_opacity, &
+      use_other_elect_cond_opacity, &
+      use_other_compton_opacity, &
+      use_other_radiative_opacity, &
 
       read_extra_kap_inlist1, extra_kap_inlist1_name, &
       read_extra_kap_inlist2, extra_kap_inlist2_name, &
@@ -282,6 +286,7 @@
       rq% cubic_interpolation_in_X = cubic_interpolation_in_X
       rq% cubic_interpolation_in_Z = cubic_interpolation_in_Z
       rq% include_electron_conduction = include_electron_conduction
+      rq% use_blouin_conductive_opacities = use_blouin_conductive_opacities
       rq% use_Zbase_for_Type1 = use_Zbase_for_Type1
       rq% use_Type2_opacities = use_Type2_opacities
 
@@ -424,14 +429,11 @@
       end if
       rq% kap_lowT_option = kap_lowT_option
 
-
-      ! this parameter needs to be removed
-      rq% min_logT_for_logR_gt_1 = 3.3d0
-
       rq% show_info = show_info
 
       rq% use_other_elect_cond_opacity = use_other_elect_cond_opacity
       rq% use_other_compton_opacity = use_other_compton_opacity
+      rq% use_other_radiative_opacity = use_other_radiative_opacity
 
    end subroutine store_controls
 

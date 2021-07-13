@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-! Copyright (C) 2020 Bill Paxton and The MESA Team
+! Copyright (C) 2020 The MESA Team
 !
 ! MESA is free software; you can use it and/or modify
 ! it under the combined terms and restrictions of the MESA MANIFESTO
@@ -34,13 +34,10 @@
    public :: read_namelist, write_namelist
    private
 
-   logical :: use_max_SCVH_for_PT, use_max_CMS_for_PT
-
    ! controls for HELM
    real(dp) :: Z_all_HELM ! all HELM for Z >= this unless use_FreeEOS
    real(dp) :: logT_all_HELM ! all HELM for lgT >= this
    real(dp) :: logT_low_all_HELM ! all HELM for lgT <= this
-   real(dp) :: logT_ion_HELM, logT_neutral_HELM, max_logRho_neutral_HELM
    real(dp) :: coulomb_temp_cut_HELM, coulomb_den_cut_HELM
 
    ! controls for OPAL_SCVH
@@ -80,7 +77,8 @@
    character (len=30) :: suffix_for_FreeEOS_Z(num_FreeEOS_Zs)
          
    ! controls for CMS
-   logical :: use_CMS
+   logical :: use_CMS, CMS_use_fixed_composition
+   integer :: CMS_fixed_composition_index
    real(dp) :: max_Z_for_any_CMS, max_Z_for_all_CMS ! set to -1 to disable CMS
    real(dp) :: logQ_max_for_any_CMS, logQ_max_for_all_CMS      ! for upper blend zone in logQ = logRho - 2*logT + 12
    real(dp) :: logQ_min_for_any_CMS, logQ_min_for_all_CMS      ! for lower blend zone in logQ
@@ -110,17 +108,22 @@
    real(dp) :: mass_fraction_limit_for_Skye
    real(dp) :: Skye_min_gamma_for_solid ! The minimum Gamma_i at which to use the solid free energy fit (below this, extrapolate).
    real(dp) :: Skye_max_gamma_for_liquid ! The maximum Gamma_i at which to use the liquid free energy fit (above this, extrapolate).
-   
+   character(len=128) :: Skye_solid_mixing_rule ! Currently support 'Ogata' or 'PC'
+
+   logical :: use_simple_Skye_blends
+   real(dp) :: logRho_min_for_any_Skye, logRho_min_for_all_Skye
+   real(dp) :: logT_min_for_any_Skye, logT_min_for_all_Skye
 
    ! misc
-   logical :: include_radiation, always_skip_elec_pos, always_include_elec_pos
+   logical :: include_radiation, include_elec_pos
    logical :: eosDT_use_linear_interp_for_X
    logical :: eosDT_use_linear_interp_to_HELM
    character(len=128) :: eosDT_file_prefix
-   character(len=128) :: eosPT_file_prefix
    logical :: okay_to_convert_ierr_to_skip
    real(dp) :: tiny_fuzz
 
+   ! other eos
+   logical :: use_other_eos_component, use_other_eos_results
    
    ! debugging
    logical :: dbg
@@ -147,17 +150,11 @@
 
    namelist /eos/ &
       use_FreeEOS, &
-      use_max_SCVH_for_PT, &
-      use_max_CMS_for_PT, &
-
       
       ! controls for HELM
       Z_all_HELM, & ! all HELM for Z >= this unless use_FreeEOS
       logT_all_HELM, & ! all HELM for lgT >= this
       logT_low_all_HELM, & ! all HELM for lgT <= this
-      logT_ion_HELM, &
-      logT_neutral_HELM, &
-      max_logRho_neutral_HELM, &
       coulomb_temp_cut_HELM, &
       coulomb_den_cut_HELM, &
       
@@ -198,7 +195,8 @@
       suffix_for_FreeEOS_Z, &
       
       ! controls for CMS
-      use_CMS, &
+      use_CMS, CMS_use_fixed_composition, &
+      CMS_fixed_composition_index, &
       max_Z_for_any_CMS, &
       max_Z_for_all_CMS, & ! set to -1 to disable CMS
       logQ_max_for_any_CMS, &
@@ -235,18 +233,26 @@
       mass_fraction_limit_for_Skye, &
       Skye_min_gamma_for_solid, & ! The minimum Gamma_i at which to use the solid free energy fit (below this, extrapolate).
       Skye_max_gamma_for_liquid, & ! The maximum Gamma_i at which to use the liquid free energy fit (above this, extrapolate).
+      Skye_solid_mixing_rule, &
+
+      use_simple_Skye_blends, &
+      logRho_min_for_any_Skye, &
+      logRho_min_for_all_Skye, &
+      logT_min_for_any_Skye, &
+      logT_min_for_all_Skye, &
 
       ! misc
       include_radiation, &
-      always_skip_elec_pos, &
-      always_include_elec_pos, &
+      include_elec_pos, &
       eosDT_use_linear_interp_for_X, &
       eosDT_use_linear_interp_to_HELM, &
       eosDT_file_prefix, &
-      eosPT_file_prefix, &
       
       okay_to_convert_ierr_to_skip, &
       tiny_fuzz, &
+
+      ! other eos
+      use_other_eos_component, use_other_eos_results, &
 
       ! debugging
       dbg, &
@@ -404,15 +410,10 @@
 
    subroutine store_controls(rq)
       type (EoS_General_Info), pointer :: rq
-      rq% use_max_SCVH_for_PT = use_max_SCVH_for_PT
-      rq% use_max_CMS_for_PT = use_max_CMS_for_PT      
       ! controls for HELM
       rq% Z_all_HELM = Z_all_HELM
       rq% logT_all_HELM = logT_all_HELM
       rq% logT_low_all_HELM = logT_low_all_HELM
-      rq% logT_ion_HELM = logT_ion_HELM
-      rq% logT_neutral_HELM = logT_neutral_HELM
-      rq% max_logRho_neutral_HELM = max_logRho_neutral_HELM
       rq% coulomb_temp_cut_HELM = coulomb_temp_cut_HELM
       rq% coulomb_den_cut_HELM = coulomb_den_cut_HELM      
       ! controls for OPAL_SCVH
@@ -452,6 +453,8 @@
          suffix_for_FreeEOS_Z(1:num_FreeEOS_Zs)      
       ! controls for CMS
       rq% use_CMS = use_CMS
+      rq% CMS_use_fixed_composition = CMS_use_fixed_composition
+      rq% CMS_fixed_composition_index = CMS_fixed_composition_index
       rq% max_Z_for_any_CMS = max_Z_for_any_CMS
       rq% max_Z_for_all_CMS = max_Z_for_all_CMS
       rq% logQ_max_for_any_CMS = logQ_max_for_any_CMS
@@ -485,16 +488,26 @@
       rq% mass_fraction_limit_for_Skye = mass_fraction_limit_for_Skye
       rq%Skye_min_gamma_for_solid = Skye_min_gamma_for_solid
       rq%Skye_max_gamma_for_liquid = Skye_max_gamma_for_liquid
+      rq%Skye_solid_mixing_rule = Skye_solid_mixing_rule
+      rq% use_simple_Skye_blends = use_simple_Skye_blends
+      rq% logRho_min_for_any_Skye = logRho_min_for_any_Skye
+      rq% logRho_min_for_all_Skye = logRho_min_for_all_Skye
+      rq% logT_min_for_any_Skye = logT_min_for_any_Skye
+      rq% logT_min_for_all_Skye = logT_min_for_all_Skye
+
       ! misc
       rq% include_radiation = include_radiation
-      rq% always_skip_elec_pos = always_skip_elec_pos
-      rq% always_include_elec_pos = always_include_elec_pos
+      rq% include_elec_pos = include_elec_pos
       rq% eosDT_use_linear_interp_for_X = eosDT_use_linear_interp_for_X
       rq% eosDT_use_linear_interp_to_HELM = eosDT_use_linear_interp_to_HELM      
       rq% eosDT_file_prefix = eosDT_file_prefix      
-      rq% eosPT_file_prefix = eosPT_file_prefix
       rq% okay_to_convert_ierr_to_skip = okay_to_convert_ierr_to_skip
       rq% tiny_fuzz = tiny_fuzz
+
+      ! other eos
+      rq% use_other_eos_component = use_other_eos_component
+      rq% use_other_eos_results = use_other_eos_results
+
       ! debugging
       rq% dbg = dbg
       rq% logT_lo = logT_lo
@@ -533,15 +546,10 @@
 
    subroutine set_controls_for_writing(rq)
       type (EoS_General_Info), pointer :: rq
-      use_max_SCVH_for_PT = rq% use_max_SCVH_for_PT
-      use_max_CMS_for_PT = rq% use_max_CMS_for_PT      
       ! controls for HELM
       Z_all_HELM = rq% Z_all_HELM
       logT_all_HELM = rq% logT_all_HELM
       logT_low_all_HELM = rq% logT_low_all_HELM
-      logT_ion_HELM = rq% logT_ion_HELM
-      logT_neutral_HELM = rq% logT_neutral_HELM
-      max_logRho_neutral_HELM = rq% max_logRho_neutral_HELM
       coulomb_temp_cut_HELM = rq% coulomb_temp_cut_HELM
       coulomb_den_cut_HELM = rq% coulomb_den_cut_HELM      
       ! controls for OPAL_SCVH
@@ -581,6 +589,8 @@
          rq% suffix_for_FreeEOS_Z(1:num_FreeEOS_Zs)      
       ! controls for CMS
       use_CMS = rq% use_CMS
+      CMS_use_fixed_composition = rq% CMS_use_fixed_composition
+      CMS_fixed_composition_index = rq% CMS_fixed_composition_index
       max_Z_for_any_CMS = rq% max_Z_for_any_CMS
       max_Z_for_all_CMS = rq% max_Z_for_all_CMS
       logQ_max_for_any_CMS = rq% logQ_max_for_any_CMS
@@ -613,17 +623,27 @@
       use_Skye = rq% use_Skye
       mass_fraction_limit_for_Skye = rq% mass_fraction_limit_for_Skye   
       Skye_min_gamma_for_solid = rq% Skye_min_gamma_for_solid
-      Skye_max_gamma_for_liquid = rq% Skye_max_gamma_for_liquid   
+      Skye_max_gamma_for_liquid = rq% Skye_max_gamma_for_liquid  
+      Skye_solid_mixing_rule = rq% Skye_solid_mixing_rule
+      use_simple_Skye_blends = rq% use_simple_Skye_blends
+      logRho_min_for_any_Skye = rq% logRho_min_for_any_Skye
+      logRho_min_for_all_Skye = rq% logRho_min_for_all_Skye
+      logT_min_for_any_Skye = rq% logT_min_for_any_Skye
+      logT_min_for_all_Skye = rq% logT_min_for_all_Skye
+
       ! misc
       include_radiation = rq% include_radiation
-      always_skip_elec_pos = rq% always_skip_elec_pos
-      always_include_elec_pos = rq% always_include_elec_pos
+      include_elec_pos = rq% include_elec_pos
       eosDT_use_linear_interp_for_X = rq% eosDT_use_linear_interp_for_X
       eosDT_use_linear_interp_to_HELM = rq% eosDT_use_linear_interp_to_HELM      
       eosDT_file_prefix = rq% eosDT_file_prefix      
-      eosPT_file_prefix = rq% eosPT_file_prefix
       okay_to_convert_ierr_to_skip = rq% okay_to_convert_ierr_to_skip
       tiny_fuzz = rq% tiny_fuzz
+
+      ! other eos
+      use_other_eos_component = rq% use_other_eos_component
+      use_other_eos_results = rq% use_other_eos_results
+
       ! debugging
       dbg = rq% dbg
       logT_lo = rq% logT_lo

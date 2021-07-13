@@ -40,8 +40,8 @@
             other_adjust_mdot => null()
          procedure(other_j_for_adjust_J_lost_interface), pointer, nopass :: &
             other_j_for_adjust_J_lost => null()
-         procedure(other_after_enter_setmatrix_interface), pointer, nopass :: &
-            other_after_enter_setmatrix => null()
+         procedure(other_after_solver_setmatrix_interface), pointer, nopass :: &
+            other_after_solver_setmatrix => null()
          procedure(other_after_struct_burn_mix_interface), pointer, nopass :: &
             other_after_struct_burn_mix => null()
          procedure(other_before_struct_burn_mix_interface), pointer, nopass :: &
@@ -101,33 +101,26 @@
          procedure (other_overshooting_scheme_interface), pointer, nopass :: &
             other_overshooting_scheme => null()
          
-         procedure (other_mlt_interface), pointer, nopass :: &
-            other_mlt => null()
          procedure (other_solver_monitor_interface), pointer, nopass :: &
             other_solver_monitor => null()
          procedure (other_neu_interface), pointer, nopass :: &
             other_neu => null()
          procedure (other_net_get_interface), pointer, nopass :: &
             other_net_get => null()
+            
          procedure (other_adjust_mlt_gradT_fraction_interface), pointer, nopass :: &
             other_adjust_mlt_gradT_fraction => null()
+         procedure (other_mlt_results_interface), pointer, nopass :: &
+            other_mlt_results => null()
          procedure (other_after_set_mixing_info_interface), pointer, nopass :: &
             other_after_set_mixing_info => null()
          procedure (other_diffusion_interface), pointer, nopass :: &
             other_diffusion => null()
+         procedure (other_screening_interface), pointer, nopass :: &
+            other_screening => null()
 
          procedure (other_surface_PT_interface), pointer, nopass :: &
             other_surface_PT => null()
-
-         procedure (other_eosDT_get_interface), pointer, nopass :: &
-            other_eosDT_get => null()
-         procedure (other_eosDT_get_T_interface), pointer, nopass :: &
-            other_eosDT_get_T => null()
-         procedure (other_eosDT_get_Rho_interface), pointer, nopass :: &
-            other_eosDT_get_Rho => null()
-
-         procedure (other_eosDE_get_interface), pointer, nopass :: &
-            other_eosDE_get => null()
 
          procedure (other_kap_get_interface), pointer, nopass :: &
             other_kap_get => null()
@@ -155,6 +148,9 @@
             other_new_generation => null()
          procedure (other_set_current_to_old_interface), pointer, nopass :: &
             other_set_current_to_old => null()
+
+         procedure (other_set_pgstar_controls_interface), pointer, nopass :: &
+            other_set_pgstar_controls => null()
 
          procedure (other_astero_freq_corr_interface), pointer, nopass :: &
             other_astero_freq_corr => null()

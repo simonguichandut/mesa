@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -28,7 +28,6 @@
       use star_private_def
       use const_def
       use adjust_mesh_support
-      use adjust_mesh_plot
 
       implicit none
 
@@ -72,7 +71,7 @@
          character (len=32) :: gval_names(max_allowed_gvals)
          logical, dimension(max_allowed_gvals) :: &
             gval_is_xa_function, gval_is_logT_function
-         logical :: changed_mesh, dumping
+         logical :: changed_mesh
          logical, parameter :: dbg = .false.
 
          real(dp), parameter :: max_sum_abs = 10d0
@@ -141,14 +140,6 @@
          end do
 
          s% mesh_call_number = s% mesh_call_number + 1
-         dumping = (s% mesh_call_number == s% mesh_dump_call_number)
-
-         if (dumping) then
-            write(*,*) 'write mesh plot info'
-            write(*,*) 's% model_number', s% model_number
-            write(*,*) 's% mesh_dump_call_number', s% mesh_dump_call_number
-            write(*,*)
-         end if
 
          if (.not. associated(s% other_star_info)) then
             allocate(s% other_star_info)
@@ -331,7 +322,7 @@
          
          nz = nz_new
          s% nz = nz
-         nvar = s% nvar
+         nvar = s% nvar_total
 
          if (dbg_remesh .or. dbg) write(*,*) 'call resize_star_info_arrays'
          call resize_star_info_arrays(s, c, ierr)
@@ -420,29 +411,13 @@
          call set_m_and_dm(s)
          call set_dm_bar(s, s% nz, s% dm, s% dm_bar)
 
-         if (dumping) then
-            call write_plot_data_for_mesh_plan( &
-               s, nz_old, nz, prv% xh, prv% xa, &
-               prv% lnd, prv% lnT, prv% lnPgas, prv% lnE, prv% eturb, &
-               prv% D_mix, prv% mixing_type, &
-               prv% dq, prv% q, xq_old, prv% q, &
-               s% species, s% i_lnR, s% i_lum, s% i_v, s% i_u, comes_from, &
-               num_gvals, gval_names, gvals, delta_gval_max, &
-               prv% xmstar, ierr)
-            if (ierr /= 0) then
-               call dealloc
-               return
-            end if
-            write(*,*)
-         end if
-
          if (dbg_remesh) write(*,*) 'call do_mesh_adjust'
          
          call do_mesh_adjust( &
             s, nz, nz_old, prv% xh, prv% xa, &
             prv% energy, prv% eta, prv% lnd, prv% lnPgas, &
             prv% j_rot, prv% i_rot, prv% omega, prv% D_omega, &
-            prv% conv_vel, prv% lnT, prv% eturb, specific_PE, specific_KE, &
+            prv% mlt_vc, prv% lnT, prv% w, specific_PE, specific_KE, &
             prv% m, prv% r, prv% rho, prv% dPdr_dRhodr_info, prv% D_mix, &
             cell_type, comes_from, prv% dq, xq_old, s% xh, s% xa, s% dq, xq_new, ierr)
          if (ierr /= 0) then
@@ -519,23 +494,6 @@
             call dealloc
             return
          end if
-
-         if (dumping) then
-            call write_plot_data_for_new_mesh( &
-               s, nz, nz_old, prv% xh, prv% xa, &
-               prv% D_mix, prv% q, &
-               s% xh, s% xa, s% dq, s% q, xq_new, s% species, s% net_iso, &
-               num_gvals, gval_names, gvals, &
-               which_gval, comes_from, cell_type, delta_gval_max, &
-               prv% xmstar, ierr)
-            if (ierr /= 0) then
-               call dealloc
-               return
-            end if
-            write(*,*)
-         end if
-
-         if (dumping) call end_dump
 
          if (s% rotation_flag) then
             J_tot2 = total_angular_momentum(s)

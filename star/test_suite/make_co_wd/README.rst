@@ -1,3 +1,9 @@
+.. _make_co_wd:
+
+**********
+make_co_wd
+**********
+
 This test builds a carbon-oxygen white dwarf starting from a specified
 pre main-sequence mass. It does this by running through a series of
 inlists for different stages of evolution. By default, the first two
@@ -8,8 +14,7 @@ of time, and the test produces a 0.6 |Msun| white dwarf from a roughly
 
 Starting from the beginning to produce a white dwarf descended from a
 progenitor of different mass or metallicity can be accomplished by
-setting the environment variable ``MESA_RUN_OPTIONAL=t`` and editing
-the values assigned to ``initial_mass`` or ``initial_z`` in
+editing the values assigned to ``initial_mass`` or ``initial_z`` in
 ``inlist_common``.
 
 Larger values for ``initial_mass`` can be used to produce more massive

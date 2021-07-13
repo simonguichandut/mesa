@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -253,10 +253,6 @@
             write(*,*) 'finished pre-MS model'
             write(*,1) 'mstar1/Msun', mstar1/Msun
             write(*,1) '(mstar-mstar1)/mstar', (mstar-mstar1)/mstar
-            write(*,1) 'log10(r/Rsun)', log10(exp(xh(s% i_lnR,1))/Rsun)
-            if (s% i_lum /= 0) write(*,1) 'log10(L/Lsun)', log10(xh(s% i_lum,1)/Lsun)
-            write(*,1) 'log10(Tsurf)', xh(s% i_lnT,1)/ln10
-            write(*,1) 'Tsurf', exp(xh(s% i_lnT,1))
             write(*,*) 'nz', nz
             write(*,*)
             stop 'debug: pre ms'
@@ -267,7 +263,6 @@
          ! overwritten during the call to allocate_star_info_arrays
 
          if (ASSOCIATED(s% xh_old)) deallocate(s% xh_old)
-         if (ASSOCIATED(s% equ1)) deallocate(s% equ1)
          if (ASSOCIATED(s% xh_start)) deallocate(s% xh_start)
          
          call allocate_star_info_arrays(s, ierr)
@@ -390,7 +385,8 @@
          use chem_lib
          use eos_lib, only: Radiation_Pressure
          use eos_support, only: get_eos, solve_eos_given_PgasT_auto
-         use star_utils, only: normalize_dqs, set_qs
+         use star_utils, only: normalize_dqs, set_qs, &
+            store_r_in_xh, store_lnT_in_xh, store_lnd_in_xh
          type (star_info), pointer :: s
          real(dp), intent(in) :: &
             T_c, rho_c, d_log10_P_in, eps_grav_in, &
@@ -402,15 +398,14 @@
          real(dp), parameter :: LOGRHO_TOL = 1E-6_dp
          real(dp), parameter :: LOGPGAS_TOL = 1E-6_dp
          
-         integer :: i, ii, k, j, i_lnd, i_lnT, i_lnR, prune, max_retries
+         integer :: i, ii, k, j, prune, max_retries
          real(dp), parameter :: &
             delta_logPgas = 0.004d0, q_at_nz = 1d-5
          real(dp) :: &
             P_surf_limit, y, dlogPgas, logPgas, Prad, Pgas, try_dlogPgas, logPgas0, &
             res(num_eos_basic_results), eps_grav, P_c, logP, m, &
             d_eos_dlnd(num_eos_basic_results), d_eos_dlnT(num_eos_basic_results), &
-            d_eos_dabar(num_eos_basic_results), d_eos_dzbar(num_eos_basic_results), &
-            dres_dxa(num_eos_basic_results,s% species), &
+            d_eos_dxa(num_eos_basic_results,s% species), &
             lnfree_e, d_lnfree_e_dlnRho, d_lnfree_e_dlnT, &
             eta, d_eta_dlnRho, d_eta_dlnT, &
             cgrav, r, rmid, rho, logRho, T, lnT, L, P, P0, dm, m0, L0, r0, lnT0, T0, &
@@ -434,10 +429,6 @@
          
          if (dbg) write(*,1) 'logT_surf_limit', logT_surf_limit
 
-         i_lnd = s% i_lnd
-         i_lnT = s% i_lnT
-         i_lnR = s% i_lnR
-         
          cgrav = standard_cgrav
          
          eps_grav = eps_grav_in
@@ -454,7 +445,7 @@
                s, 0, xa, &
                rho_c, log10(rho_c), T_c, log10(T_c), &
                res, d_eos_dlnd, d_eos_dlnT, &
-               dres_dxa, ierr)
+               d_eos_dxa, ierr)
          if (ierr /= 0) return
          call unpack_eos_results
          
@@ -478,9 +469,9 @@
          
          ! density at nz
          call solve_eos_given_PgasT_auto( &
-              s, 0, z, xa(s% net_iso(ih1)), abar, zbar, xa, &
+              s, 0, xa, &
               lnT/ln10, log10(Pgas), LOGRHO_TOL, LOGPGAS_TOL, &
-              logRho, res, d_eos_dlnd, d_eos_dlnT, d_eos_dabar, d_eos_dzbar, &
+              logRho, res, d_eos_dlnd, d_eos_dlnT, d_eos_dxa, &
               ierr)
          if (ierr /= 0) return
          rho = exp10(logRho)
@@ -515,9 +506,9 @@
          s% dq => dq
          s% q => q
          
-         xh(i_lnd, nz) = logRho*ln10
-         xh(i_lnT, nz) = lnT
-         xh(i_lnR, nz) = log(r)
+         call store_lnd_in_xh(s, nz, logRho*ln10, xh)
+         call store_lnT_in_xh(s, nz, lnT, xh)
+         call store_r_in_xh(s, nz, r, xh)
          if (s% i_lum /= 0) xh(s% i_lum,nz) = L
          
          q(nz) = q_at_nz
@@ -597,9 +588,9 @@
                   if (i == 2) exit
                   
                   call solve_eos_given_PgasT_auto( &
-                       s, 0, z, x, abar, zbar, xa, &
+                       s, 0, xa, &
                        lnT/ln10, logPgas, LOGRHO_TOL, LOGPGAS_TOL, &
-                       logRho, res, d_eos_dlnd, d_eos_dlnT, d_eos_dabar, d_eos_dzbar, &
+                       logRho, res, d_eos_dlnd, d_eos_dlnT, d_eos_dxa, &
                        ierr)
                   rho = exp10(logRho)
                   if (ierr /= 0) return
@@ -619,17 +610,14 @@
                   exit step_loop
                end if
          
-               xh(i_lnd, k) = logRho*ln10
-               xh(i_lnT, k) = lnT
-               xh(i_lnR, k) = log(r)
+               call store_lnd_in_xh(s, k, logRho*ln10, xh)
+               call store_lnT_in_xh(s, k, lnT, xh)
+               call store_r_in_xh(s, k, r, xh)
                if (s% i_lum /= 0) xh(s% i_lum,k) = L
                q(k) = m/mstar
                dq(k) = dm/mstar
                
                if (dbg) then
-                  write(*,2) 'xh(i_lnd, k)', k, xh(i_lnd, k)
-                  write(*,2) 'xh(i_lnT, k)', k, xh(i_lnT, k)
-                  write(*,2) 'xh(i_lnR, k)', k, xh(i_lnR, k)
                   write(*,2) 'L', k, L
                   write(*,2) 'q(k)', k, q(k)
                   write(*,2) 'dq(k)', k, dq(k)
@@ -695,7 +683,7 @@
             eta, d_eta_dlnRho, d_eta_dlnT, &
             gradT, ierr )
          use chem_def, only: ih1
-         use mlt_info, only: do1_mlt_eval
+         use mlt_get_results, only: get_gradT
          use kap_def, only : num_kap_fracs
          use kap_lib, only : kap_get
 
@@ -709,44 +697,20 @@
          integer, intent(out) :: ierr
 
          
-         real(dp) :: &
-            cgrav, opacity, dlnkap_dlnd, dlnkap_dlnT, Cv, csound, &
-            max_conv_vel, dt, gradL_composition_term, tau
+         real(dp) :: dlnkap_dlnd, dlnkap_dlnT, gradL_composition_term, &
+            opacity, grav, scale_height, scale_height2, gradr, cgrav
          real(dp) :: kap_fracs(num_kap_fracs), dlnkap_dxa(s% species)
+         real(dp) :: Y_face, conv_vel, D, Gamma ! Not used
          integer :: mixing_type
-         real(dp) :: mlt_basics(num_mlt_results)
-         real(dp), target :: mlt_partials1_ary(num_mlt_partials*num_mlt_results)
-         real(dp), pointer :: mlt_partials1(:), mlt_partials(:,:)
-         real(dp), parameter :: alpha_semiconvection = 0, thermohaline_coeff = 0, &
-            gradr_factor = 1, d_gradr_factor_dw = 0d0
-         real(dp) :: alfa, beta, &
-            normal_mlt_gradT_factor, &
-            T_00, T_m1, rho_00, rho_m1, P_00, P_m1, &
-            chiRho_for_partials_00, chiT_for_partials_00, &
-            chiRho_for_partials_m1, chiT_for_partials_m1, &
-            chiRho_00, d_chiRho_00_dlnd, d_chiRho_00_dlnT, &
-            chiRho_m1, d_chiRho_m1_dlnd, d_chiRho_m1_dlnT, &
-            chiT_00, d_chiT_00_dlnd, d_chiT_00_dlnT, &
-            chiT_m1, d_chiT_m1_dlnd, d_chiT_m1_dlnT, &
-            Cp_00, d_Cp_00_dlnd, d_Cp_00_dlnT, &
-            Cp_m1, d_Cp_m1_dlnd, d_Cp_m1_dlnT, &
-            opacity_00, d_opacity_00_dlnd, d_opacity_00_dlnT, &
-            opacity_m1, d_opacity_m1_dlnd, d_opacity_m1_dlnT, &
-            grada_00, d_grada_00_dlnd, d_grada_00_dlnT, &
-            grada_m1, d_grada_m1_dlnd, d_grada_m1_dlnT 
-         normal_mlt_gradT_factor = 1d0
+         logical :: make_gradr_sticky_in_solver_iters
          
          ierr = 0
-         mlt_partials1 => mlt_partials1_ary
-         mlt_partials(1:num_mlt_partials,1:num_mlt_results) => &
-            mlt_partials1(1:num_mlt_partials*num_mlt_results)
 
          if (s% use_simple_es_for_kap) then
             opacity = 0.2d0*(1 + x)
             dlnkap_dlnd = 0
             dlnkap_dlnT = 0
          else
-
             call kap_get( &
                  s% kap_handle, s% species, s% chem_id, s% net_iso, xa, &
                  log10(Rho), lnT/ln10, &
@@ -759,60 +723,22 @@
             end if
          end if
          
+         gradL_composition_term = 0d0
          cgrav = standard_cgrav
-         gradL_composition_term = 0
-         Cv = Cp
-         tau = 1
-         max_conv_vel = 1d99
-         dt = -1
-         csound = 0 ! not used when dt <= 0
-         ! not used
-         alfa=0d0; beta=0d0;
-         T_00=0d0; T_m1=0d0; rho_00=0d0; rho_m1=0d0; P_00=0d0; P_m1=0d0
-         chiRho_for_partials_00=0d0; chiT_for_partials_00=0d0
-         chiRho_for_partials_m1=0d0; chiT_for_partials_m1=0d0
-         chiRho_00=0d0; d_chiRho_00_dlnd=0d0; d_chiRho_00_dlnT=0d0
-         chiRho_m1=0d0; d_chiRho_m1_dlnd=0d0; d_chiRho_m1_dlnT=0d0
-         chiT_00=0d0; d_chiT_00_dlnd=0d0; d_chiT_00_dlnT=0d0
-         chiT_m1=0d0; d_chiT_m1_dlnd=0d0; d_chiT_m1_dlnT=0d0
-         Cp_00=0d0; d_Cp_00_dlnd=0d0; d_Cp_00_dlnT=0d0
-         Cp_m1=0d0; d_Cp_m1_dlnd=0d0; d_Cp_m1_dlnT=0d0
-         opacity_00=0d0; d_opacity_00_dlnd=0d0; d_opacity_00_dlnT=0d0
-         opacity_m1=0d0; d_opacity_m1_dlnd=0d0; d_opacity_m1_dlnT=0d0
-         grada_00=0d0; d_grada_00_dlnd=0d0; d_grada_00_dlnT=0d0
-         grada_m1=0d0; d_grada_m1_dlnd=0d0; d_grada_m1_dlnT=0d0            
-
-         call do1_mlt_eval( &
-            s, 0, cgrav, m, mstar, r, L, x, T, rho, P, &
-            chiRho, chiT, Cp, opacity, grada, &
-            
-            ! not used
-               alfa, beta, &
-               T_00, T_m1, rho_00, rho_m1, P_00, P_m1, &
-               chiRho_for_partials_00, chiT_for_partials_00, &
-               chiRho_for_partials_m1, chiT_for_partials_m1, &
-               chiRho_00, d_chiRho_00_dlnd, d_chiRho_00_dlnT, &
-               chiRho_m1, d_chiRho_m1_dlnd, d_chiRho_m1_dlnT, &
-               chiT_00, d_chiT_00_dlnd, d_chiT_00_dlnT, &
-               chiT_m1, d_chiT_m1_dlnd, d_chiT_m1_dlnT, &
-               Cp_00, d_Cp_00_dlnd, d_Cp_00_dlnT, &
-               Cp_m1, d_Cp_m1_dlnd, d_Cp_m1_dlnT, &
-               opacity_00, d_opacity_00_dlnd, d_opacity_00_dlnT, &
-               opacity_m1, d_opacity_m1_dlnd, d_opacity_m1_dlnT, &
-               grada_00, d_grada_00_dlnd, d_grada_00_dlnT, &
-               grada_m1, d_grada_m1_dlnd, d_grada_m1_dlnT, &            
-            
-            gradr_factor, d_gradr_factor_dw, gradL_composition_term, &
-            alpha_semiconvection, s% semiconvection_option, &
-            thermohaline_coeff, s% thermohaline_option, ih1, &
-            s% mixing_length_alpha, s% alt_scale_height_flag, s% remove_small_D_limit, &
-            s% MLT_option, s% Henyey_MLT_y_param, s% Henyey_MLT_nu_param, &
-            normal_mlt_gradT_factor, &
-            max_conv_vel, dt, tau, .false., & 
-            mixing_type, mlt_basics, mlt_partials1, ierr)
-         if (ierr /= 0) return
+         grav = cgrav*m/pow2(r)
+         scale_height = P/(grav*rho) ! this assumes HSE
+         if (s% alt_scale_height_flag) then
+            scale_height2 = sqrt(P/cgrav)/rho
+            if (scale_height2 < scale_height) then
+               scale_height = scale_height2
+            end if
+         end if
+         gradr = P*opacity*L/(16d0*pi*clight*m*cgrav*crad*pow4(T)/3d0) 
          
-         gradT = mlt_basics(mlt_gradT) ! actual temperature gradient dlnT/dlnP
+         call get_gradT(s, s% MLT_option, & ! used to create models
+            r, L, T, P, opacity, rho, chiRho, chiT, Cp, gradr, grada, scale_height, &
+            s% net_iso(ih1), x, standard_cgrav, m, gradL_composition_term, s% mixing_length_alpha, &
+            mixing_type, gradT, Y_face, conv_vel, D, Gamma, ierr)
   
       end subroutine eval_gradT
 

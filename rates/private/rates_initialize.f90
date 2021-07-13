@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -41,9 +41,9 @@
          use chem_def, only: nuclide_set, chem_isos, num_chem_isos, iso_name_length
          use chem_lib, only: generate_nuclide_set
          integer :: i, ierr
-         character(len=iso_name_length), pointer :: names(:)
-         type(nuclide_set), pointer :: set(:)
-         integer, pointer :: chem_id(:) 
+         character(len=iso_name_length), pointer :: names(:) =>null()
+         type(nuclide_set), pointer :: set(:) =>null()
+         integer, pointer :: chem_id(:) =>null()
             ! will be allocated by extract_nuclides_from_chem_isos
          logical :: use_weaklib
          include 'formats'
@@ -159,7 +159,7 @@
          integer :: j, weak_j, particles_in, particles_out
          logical :: weak, reverse, already_defined
          integer :: cin(max_num_reaction_inputs), cout(max_num_reaction_outputs)
-         type (reaction_data), pointer :: r
+         type (reaction_data), pointer :: r =>null()
          
          logical, parameter :: dbg = .false.
          
@@ -512,7 +512,7 @@
       
       
       subroutine free_raw_rates_records
-         type (rate_table_info), pointer :: ri
+         type (rate_table_info), pointer :: ri =>null()
          integer :: i
          if (ASSOCIATED(raw_rates_records)) then
             do i = 1, rates_reaction_id_max
@@ -530,7 +530,7 @@
          use utils_def
          integer, intent(out) :: ierr
          
-         type (rate_table_info), pointer :: ri
+         type (rate_table_info), pointer :: ri =>null()
          integer :: i, iounit, n, t, ir
          character (len=256) :: line, dir, rate_name, rate_fname, filename, message
          character (len=256) :: buffer, string
@@ -609,9 +609,8 @@
             use raw_rates, only: set_raw_rate
             real(dp) :: logT, temp, raw_rate
             integer :: which_rate, i, ierr
-            type (T_Factors), pointer :: tf
+            type (T_Factors) :: tf 
          
-            allocate(tf)
             logT = 8
             temp = exp10(logT)
             call tfactors(tf, logT, temp)
@@ -626,7 +625,6 @@
                   ierr = 0
                end if
             end do
-            deallocate(tf)
             if (.not. okay) stop 'init_raw_rates_records'
          end subroutine check
          
@@ -1130,8 +1128,8 @@
          integer, intent(out) :: ierr
          
          integer :: old_max, new_max, i
-         type (rate_table_info), pointer :: old_raw_rates_records(:)
-         type (rate_table_info), pointer :: ri
+         type (rate_table_info), pointer :: old_raw_rates_records(:) =>null()
+         type (rate_table_info), pointer :: ri =>null()
          
          include 'formats'
 
@@ -1269,7 +1267,7 @@
       
       subroutine init1_rates_info
          use rates_names, only: set_reaction_names
-         type (rate_table_info), pointer :: ri
+         type (rate_table_info), pointer :: ri =>null()
          integer :: i
          rates_reaction_id_max = num_predefined_reactions
          allocate( &
@@ -1305,8 +1303,8 @@
          integer, intent(in) :: old_max, new_max
          integer, intent(out) :: ierr
 
-         character (len=maxlen_reaction_Name), pointer :: new_reaction_Name(:)
-         character (len=maxlen_reaction_Info), pointer :: new_reaction_Info(:)
+         character (len=maxlen_reaction_Name), pointer :: new_reaction_Name(:) =>null()
+         character (len=maxlen_reaction_Info), pointer :: new_reaction_Info(:) =>null()
          integer :: i
          
          include 'formats'

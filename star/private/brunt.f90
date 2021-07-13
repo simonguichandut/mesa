@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -51,6 +51,7 @@
          integer, intent(in) :: nzlo, nzhi
          integer, intent(out) :: ierr
          integer :: nz, k, i
+         real(dp), allocatable, dimension(:) :: smoothing_array
 
          include 'formats'
 
@@ -87,22 +88,43 @@
             end if
          end do
 
+         allocate(smoothing_array(nz))
+         call smooth_brunt_B(smoothing_array)
+         if (s% use_other_brunt_smoothing) then
+            call s% other_brunt_smoothing(s% id, ierr)
+            if (ierr /= 0) then
+               s% retry_message = 'failed in other_brunt_smoothing'
+               if (s% report_ierr) write(*, *) s% retry_message
+               return
+            end if
+         end if
+
+         contains
+
+         subroutine smooth_brunt_B(work)
+            use star_utils, only: threshold_smoothing
+            real(dp) :: work(:)
+            logical, parameter :: preserve_sign = .false.
+            if (s% num_cells_for_smooth_brunt_B <= 0) return
+            call threshold_smoothing( &
+               s% brunt_B, s% threshold_for_smooth_brunt_B, s% nz, &
+               s% num_cells_for_smooth_brunt_B, preserve_sign, work)
+         end subroutine smooth_brunt_B
+
       end subroutine do_brunt_B
 
 
       ! call this after mlt
       subroutine do_brunt_N2(s,nzlo,nzhi,ierr)
          use star_utils, only: get_face_values
-         use interp_1d_def
 
          type (star_info), pointer :: s
          integer, intent(in) :: nzlo, nzhi
          integer, intent(out) :: ierr
 
          real(dp) :: f
-         real(dp), pointer, dimension(:) :: &
-            work1, f1, rho_P_chiT_chiRho, rho_P_chiT_chiRho_face
-         integer, parameter :: nwork = pm_work_size
+         real(dp), allocatable, dimension(:) :: &
+            rho_P_chiT_chiRho, rho_P_chiT_chiRho_face
 
          integer :: nz, k, i
 
@@ -117,29 +139,21 @@
             return
          end if
 
-         call do_alloc(ierr)
-         if (ierr /= 0) return
-
-         call smooth_brunt_B(work1)
-         if (s% use_other_brunt_smoothing) then
-            call s% other_brunt_smoothing(s% id, ierr)
-            if (ierr /= 0) then
-               s% retry_message = 'failed in other_brunt_smoothing'
-               if (s% report_ierr) write(*, *) s% retry_message
-               call dealloc
-               return
-            end if
-         end if
+         allocate(rho_P_chiT_chiRho(nz), rho_P_chiT_chiRho_face(nz))
 
          do k=1,nz
-            rho_P_chiT_chiRho(k) = (s% rho(k)/s% P(k))*(s% chiT(k)/s% chiRho(k))
+            rho_P_chiT_chiRho(k) = (s% rho(k)/s% Peos(k))*(s% chiT(k)/s% chiRho(k))
+            ! correct for difference between gravitational mass density and baryonic mass density (rho)
+            if (s% use_mass_corrections) then
+               rho_P_chiT_chiRho(k) = s% mass_correction(k)*rho_P_chiT_chiRho(k)
+            end if
          end do
+
          call get_face_values( &
             s, rho_P_chiT_chiRho, rho_P_chiT_chiRho_face, ierr)
          if (ierr /= 0) then
             s% retry_message = 'failed in get_face_values'
             if (s% report_ierr) write(*, *) s% retry_message
-            call dealloc
             return
          end if
 
@@ -151,7 +165,7 @@
                s% brunt_N2_composition_term(k) = 0
                cycle
             end if
-            f = s% grav(k)*s% grav(k)*rho_P_chiT_chiRho_face(k)
+            f = pow2(s% grav(k))*rho_P_chiT_chiRho_face(k)
             if (is_bad(f) .or. is_bad(s% brunt_B(k)) .or. is_bad(s% gradT_sub_grada(k))) then
                write(*,2) 'f', k, f
                write(*,2) 's% brunt_B(k)', k, s% brunt_B(k)
@@ -164,8 +178,6 @@
             s% brunt_N2_composition_term(k) = f*s% brunt_B(k)
          end do
 
-         call dealloc
-
          if (s% brunt_N2_coefficient /= 1d0) then
             do k=1,nz
                s% brunt_N2(k) = s% brunt_N2_coefficient*s% brunt_N2(k)
@@ -173,48 +185,6 @@
                   s% brunt_N2_coefficient*s% brunt_N2_composition_term(k)
             end do
          end if
-
-
-         contains
-
-         subroutine do_alloc(ierr)
-            integer, intent(out) :: ierr
-            call do_work_arrays(.true., ierr)
-         end subroutine do_alloc
-
-         subroutine dealloc
-            call do_work_arrays(.false., ierr)
-         end subroutine dealloc
-            
-         subroutine do_work_arrays(alloc_flag, ierr)
-            use alloc, only: work_array
-            logical, intent(in) :: alloc_flag
-            integer, intent(out) :: ierr
-            logical, parameter :: crit = .false.
-            ierr = 0
-            call work_array(s, alloc_flag, crit, &
-               rho_P_chiT_chiRho, nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               rho_P_chiT_chiRho_face, nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               work1, nwork*nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               f1, 4*nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-         end subroutine do_work_arrays
-
-         subroutine smooth_brunt_B(work)
-            use star_utils, only: threshold_smoothing
-            real(dp), pointer, dimension(:) :: work
-            logical, parameter :: preserve_sign = .false.
-            if (s% num_cells_for_smooth_brunt_B <= 0) return
-            call threshold_smoothing( &
-               s% brunt_B, s% threshold_for_smooth_brunt_B, s% nz, s% num_cells_for_smooth_brunt_B, preserve_sign, work)
-         end subroutine smooth_brunt_B
-
 
       end subroutine do_brunt_N2
 
@@ -227,7 +197,8 @@
          type (star_info), pointer :: s
          integer, intent(out) :: ierr
 
-         real(dp), pointer, dimension(:) :: T_face, rho_face, chiT_face
+
+         real(dp), allocatable, dimension(:) :: T_face, rho_face, chiT_face, chiRho_face
          real(dp) :: brunt_B
          integer :: nz, species, k, i, op_err
          logical, parameter :: dbg = .false.
@@ -238,95 +209,46 @@
 
          nz = s% nz
          species = s% species
-         
-         nullify(T_face, rho_face, chiT_face)
 
-         call do_alloc(ierr)
-         if (ierr /= 0) then
-            write(*,*) 'allocate failed in do_brunt_MHM_form'
-            ierr = -1
-            return
-         end if
+         allocate(T_face(nz), rho_face(nz), chiT_face(nz), chiRho_face(nz))
 
          call get_face_values(s, s% chiT, chiT_face, ierr)
-         if (ierr /= 0) then
-            call dealloc
-            return
-         end if
+         if (ierr /= 0) return
+
+         call get_face_values(s, s% chiRho, chiRho_face, ierr)
+         if (ierr /= 0) return
 
          call get_face_values(s, s% T, T_face, ierr)
-         if (ierr /= 0) then
-            call dealloc
-            return
-         end if
+         if (ierr /= 0) return
 
          call get_face_values(s, s% rho, rho_face, ierr)
-         if (ierr /= 0) then
-            call dealloc
-            return
-         end if
+         if (ierr /= 0) return
 
 !$OMP PARALLEL DO PRIVATE(k,op_err) SCHEDULE(dynamic,2)
          do k=1,nz
             op_err = 0
             call get_brunt_B(&
-               s, species, nz, k, T_face(k), rho_face(k), chiT_face(k), op_err)
+               s, species, nz, k, T_face(k), rho_face(k), chiT_face(k), chiRho_face(k), op_err)
             if (op_err /= 0) ierr = op_err
          end do
 !$OMP END PARALLEL DO
-         if (ierr /= 0) then
-            call dealloc
-            return
-         end if
-
-         call dealloc
-
-         contains
-            
-         subroutine do_alloc(ierr)
-            integer, intent(out) :: ierr
-            call do_work_arrays(.true.,ierr)
-         end subroutine do_alloc
-
-         subroutine dealloc
-            integer :: ierr
-            call do_work_arrays(.false.,ierr)
-         end subroutine dealloc
-
-         subroutine do_work_arrays(alloc_flag, ierr)
-            use interp_1d_def
-            use alloc, only: work_array
-            logical, intent(in) :: alloc_flag
-            integer, intent(out) :: ierr
-            logical, parameter :: crit = .false.
-            ierr = 0
-            call work_array(s, alloc_flag, crit, &
-               T_face, nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               rho_face, nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-               chiT_face, nz, nz_alloc_extra, 'brunt', ierr)
-            if (ierr /= 0) return
-         end subroutine do_work_arrays
 
       end subroutine do_brunt_B_MHM_form
       
 
-      subroutine get_brunt_B(s, species, nz, k, T_face, rho_face, chiT_face, ierr)
+      subroutine get_brunt_B(s, species, nz, k, T_face, rho_face, chiT_face, chiRho_face, ierr)
          use eos_def, only: num_eos_basic_results, num_eos_d_dxa_results, i_lnPgas
          use eos_support, only: get_eos
 
          type (star_info), pointer :: s
          integer, intent(in) :: species, nz, k
-         real(dp), intent(in) :: T_face, rho_face, chiT_face
+         real(dp), intent(in) :: T_face, rho_face, chiT_face, chiRho_face
          integer, intent(out) :: ierr
 
          real(dp) :: lnP1, lnP2, logRho_face, logT_face, Prad_face, &
-            alfa, Ppoint, dlnP_dm, delta_lnP
+            alfa, Ppoint, dlnP_dm, delta_lnP, delta_lnMbar
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_eos_dlnd, d_eos_dlnT, d_eos_dabar, d_eos_dzbar
+            res, d_eos_dlnd, d_eos_dlnT
          real(dp) :: d_eos_dxa(num_eos_d_dxa_results,species)
 
          logical, parameter :: dbg = .false.
@@ -381,15 +303,22 @@
          if (ierr /= 0) return
          lnP2 = log(Prad_face + exp(res(i_lnPgas)))
 
-         delta_lnP = s% lnP(k-1) - s% lnP(k)
+         delta_lnP = s% lnPeos(k-1) - s% lnPeos(k)
          if (delta_lnP > -1d-50) then
             alfa = s% dq(k-1)/(s% dq(k-1) + s% dq(k))
-            Ppoint = alfa*s% P(k) + (1-alfa)*s% P(k-1)
+            Ppoint = alfa*s% Peos(k) + (1-alfa)*s% Peos(k-1)
             dlnP_dm = -s% cgrav(k)*s% m(k)/(pi4*pow4(s% r(k))*Ppoint)
             delta_lnP = dlnP_dm*s% dm_bar(k)
          end if
 
          s% brunt_B(k) = (lnP1 - lnP2)/delta_lnP/chiT_face
+
+         ! add term accounting for the composition-related gradient in gravitational mass
+         if (s% use_mass_corrections) then
+            delta_lnMbar = log(s% mass_correction(k-1)) - log(s% mass_correction(k))
+            s% brunt_B(k) = s% brunt_B(k) - chiRho_face*delta_lnMbar/delta_lnP/chiT_face
+         end if
+
          if (is_bad_num(s% brunt_B(k))) then
             ierr = -1
             s% retry_message = 'bad num for brunt_B'
@@ -397,8 +326,8 @@
                write(*,2) 's% brunt_B(k)', k, s% brunt_B(k)
                write(*,2) 'chiT_face', k, chiT_face
                write(*,2) 'delta_lnP', k, delta_lnP
-               write(*,2) 's% lnP(k)', k, s% lnP(k)
-               write(*,2) 's% lnP(k-1)', k-1, s% lnP(k-1)
+               write(*,2) 's% lnPeos(k)', k, s% lnPeos(k)
+               write(*,2) 's% lnPeos(k-1)', k-1, s% lnPeos(k-1)
                write(*,2) 'lnP1', k, lnP1
                write(*,2) 'lnP2', k, lnP2
                write(*,*)

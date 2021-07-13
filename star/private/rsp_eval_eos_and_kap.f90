@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2018-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2018-2019  The MESA Team
 !
 !   This file is part of MESA.
 !
@@ -29,6 +29,9 @@
       use kap_def
       use const_lib
       use utils_lib
+      use star_utils, only: &
+         store_rho_in_xh, store_lnd_in_xh, get_rho_and_lnd_from_xh, &
+         store_T_in_xh, store_lnT_in_xh, get_T_and_lnT_from_xh
       use star_private_def
       use rsp_def, only: xa, X, Z, Y, &
          abar, zbar, z53bar, XC, XN, XO, Xne
@@ -224,12 +227,10 @@
          logT = log10(T)  
          
          if (k > 0 .and. k <= s% nz) then
-            s% rho(k) = rho
-            s% lnd(k) = logRho*ln10
-            s% xh(s% i_lnd,k) = s% lnd(k)
-            s% T(k) = T
-            s% lnT(k) = logT*ln10
-            s% xh(s% i_lnT,k) = s% lnT(k)
+            call store_rho_in_xh(s, k, rho)
+            call get_rho_and_lnd_from_xh(s, k, s% rho(k), s% lnd(k))
+            call store_T_in_xh(s, k, T)
+            call get_T_and_lnT_from_xh(s, k, s% T(k), s% lnT(k))
             s% abar(k) = abar
             s% zbar(k) = zbar
             s% z53bar(k) = z53bar
@@ -351,8 +352,8 @@
          real(dp) :: rho, logRho, dlnd_dV, egas_tol, logT, &
             logT_guess, logT_tol, new_erad, new_egas, OPV, OPT
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
-         real(dp) :: d_dxa(num_eos_d_dxa_results,s% species)
+            res, d_dlnd, d_dlnT
+         real(dp) :: d_dxa(num_eos_d_dxa_results, species)
          
          include 'formats'
          ierr = 0
@@ -381,14 +382,13 @@
             logT_guess = s% lnT(k)/ln10
             logT_tol = 1d-11
             call solve_eos_given_DEgas( &
-               s, k, Z, X, abar, zbar, xa, &
+               s, k, xa, &
                logRho, egas, logT_guess, logT_tol, egas_tol, &
-               logT, res, d_dlnd, d_dlnT, d_dabar, d_dzbar, &
+               logT, res, d_dlnd, d_dlnT, d_dxa, &
                ierr)
             if (ierr == 0) then
-               s% lnT(k) = logT*ln10
-               s% xh(s% i_lnT,k) = s% lnT(k)
-               s% T(k) = exp(s% lnT(k))
+               call store_lnT_in_xh(s, k, logT*ln10)
+               call get_T_and_lnT_from_xh(s, k, s% T(k), s% lnT(k))
                T = s% T(k)
                new_erad = crad*T**4/rho
                new_egas = exp(res(i_lnE)) - new_erad
@@ -490,8 +490,8 @@
          real(dp) :: rho, logRho, dlnd_dV, logE, logE_want, logE_tol, logT, &
             logT_guess, logT_tol, new_erad, new_egas, OPV, OPT
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
-         real(dp) :: d_dxa(num_eos_d_dxa_results,s% species)
+            res, d_dlnd, d_dlnT
+         real(dp) :: d_dxa(num_eos_d_dxa_results, species)
          
          include 'formats'
          ierr = 0
@@ -522,14 +522,13 @@
             logE_tol = 1d-11
             
             call solve_eos_given_DE( &
-               s, k, Z, X, abar, zbar, xa, &
+               s, k, xa, &
                logRho, logE_want, logT_guess, logT_tol, logE_tol, &
-               logT, res, d_dlnd, d_dlnT, d_dabar, d_dzbar, &
+               logT, res, d_dlnd, d_dlnT, d_dxa, &
                ierr)
             if (ierr == 0) then
-               s% lnT(k) = logT*ln10
-               s% xh(s% i_lnT,k) = s% lnT(k)
-               s% T(k) = exp(s% lnT(k))
+               call store_lnT_in_xh(s, k, logT*ln10)
+               call get_T_and_lnT_from_xh(s, k, s% T(k), s% lnT(k))
                T = s% T(k)
                new_erad = crad*T**4/rho
                new_egas = exp(res(i_lnE)) - new_erad
@@ -716,7 +715,8 @@
          real(dp) :: rho, logRho, logP, logT_guess, &
             logT_tol, logP_tol, logT
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
+            res, d_dlnd, d_dlnT
+         real(dp) :: d_dxa(num_eos_d_dxa_results, species)
          include 'formats'
          ierr = 0
          rho = 1d0/Vol
@@ -726,9 +726,9 @@
          logT_tol = 1d-11
          logP_tol = 1d-11
          call solve_eos_given_DP( &
-            s, k, Z, X, abar, zbar, xa, &
+            s, k, xa, &
             logRho, logP, logT_guess, logT_tol, logP_tol, &
-            logT, res, d_dlnd, d_dlnT, d_dabar, d_dzbar, &
+            logT, res, d_dlnd, d_dlnT, d_dxa, &
             ierr)
          T = exp10(logT)
       end subroutine eval1_mesa_T_given_DP
@@ -745,7 +745,8 @@
          real(dp) :: logT, logP, logRho_guess, logRho, &
               logRho_tol, logP_tol
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
+            res, d_dlnd, d_dlnT
+         real(dp) :: d_dxa(num_eos_d_dxa_results, species)
          integer :: iter
             
          include 'formats'
@@ -763,9 +764,9 @@
          ! so be prepared to relax them.
          do iter = 1, 9
             call solve_eos_given_PT( &
-                 s, k, Z, X, abar, zbar, xa, &
+                 s, k, xa, &
                  logT, logP, logRho_guess, logRho_tol, logP_tol, &
-                 logRho, res, d_dlnd, d_dlnT, d_dabar, d_dzbar, &
+                 logRho, res, d_dlnd, d_dlnT, d_dxa, &
                  ierr)            
             if (ierr == 0) exit
             logRho_tol = logRho_tol*3d0
@@ -866,7 +867,8 @@
             other_value, other_tol, logRho_bnd1, other_at_bnd1, &
             logRho_bnd2, other_at_bnd2, logRho_guess, logRho_result, logRho_tol
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
+            res, d_dlnd, d_dlnT
+         real(dp), dimension(num_eos_d_dxa_results, species) :: d_dxa
          integer :: max_iter, which_other, eos_calls, iter
             
          include 'formats'
@@ -881,17 +883,17 @@
          logRho_bnd2 = arg_not_provided
          other_at_bnd2 = arg_not_provided
          logRho_guess = log10(s% rho(kk))
-         s% lnT(kk) = log(s% T(kk))
-         s% xh(s% i_lnT,kk) = s% lnT(kk)
+         call store_T_in_xh(s, kk, s% T(kk))
+         call get_T_and_lnT_from_xh(s, kk, s% T(kk), s% lnT(kk))
          
          call eosDT_get_Rho( &
-            eos_handle, Z, X, abar, zbar, &
+            eos_handle, &
             species, chem_id, net_iso, xa, &
             s% lnT(kk)/ln10, which_other, other_value, &
             logRho_tol, other_tol, max_iter, logRho_guess, &
             logRho_bnd1, logRho_bnd2, other_at_bnd1, other_at_bnd2, &
             logRho_result, res, d_dlnd, d_dlnT, &
-            d_dabar, d_dzbar, eos_calls, ierr)
+            d_dxa, eos_calls, ierr)
          if (ierr /= 0) return
                
          s% lnd(kk) = logRho_result*ln10
@@ -911,7 +913,8 @@
             egas_tol, logT_bnd1, egas_at_bnd1, new_egas, egas_want, &
             logT_bnd2, egas_at_bnd2, logT_guess, logT_result, logT_tol
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
+            res, d_dlnd, d_dlnT
+         real(dp) :: d_dxa(num_eos_d_dxa_results, species)
          integer :: max_iter, which_other, eos_calls, iter
             
          include 'formats'
@@ -926,19 +929,18 @@
          egas_at_bnd2 = arg_not_provided
          logT_guess = log10(s% T(kk))
          
-         call eosDT_get_T_given_egas( &
-            eos_handle, Z, X, abar, zbar, &
+         call eosDT_get_T( &
+            eos_handle, &
             species, chem_id, net_iso, xa, &
-            s% lnd(kk)/ln10, egas_want, &
+            s% lnd(kk)/ln10, i_egas, egas_want, &
             logT_tol, egas_tol, max_iter, logT_guess, &
             logT_bnd1, logT_bnd2, egas_at_bnd1, egas_at_bnd2, &
             logT_result, res, d_dlnd, d_dlnT, &
-            d_dabar, d_dzbar, eos_calls, ierr)
+            d_dxa, eos_calls, ierr)
          if (ierr /= 0) return
                
-         s% lnT(kk) = logT_result*ln10
-         s% xh(s% i_lnT,kk) = s% lnT(kk)
-         s% T(kk) = exp(s% lnT(kk))
+         call store_lnT_in_xh(s, kk, logT_result*ln10)
+         call get_T_and_lnT_from_xh(s, kk, s% T(kk), s% lnT(kk))
          
          new_egas = exp(res(i_lnE)) - crad*s% T(kk)**4/s% rho(kk)
          if (is_bad(new_egas) .or. new_egas <= 0d0 .or. &
@@ -983,7 +985,8 @@
             other_value, other_tol, logT_bnd1, other_at_bnd1, &
             logT_bnd2, other_at_bnd2, logT_guess, logT_result, logT_tol
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
+            res, d_dlnd, d_dlnT
+         real(dp), dimension(num_eos_d_dxa_results, species) :: d_dxa
          integer :: max_iter, which_other, eos_calls, iter
             
          include 'formats'
@@ -1000,18 +1003,17 @@
          logT_guess = log10(s% T(kk))
          
          call eosDT_get_T( &
-            eos_handle, Z, X, abar, zbar, &
+            eos_handle, &
             species, chem_id, net_iso, xa, &
             s% lnd(kk)/ln10, which_other, other_value, &
             logT_tol, other_tol, max_iter, logT_guess, &
             logT_bnd1, logT_bnd2, other_at_bnd1, other_at_bnd2, &
             logT_result, res, d_dlnd, d_dlnT, &
-            d_dabar, d_dzbar, eos_calls, ierr)
+            d_dxa, eos_calls, ierr)
          if (ierr /= 0) return
                
-         s% lnT(kk) = logT_result*ln10
-         s% xh(s% i_lnT,kk) = s% lnT(kk)
-         s% T(kk) = exp(s% lnT(kk))
+         call store_lnT_in_xh(s, kk, logT_result*ln10)
+         call get_T_and_lnT_from_xh(s, kk, s% T(kk), s% lnT(kk))
 
       end subroutine set_T_for_new_Pgas
 
@@ -1026,7 +1028,8 @@
             other_value, logT_bnd1, other_at_bnd1, &
             logT_bnd2, other_at_bnd2, logT_guess, logT_result
          real(dp), dimension(num_eos_basic_results) :: &
-            res, d_dlnd, d_dlnT, d_dabar, d_dzbar
+            res, d_dlnd, d_dlnT
+         real(dp), dimension(num_eos_d_dxa_results, species) :: d_dxa
          integer :: max_iter, which_other, eos_calls, iter
          ierr = 0         
          max_iter = 100
@@ -1041,18 +1044,17 @@
          logT_guess = log10(s% T(kk))
          
          call eosDT_get_T( &
-            eos_handle, Z, X, abar, zbar, &
+            eos_handle, &
             species, chem_id, net_iso, xa, &
             s% lnd(kk)/ln10, which_other, other_value, &
             logT_tol, other_tol, max_iter, logT_guess, &
             logT_bnd1, logT_bnd2, other_at_bnd1, other_at_bnd2, &
             logT_result, res, d_dlnd, d_dlnT, &
-            d_dabar, d_dzbar, eos_calls, ierr)
+            d_dxa, eos_calls, ierr)
          if (ierr /= 0) return
                
-         s% lnT(kk) = logT_result*ln10
-         s% xh(s% i_lnT,kk) = s% lnT(kk)
-         s% T(kk) = exp(s% lnT(kk))
+         call store_lnT_in_xh(s, kk, logT_result*ln10)
+         call get_T_and_lnT_from_xh(s, kk, s% T(kk), s% lnT(kk))
       end subroutine set_T_for_new_energy                
 
 

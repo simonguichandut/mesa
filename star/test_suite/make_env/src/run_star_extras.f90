@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010  Bill Paxton
+!   Copyright (C) 2010  The MESA Team
 !
 !   this file is part of mesa.
 !
@@ -160,9 +160,10 @@
       
       subroutine create_env(id, s, ierr)
          use eos_lib
-         use eos_def, only: i_lnfree_e, num_eos_basic_results
+         use eos_def, only: i_lnfree_e, num_eos_basic_results, num_eos_d_dxa_results
          use chem_lib, only: basic_composition_info
          use utils_lib, only: is_bad
+         use atm_lib, only: atm_Teff
          
          integer, intent(in) :: id
          type (star_info), pointer :: s
@@ -186,8 +187,7 @@
          real(dp) :: res(num_eos_basic_results)
          real(dp) :: dres_dlnRho(num_eos_basic_results)
          real(dp) :: dres_dlnT(num_eos_basic_results)
-         real(dp) :: dres_dabar(num_eos_basic_results)
-         real(dp) :: dres_dzbar(num_eos_basic_results)
+         real(dp), allocatable :: dres_dxa(:,:)
          real(dp), parameter :: LOGRHO_TOL = 1d-11
          real(dp), parameter :: LOGPGAS_TOL = 1d-11
          
@@ -223,6 +223,9 @@
          s% tau_factor = s% x_ctrl(6)
 
          species = s% species
+
+         allocate(dres_dxa(num_eos_d_dxa_results, species))
+         
          if (s% x_logical_ctrl(2)) then ! R and L in cgs units
             s% r(1) = s% x_ctrl(3)
             s% L(1:nz) = s% x_ctrl(4)
@@ -295,6 +298,7 @@
          s% atm_T_tau_relation = 'Eddington'
          s% atm_T_tau_opacity = 'iterated'
          s% Pextra_factor = 2
+         s% Teff = atm_Teff(s% L(1), s% r(1))
          call get_initial_guess_for_atm(ierr)
          if (ierr /= 0) then
             write(*, *) 'Call get_initial_guess_for_atm failed', k
@@ -362,7 +366,8 @@
          write(*,*) 'finished create_env'
          write(*,*)
          !stop
-         
+
+         deallocate(dres_dxa)
          
          contains
 
@@ -370,7 +375,7 @@
          subroutine get_initial_guess_for_atm(ierr)
             integer, intent(out) :: ierr
             skip_partials = .true.
-            s% opacity_start(1) = 1d-2 ! kap_guess
+            s% opacity(1) = 1d-2 ! kap_guess
             call star_get_atm_PT( &
                 s% id, tau_surf, s% L(1), s% r(1), s% m(1), s% cgrav(1), skip_partials, &
                 s% Teff, &
@@ -386,9 +391,9 @@
             logT = log10(T_surf)
             k = 1
             call star_solve_eos_given_PgasT_auto( &
-               s% id, k, s% Z(k), s% X(k), s% abar(k), s% zbar(k), s% xa(:,k), &
+               s% id, k, s% xa(:,k), &
                logT, log10(Pgas), LOGRHO_TOL, LOGPGAS_TOL, &
-               logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+               logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
                ierr)
             if (ierr /= 0) then
                write(*, *) 'Call star_solve_eos_given_PgasT_auto failed', k
@@ -399,11 +404,19 @@
          
          subroutine get_atm(ierr)
             integer, intent(out) :: ierr
+            logical, parameter :: &
+               need_atm_Psurf = .true., need_atm_Tsurf = .true.
+            include 'formats'
+            ierr = 0
             skip_partials = .true.
+            if (s% opacity(1) <= 0d0 .or. is_bad(s% opacity(1))) then
+               write(*,1) 's% opacity(1)', s% opacity(1)
+               stop 'run_star_extras get_atm'
+            end if
             s% opacity_start(1) = s% opacity(1)
             call star_get_surf_PT( &
                s% id, skip_partials, &
-               s% Teff, &
+               need_atm_Psurf, need_atm_Tsurf, &
                lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
                lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
                ierr)
@@ -416,9 +429,9 @@
             logT = log10(T_surf)
             k = 1
             call star_solve_eos_given_PgasT( &
-               s% id, k, s% Z(k), s% X(k), s% abar(k), s% zbar(k), s% xa(:,k), &
+               s% id, k, s% xa(:,k), &
                logT, log10(Pgas), logRho, LOGRHO_TOL, LOGPGAS_TOL, &
-               logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+               logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
                ierr)
             if (ierr /= 0) then
                write(*, *) 'Call star_solve_eos_given_PgasT failed in get_atm'
@@ -453,9 +466,9 @@
                logT = log10(T_00)
                
                call star_solve_eos_given_PgasT( &
-                  s% id, k, s% Z(k), s% X(k), s% abar(k), s% zbar(k), s% xa(:,k), &
+                  s% id, k, s% xa(:,k), &
                   logT, log10(Pgas), logRho_m1, LOGRHO_TOL, LOGPGAS_TOL, &
-                  logRho, res, dres_dlnRho, dres_dlnT, dres_dabar, dres_dzbar, &
+                  logRho, res, dres_dlnRho, dres_dlnT, dres_dxa, &
                   ierr)
                if (ierr /= 0) then
                   write(*, *) 'Call star_solve_eos_given_PgasT failed', k
@@ -482,8 +495,6 @@
                s% lnT_start(k) = s% lnT(k)
                s% csound_face(k) = s% csound(k)
                s% csound_start(k) = s% csound(k)
-               s% tau_start(k) = 1d99
-               if (k > 1) s% tau_start(k-1) = 1d99
                s% mlt_gradT_fraction = -1d0
                s% adjust_mlt_gradT_fraction(k) = -1d0
                
@@ -497,7 +508,7 @@
                end if
                
                gradT = s% gradT(k)
-               d_gradT_dT = s% d_gradT_dlnT00(k)/T_00
+               d_gradT_dT = s% gradT_ad(k)%d1Array(i_lnT_00)/T_00
                T_face = 0.5d0*(T_m1 + T_00)
                d_T_face_dT = 0.5d0
                T_expected = T_m1 - T_face*gradT*dlnP_face

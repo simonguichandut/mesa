@@ -597,7 +597,7 @@ contains
 
     ! Store the mass-fractional location of the new convective
     ! boundary, and reset the locations for the old convective
-    ! boundary (cf. set_mlt_cz_boundary_info)
+    ! boundary (cf. set_cz_boundary_info)
 
     if (outward) then
 
@@ -690,7 +690,7 @@ contains
 
     use eos_def
     use micro
-    use mlt_info
+    use mlt_info, only: do1_mlt_2
 
     type(star_info), pointer :: s
     integer, intent(in)      :: k_bot_mz
@@ -732,6 +732,7 @@ contains
     real(dp) :: w
     real(dp) :: rho_face_save(s%nz)
     integer  :: op_err
+    logical  :: make_gradr_sticky_in_solver_iters
 
     ! Evaluate abundance data
 
@@ -815,9 +816,9 @@ contains
        s%rho_face(k) = w*exp(s%lnd(k)) + (1._dp-w)*exp(s%lnd(k-1))
 
        ! Evaluate mixing coefficients etc.
-
-       call do1_mlt(s, k, s% alpha_mlt(k), 0._dp, &
-            -1._dp, -1._dp, -1._dp, -1._dp, -1._dp, -1._dp, -1._dp, op_err)
+       ! Explicitly set gradL_composition_term to 0 in this call.
+       call do1_mlt_2(s, k, make_gradr_sticky_in_solver_iters, op_err, &
+            s% alpha_mlt(k), 0._dp)
        if (op_err /= 0) stop 'non-zero op_err'
 
        D(k) = s%mlt_D(k)
@@ -867,9 +868,7 @@ contains
     restore_face_loop: do k = k_a, k_b
 
        s%rho_face(k) = rho_face_save(k)
-
-       call do1_mlt(s, k, s% alpha_mlt(k), -1._dp, &
-            -1._dp, -1._dp, -1._dp, -1._dp, -1._dp, -1._dp, -1._dp, op_err)
+       call do1_mlt_2(s, k, make_gradr_sticky_in_solver_iters, op_err)
        if (op_err /= 0) stop 'non-zero op_err'
 
     end do restore_face_loop
@@ -914,8 +913,7 @@ contains
 
     real(dp) :: logRho
     real(dp) :: res(num_eos_basic_results)
-    real(dp) :: d_dabar(num_eos_basic_results)
-    real(dp) :: d_dzbar(num_eos_basic_results)
+    real(dp) :: d_dxa(num_eos_d_dxa_results,s%species)
 
     ! Evaluate EOS data in cell k, assuming the cell's temperature and
     ! pressure are as specified in the model, but with abundances
@@ -924,9 +922,9 @@ contains
     ! (NEEDS FIXING TO HANDLE CASE WHEN LNPGAS_FLAG = .TRUE.)
 
     call solve_eos_given_PgasT( &
-         s, k, z, x, abar, zbar, xa, &
+         s, k, xa, &
          s%lnT(k)/ln10, s%lnPgas(k)/ln10, s%lnd(k)/ln10, LOGRHO_TOL, LOGPGAS_TOL, &
-         logRho, res, d_dlnd, d_dlnT, d_dabar, d_dzbar, &
+         logRho, res, d_dlnd, d_dlnT, d_dxa, &
        ierr)
     if (ierr /= 0) then
        if (DEBUG) write(*,*) 'Non-zero return from solve_eos_given_PgasT in eval_eos/predictive_mix'

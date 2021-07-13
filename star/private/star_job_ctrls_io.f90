@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2013  Bill Paxton
+!   Copyright (C) 2013  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -37,9 +37,6 @@
       namelist /star_job/ &
          mesa_dir, &
          eosDT_cache_dir, &
-         eosPT_cache_dir, &
-         eosDE_cache_dir, &
-         ionization_cache_dir, &
          kap_cache_dir, &
          rates_cache_dir, &
          pause_before_terminate, &
@@ -53,6 +50,9 @@
          steps_before_start_timing, &
          show_eqns_and_vars_names, &
          pgstar_flag, &
+         disable_pgstar_during_relax_flag, &
+         clear_initial_pgstar_history, &
+         clear_pgstar_history, &
          save_pgstar_files_when_terminate, &
          save_photo_when_terminate, &
          load_saved_photo, &
@@ -91,8 +91,7 @@
          echo_at_start, &
          echo_at_end, &
          load_saved_model, &
-         load_saved_model_for_RSP, &
-         saved_model_name, &
+         load_model_filename, &
          create_merger_model, &
          saved_model_for_merger_1, &
          saved_model_for_merger_2, &
@@ -105,6 +104,7 @@
          lg_max_abs_mdot, &
          relax_mass_to_remove_H_env, &
          relax_initial_mass_to_remove_H_env, &
+         extra_mass_retained_by_remove_H_env, &
          relax_mass_scale, &
          relax_initial_mass_scale, &
          dlgm_per_step, &
@@ -156,6 +156,7 @@
          remove_center_by_radius_cm, &
          remove_center_by_radius_Rsun, &
          remove_center_by_he4, &
+         remove_center_by_c12_o16, &
          remove_center_by_si28, &
          remove_center_to_reduce_co56_ni56, &
          remove_center_by_ye, &
@@ -182,6 +183,7 @@
          remove_initial_center_by_radius_cm, &
          remove_initial_center_by_radius_Rsun, &
          remove_initial_center_by_he4, &
+         remove_initial_center_by_c12_o16, &
          remove_initial_center_by_si28, &
          remove_initial_center_to_reduce_co56_ni56, &
          remove_initial_center_by_ye, &
@@ -245,9 +247,6 @@
          relax_initial_max_surf_dq, &
          new_max_surf_dq, &
          max_surf_dq_multiplier, &
-         relax_fixed_L_for_BB_outer_BC, &
-         relax_initial_fixed_L_for_BB_outer_BC, &
-         steps_for_relax_fixed_L, &
 
          relax_tau_factor, &
          relax_initial_tau_factor, &
@@ -301,10 +300,11 @@
          change_initial_RSP_flag, &
          new_RSP_flag, &
          
-         change_Eturb_flag, &
-         change_initial_Eturb_flag, &
-         change_Eturb_flag_at_model_number, &
-         new_Eturb_flag, &
+         change_RSP2_flag, &
+         change_initial_RSP2_flag, &
+         change_RSP2_flag_at_model_number, &
+         new_RSP2_flag, &
+         create_RSP2_model, &
          
          change_conv_vel_flag, &
          change_initial_conv_vel_flag, &
@@ -343,7 +343,6 @@
          new_reconstruction_flag, &
          
          center_ye_limit_for_v_flag, &
-         gamma1_integral_for_v_flag, &
          logT_for_conv_vel_flag, &
          change_rotation_flag, &
          change_initial_rotation_flag, &
@@ -499,7 +498,6 @@
          required_termination_code_string, &
          profile_starting_model, &
          profile_model_number, &
-         internals_num, &
          report_retries, &
 
          net_reaction_filename, &
@@ -536,8 +534,6 @@
          save_pulse_data_filename, &
          
          chem_isotopes_filename, &
-         ionization_file_prefix, &
-         ionization_Z1_suffix, &
          extras_lipar, &
          extras_lrpar, &
          extras_lcpar, &
@@ -685,9 +681,6 @@
 
          s% job% mesa_dir = mesa_dir
          s% job% eosDT_cache_dir = eosDT_cache_dir
-         s% job% eosPT_cache_dir = eosPT_cache_dir
-         s% job% eosDE_cache_dir = eosDE_cache_dir
-         s% job% ionization_cache_dir = ionization_cache_dir
          s% job% kap_cache_dir = kap_cache_dir
          s% job% rates_cache_dir = rates_cache_dir
          s% job% pause_before_terminate = pause_before_terminate
@@ -701,6 +694,9 @@
          s% job% steps_before_start_timing = steps_before_start_timing
          s% job% show_eqns_and_vars_names = show_eqns_and_vars_names
          s% job% pgstar_flag = pgstar_flag
+         s% job% disable_pgstar_during_relax_flag = disable_pgstar_during_relax_flag
+         s% job% clear_initial_pgstar_history = clear_initial_pgstar_history
+         s% job% clear_pgstar_history = clear_pgstar_history
          s% job% save_pgstar_files_when_terminate = save_pgstar_files_when_terminate
          s% job% save_photo_when_terminate = save_photo_when_terminate
          s% job% load_saved_photo = load_saved_photo
@@ -741,8 +737,7 @@
          s% job% echo_at_start = echo_at_start
          s% job% echo_at_end = echo_at_end
          s% job% load_saved_model = load_saved_model
-         s% job% load_saved_model_for_RSP = load_saved_model_for_RSP
-         s% job% saved_model_name = saved_model_name
+         s% job% load_model_filename = load_model_filename
          s% job% create_merger_model = create_merger_model
          s% job% saved_model_for_merger_1 = saved_model_for_merger_1
          s% job% saved_model_for_merger_2 = saved_model_for_merger_2
@@ -755,6 +750,7 @@
          s% job% lg_max_abs_mdot = lg_max_abs_mdot
          s% job% relax_mass_to_remove_H_env = relax_mass_to_remove_H_env
          s% job% relax_initial_mass_to_remove_H_env = relax_initial_mass_to_remove_H_env
+         s% job% extra_mass_retained_by_remove_H_env = extra_mass_retained_by_remove_H_env
          s% job% relax_mass_scale = relax_mass_scale
          s% job% relax_initial_mass_scale = relax_initial_mass_scale
          s% job% dlgm_per_step = dlgm_per_step
@@ -808,6 +804,7 @@
          s% job% remove_initial_center_by_radius_cm = remove_initial_center_by_radius_cm
          s% job% remove_initial_center_by_radius_Rsun = remove_initial_center_by_radius_Rsun
          s% job% remove_initial_center_by_he4 = remove_initial_center_by_he4
+         s% job% remove_initial_center_by_c12_o16 = remove_initial_center_by_c12_o16
          s% job% remove_initial_center_by_si28 = remove_initial_center_by_si28
          s% job% remove_initial_center_to_reduce_co56_ni56 = remove_initial_center_to_reduce_co56_ni56
          s% job% remove_initial_center_by_ye = remove_initial_center_by_ye
@@ -826,6 +823,7 @@
          s% job% remove_center_by_radius_cm = remove_center_by_radius_cm
          s% job% remove_center_by_radius_Rsun = remove_center_by_radius_Rsun
          s% job% remove_center_by_he4 = remove_center_by_he4
+         s% job% remove_center_by_c12_o16 = remove_center_by_c12_o16
          s% job% remove_center_by_si28 = remove_center_by_si28
          s% job% remove_center_to_reduce_co56_ni56 = remove_center_to_reduce_co56_ni56
          s% job% remove_center_by_ye = remove_center_by_ye
@@ -902,9 +900,6 @@
          s% job% relax_initial_max_surf_dq = relax_initial_max_surf_dq
          s% job% new_max_surf_dq = new_max_surf_dq
          s% job% max_surf_dq_multiplier = max_surf_dq_multiplier
-         s% job% relax_fixed_L_for_BB_outer_BC = relax_fixed_L_for_BB_outer_BC
-         s% job% relax_initial_fixed_L_for_BB_outer_BC = relax_initial_fixed_L_for_BB_outer_BC
-         s% job% steps_for_relax_fixed_L = steps_for_relax_fixed_L
 
          s% job% relax_tau_factor = relax_tau_factor
          s% job% relax_initial_tau_factor = relax_initial_tau_factor
@@ -955,10 +950,11 @@
          s% job% change_RSP_flag = change_RSP_flag
          s% job% change_initial_RSP_flag = change_initial_RSP_flag
          s% job% new_RSP_flag = new_RSP_flag
-         s% job% change_Eturb_flag = change_Eturb_flag
-         s% job% change_initial_Eturb_flag = change_initial_Eturb_flag
-         s% job% change_Eturb_flag_at_model_number = change_Eturb_flag_at_model_number
-         s% job% new_Eturb_flag = new_Eturb_flag
+         s% job% change_RSP2_flag = change_RSP2_flag
+         s% job% change_initial_RSP2_flag = change_initial_RSP2_flag
+         s% job% change_RSP2_flag_at_model_number = change_RSP2_flag_at_model_number
+         s% job% new_RSP2_flag = new_RSP2_flag
+         s% job% create_RSP2_model = create_RSP2_model
          s% job% change_conv_vel_flag = change_conv_vel_flag
          s% job% change_initial_conv_vel_flag = change_initial_conv_vel_flag
          s% job% new_conv_vel_flag = new_conv_vel_flag
@@ -991,7 +987,6 @@
          s% job% new_reconstruction_flag = new_reconstruction_flag
          
          s% job% center_ye_limit_for_v_flag = center_ye_limit_for_v_flag
-         s% job% gamma1_integral_for_v_flag = gamma1_integral_for_v_flag
          s% job% logT_for_conv_vel_flag = logT_for_conv_vel_flag
          s% job% change_rotation_flag = change_rotation_flag
          s% job% change_initial_rotation_flag = change_initial_rotation_flag
@@ -1149,7 +1144,6 @@
          s% job% required_termination_code_string = required_termination_code_string
          s% job% profile_starting_model = profile_starting_model
          s% job% profile_model_number = profile_model_number
-         s% job% internals_num = internals_num
          s% job% report_retries = report_retries
 
          s% job% net_reaction_filename = net_reaction_filename
@@ -1188,8 +1182,6 @@
          s% job% save_pulse_data_filename = save_pulse_data_filename
          
          s% job% chem_isotopes_filename = chem_isotopes_filename
-         s% job% ionization_file_prefix = ionization_file_prefix
-         s% job% ionization_Z1_suffix = ionization_Z1_suffix
          s% job% extras_lipar = extras_lipar
          s% job% extras_lrpar = extras_lrpar
          s% job% extras_lcpar = extras_lcpar
@@ -1213,6 +1205,7 @@
 
 
       subroutine set_default_star_job_controls
+         required_termination_code_string(:) = ''
          extras_ipar(:) = 0
          extras_rpar(:) = 0
          extras_cpar(:) = ''
@@ -1261,9 +1254,6 @@
 
          mesa_dir = s% job% mesa_dir
          eosDT_cache_dir = s% job% eosDT_cache_dir
-         eosPT_cache_dir = s% job% eosPT_cache_dir
-         eosDE_cache_dir = s% job% eosDE_cache_dir
-         ionization_cache_dir = s% job% ionization_cache_dir
          kap_cache_dir = s% job% kap_cache_dir
          rates_cache_dir = s% job% rates_cache_dir
          pause_before_terminate = s% job% pause_before_terminate
@@ -1277,6 +1267,9 @@
          steps_before_start_timing = s% job% steps_before_start_timing
          show_eqns_and_vars_names = s% job% show_eqns_and_vars_names
          pgstar_flag = s% job% pgstar_flag
+         disable_pgstar_during_relax_flag = s% job% disable_pgstar_during_relax_flag
+         clear_initial_pgstar_history = s% job% clear_initial_pgstar_history
+         clear_pgstar_history = s% job% clear_pgstar_history
          save_pgstar_files_when_terminate = s% job% save_pgstar_files_when_terminate
          save_photo_when_terminate = s% job% save_photo_when_terminate
          load_saved_photo = s% job% load_saved_photo
@@ -1317,8 +1310,7 @@
          echo_at_start = s% job% echo_at_start
          echo_at_end = s% job% echo_at_end
          load_saved_model = s% job% load_saved_model
-         load_saved_model_for_RSP = s% job% load_saved_model_for_RSP
-         saved_model_name = s% job% saved_model_name
+         load_model_filename = s% job% load_model_filename
          create_merger_model = s% job% create_merger_model
          saved_model_for_merger_1 = s% job% saved_model_for_merger_1
          saved_model_for_merger_2 = s% job% saved_model_for_merger_2
@@ -1331,6 +1323,7 @@
          lg_max_abs_mdot = s% job% lg_max_abs_mdot
          relax_mass_to_remove_H_env = s% job% relax_mass_to_remove_H_env
          relax_initial_mass_to_remove_H_env = s% job% relax_initial_mass_to_remove_H_env
+         extra_mass_retained_by_remove_H_env = s% job% extra_mass_retained_by_remove_H_env
          relax_mass_scale = s% job% relax_mass_scale
          relax_initial_mass_scale = s% job% relax_initial_mass_scale
          dlgm_per_step = s% job% dlgm_per_step
@@ -1383,6 +1376,7 @@
          remove_center_by_radius_Rsun = s% job% remove_center_by_radius_Rsun
          remove_center_by_radius_cm = s% job% remove_center_by_radius_cm
          remove_center_by_he4 = s% job% remove_center_by_he4
+         remove_center_by_c12_o16 = s% job% remove_center_by_c12_o16
          remove_center_by_si28 = s% job% remove_center_by_si28
          remove_center_to_reduce_co56_ni56 = s% job% remove_center_to_reduce_co56_ni56
          remove_center_by_ye = s% job% remove_center_by_ye
@@ -1411,6 +1405,7 @@
          remove_initial_center_by_radius_Rsun = s% job% remove_initial_center_by_radius_Rsun
          remove_initial_center_by_radius_cm = s% job% remove_initial_center_by_radius_cm
          remove_initial_center_by_he4 = s% job% remove_initial_center_by_he4
+         remove_initial_center_by_c12_o16 = s% job% remove_initial_center_by_c12_o16
          remove_initial_center_by_si28 = s% job% remove_initial_center_by_si28
          remove_initial_center_to_reduce_co56_ni56 = s% job% remove_initial_center_to_reduce_co56_ni56
          remove_initial_center_by_ye = s% job% remove_initial_center_by_ye
@@ -1479,9 +1474,6 @@
          relax_initial_max_surf_dq = s% job% relax_initial_max_surf_dq
          new_max_surf_dq = s% job% new_max_surf_dq
          max_surf_dq_multiplier = s% job% max_surf_dq_multiplier
-         relax_fixed_L_for_BB_outer_BC = s% job% relax_fixed_L_for_BB_outer_BC
-         relax_initial_fixed_L_for_BB_outer_BC = s% job% relax_initial_fixed_L_for_BB_outer_BC
-         steps_for_relax_fixed_L = s% job% steps_for_relax_fixed_L
 
          relax_tau_factor = s% job% relax_tau_factor
          relax_initial_tau_factor = s% job% relax_initial_tau_factor
@@ -1532,10 +1524,11 @@
          change_RSP_flag = s% job% change_RSP_flag
          change_initial_RSP_flag = s% job% change_initial_RSP_flag
          new_RSP_flag = s% job% new_RSP_flag
-         change_Eturb_flag = s% job% change_Eturb_flag
-         change_initial_Eturb_flag = s% job% change_initial_Eturb_flag
-         change_Eturb_flag_at_model_number = s% job% change_Eturb_flag_at_model_number
-         new_Eturb_flag = s% job% new_Eturb_flag
+         change_RSP2_flag = s% job% change_RSP2_flag
+         change_initial_RSP2_flag = s% job% change_initial_RSP2_flag
+         change_RSP2_flag_at_model_number = s% job% change_RSP2_flag_at_model_number
+         new_RSP2_flag = s% job% new_RSP2_flag
+         create_RSP2_model = s% job% create_RSP2_model
          change_conv_vel_flag = s% job% change_conv_vel_flag
          change_initial_conv_vel_flag = s% job% change_initial_conv_vel_flag
          new_conv_vel_flag = s% job% new_conv_vel_flag
@@ -1567,7 +1560,6 @@
          new_reconstruction_flag = s% job% new_reconstruction_flag
 
          center_ye_limit_for_v_flag = s% job% center_ye_limit_for_v_flag
-         gamma1_integral_for_v_flag = s% job% gamma1_integral_for_v_flag
          logT_for_conv_vel_flag = s% job% logT_for_conv_vel_flag
          change_rotation_flag = s% job% change_rotation_flag
          change_initial_rotation_flag = s% job% change_initial_rotation_flag
@@ -1725,7 +1717,6 @@
          required_termination_code_string = s% job% required_termination_code_string
          profile_starting_model = s% job% profile_starting_model
          profile_model_number = s% job% profile_model_number
-         internals_num = s% job% internals_num
          report_retries = s% job% report_retries
 
          net_reaction_filename = s% job% net_reaction_filename
@@ -1764,8 +1755,6 @@
          save_pulse_data_filename = s% job% save_pulse_data_filename
          
          chem_isotopes_filename = s% job% chem_isotopes_filename
-         ionization_file_prefix = s% job% ionization_file_prefix
-         ionization_Z1_suffix = s% job% ionization_Z1_suffix
          extras_lipar = s% job% extras_lipar
          extras_lrpar = s% job% extras_lrpar
          extras_lcpar = s% job% extras_lcpar

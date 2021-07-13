@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -61,8 +61,9 @@
             stop 'do_evolve_step_part1'
          end if
          
-         if ( first_try .and. s% fill_arrays_with_NaNs .and. .not. s% RSP_flag) then
-            write(*,*) 'fill_arrays_with_NaNs at start of step'
+         if (first_try .and. s% fill_arrays_with_NaNs .and. .not. s% RSP_flag) then
+            if (mod(s% model_number, s% terminal_interval) == 0) &
+               write(*,*) 'fill_arrays_with_NaNs at start of step'
             call test_set_undefined
             call fill_star_info_arrays_with_NaNs(s, ierr)
             if (ierr /= 0) return
@@ -102,43 +103,17 @@
             s% n_conv_regions = -999
             s% atm_structure_num_pts = -999
             s% generations = -999
-            s% init_model_number = -999
-            s% start_H_envelope_base_k = -999
-            s% total_step_attempts = -999
-            s% total_relax_step_attempts = -999
-            s% total_step_retries = -999
-            s% total_relax_step_retries = -999
-            s% total_step_redos = -999
-            s% total_relax_step_redos = -999
-            s% total_steps_finished = -999
-            s% total_relax_steps_finished = -999
             s% num_solver_iterations = -999
-            s% num_skipped_setvars = -999
-            s% num_setvars = -999
-            s% num_solver_setvars = -999
-            s% num_hydro_merges = -999
-            s% num_hydro_splits = -999
-            s% bad_max_corr_cnt = -999
-            s% timestep_hold = -999
-            s% model_number_for_last_retry = -999
-            s% model_number_for_last_retry_old = -999
-            s% diffusion_call_number = -999
             s% num_diffusion_solver_iters = -999
             s% num_diffusion_solver_steps = -999
             s% num_rotation_solver_steps = -999
             s% result_reason = -999
-            s% why_Tlim = -999
-            s% burner_storage_sz_per_thread = -999
             s% burner_num_threads = -999
             s% k_below_const_q = -999
             s% k_const_mass = -999
             s% k_for_test_CpT_absMdot_div_L = -999
             s% k_below_just_added = -999
-            s% start_H_envelope_base_k = -999
-            s% init_model_number = -999
             s% termination_code = -999
-            s% boost_mlt_alfa = -999
-            s% burn_nstep_max = -999
             s% burn_nfcn_total = -999
             s% dX_nuc_drop_max_k = -999
             s% dX_nuc_drop_max_j = -999
@@ -161,7 +136,6 @@
             call set_to_NaN(s% L_phot_old)
             call set_to_NaN(s% L_surf)
             call set_to_NaN(s% L_surf_old)
-            call set_to_NaN(s% Lrad_div_Ledd_avg_surf_old)
             call set_to_NaN(s% M_center_old)
             call set_to_NaN(s% R_center_old)
             call set_to_NaN(s% Teff_old)
@@ -172,9 +146,6 @@
             call set_to_NaN(s% adjust_mass_outer_frac_sub1)
             call set_to_NaN(s% angular_momentum_added)
             call set_to_NaN(s% angular_momentum_removed)
-            call set_to_NaN(s% astero_revised_max_yr_dt_old)
-            call set_to_NaN(s% center_eps_nuc_old)
-            call set_to_NaN(s% co_core_mass_old)
             call set_to_NaN(s% conv_mx1_bot)
             call set_to_NaN(s% conv_mx1_bot_r)
             call set_to_NaN(s% conv_mx1_top)
@@ -185,8 +156,6 @@
             call set_to_NaN(s% conv_mx2_top_r)
             call set_to_NaN(s% cumulative_energy_error_old)
             call set_to_NaN(s% cumulative_extra_heating_old)
-            call set_to_NaN(s% dVARdot_dVAR)
-            call set_to_NaN(s% dX_nuc_drop_max_drop)
             call set_to_NaN(s% d_vc_dv)
             call set_to_NaN(s% delta_Pg)
             call set_to_NaN(s% delta_nu)
@@ -200,24 +169,19 @@
             call set_to_NaN(s% explicit_mstar_dot)
             call set_to_NaN(s% gradT_excess_max_lambda)
             call set_to_NaN(s% gradT_excess_min_beta)
-            call set_to_NaN(s% h1_czb_mass)            
-            call set_to_NaN(s% h1_czb_mass_old)
-            call set_to_NaN(s% he_core_mass_old)
+            call set_to_NaN(s% h1_czb_mass)    
             call set_to_NaN(s% initial_L_center)
             call set_to_NaN(s% initial_R_center)
             call set_to_NaN(s% initial_timestep)   
             call set_to_NaN(s% initial_v_center)
-            call set_to_NaN(s% log_L_surf)
-            call set_to_NaN(s% log_P_center)
-            call set_to_NaN(s% log_P_center_old)
-            call set_to_NaN(s% max_fixup_for_mix)
+            call set_to_NaN(s% max_conv_time_scale)
             call set_to_NaN(s% max_residual)
             call set_to_NaN(s% mdot_acoustic_surface)
             call set_to_NaN(s% mdot_adiabatic_surface)
             call set_to_NaN(s% mesh_adjust_IE_conservation)
             call set_to_NaN(s% mesh_adjust_KE_conservation)
             call set_to_NaN(s% mesh_adjust_PE_conservation)
-            call set_to_NaN(s% min_dr_div_cs_start)
+            call set_to_NaN(s% min_conv_time_scale)
             call set_to_NaN(s% mstar_dot_old)
             call set_to_NaN(s% mstar_old)
             call set_to_NaN(s% mx1_bot)
@@ -230,41 +194,12 @@
             call set_to_NaN(s% mx2_top_r)
             call set_to_NaN(s% non_epsnuc_energy_change_from_split_burn)
             call set_to_NaN(s% nu_max)
-            call set_to_NaN(s% photosphere_opacity_start)
-            call set_to_NaN(s% power_CNO)
-            call set_to_NaN(s% power_PP)
-            call set_to_NaN(s% power_ar_alpha)
-            call set_to_NaN(s% power_c12_c12)
-            call set_to_NaN(s% power_c12_o16)
-            call set_to_NaN(s% power_c_alpha)
-            call set_to_NaN(s% power_ca_alpha)
-            call set_to_NaN(s% power_co56_fe56)
-            call set_to_NaN(s% power_cr_alpha)
-            call set_to_NaN(s% power_fe_co_ni)
-            call set_to_NaN(s% power_h_burn_old)
-            call set_to_NaN(s% power_he_burn_old)
-            call set_to_NaN(s% power_mg_alpha)
-            call set_to_NaN(s% power_n_alpha)
-            call set_to_NaN(s% power_na_alpha)
-            call set_to_NaN(s% power_ne_alpha)
             call set_to_NaN(s% power_neutrinos)
-            call set_to_NaN(s% power_ni56_co56)
             call set_to_NaN(s% power_nonnuc_neutrinos)
             call set_to_NaN(s% power_nuc_burn_old)
             call set_to_NaN(s% power_nuc_neutrinos)
-            call set_to_NaN(s% power_o16_o16)
-            call set_to_NaN(s% power_o_alpha)
-            call set_to_NaN(s% power_other)
-            call set_to_NaN(s% power_pnhe4)
-            call set_to_NaN(s% power_s_alpha)
-            call set_to_NaN(s% power_si_alpha)
-            call set_to_NaN(s% power_ti_alpha)
-            call set_to_NaN(s% power_tri_alpha)
-            call set_to_NaN(s% power_z_burn_old)
             call set_to_NaN(s% prev_Ledd)
-            call set_to_NaN(s% prev_create_atm_R0_div_R)
             call set_to_NaN(s% residual_norm)
-            call set_to_NaN(s% revised_max_yr_dt_old)
             call set_to_NaN(s% rotational_mdot_boost)
             call set_to_NaN(s% shock_mass_start)
             call set_to_NaN(s% solver_test_partials_dval_dx)
@@ -272,9 +207,7 @@
             call set_to_NaN(s% star_age)
             call set_to_NaN(s% starting_T_center)
             call set_to_NaN(s% super_eddington_wind_mdot)
-            call set_to_NaN(s% surf_accel_grav_ratio)
             call set_to_NaN(s% surf_csound)
-            call set_to_NaN(s% surf_opacity)
             call set_to_NaN(s% surf_r_equatorial)
             call set_to_NaN(s% surf_rho)
             call set_to_NaN(s% surface_cell_specific_total_energy_old)
@@ -338,9 +271,7 @@
             call set_to_NaN(s% total_turbulent_energy_old)
             call set_to_NaN(s% total_turbulent_energy_start)
             call set_to_NaN(s% v_center_old)
-            call set_to_NaN(s% v_surf_old) ! (cm/second)
             call set_to_NaN(s% virial_thm_P_avg)
-            call set_to_NaN(s% w_div_w_crit_avg_surf_old)
             call set_to_NaN(s% work_inward_at_center)
             call set_to_NaN(s% work_outward_at_surface)
             call set_to_NaN(s% xmstar_old)
@@ -388,6 +319,7 @@
          s% need_to_setvars = .true. ! always start fresh
          s% okay_to_set_mixing_info = .true. ! set false by element diffusion
          s% generations = 1
+         s% okay_to_set_mlt_vc = .false. ! don't change mlt_vc until have set mlt_vc_old
          
          if (s% timestep_hold > s% model_number + 10000) then 
             write(*,3) 'ERROR: s% timestep_hold', s% timestep_hold, s% model_number
@@ -405,6 +337,7 @@
          if (failed('set_qs')) return
          call set_m_and_dm(s)
          call set_dm_bar(s, nz, s% dm, s% dm_bar)
+         
          if (s% rotation_flag) then
             call set_cgrav(s, ierr)
             if (failed('set_cgrav')) return
@@ -412,8 +345,7 @@
             s% total_angular_momentum = total_angular_momentum(s)
             ! set r and rmid from xh
             do k=1,nz
-               s% lnR(k) = s% xh(s% i_lnR,k)
-               s% r(k) = exp(s% lnR(k))
+               call get_r_and_lnR_from_xh(s, k, s% r(k), s% lnR(k))
             end do
             call set_rmid(s, 1, nz, ierr)
             if (failed('set_rmid')) return
@@ -452,9 +384,10 @@
             end if
             s% have_new_generation = .true.
             s% have_new_cz_bdy_info = .false.
-            if (s% steps_before_use_Fraley_time_centering >= 0 .and. &
-                s% model_number > s% steps_before_use_Fraley_time_centering) &
-               s% using_Fraley_time_centering = .true.
+            if ((s% steps_before_use_velocity_time_centering == 0) .or. &
+                (s% steps_before_use_velocity_time_centering > 0 .and. &
+                   s% model_number >= s% steps_before_use_velocity_time_centering)) &
+               s% using_velocity_time_centering = .true.
          end if
          
          call reset_epsnuc_vectors(s)
@@ -567,24 +500,23 @@
          use eps_mdot, only: calculate_eps_mdot
          use struct_burn_mix, only: do_struct_burn_mix
          use hydro_vars, only: set_vars_if_needed, set_vars, set_final_vars, set_cgrav
-         use hydro_mtx, only: dump_struct
          use star_utils, only: start_time, update_time, get_phot_info
          use solve_omega_mix, only: do_solve_omega_mix
          use mix_info, only: set_cz_bdy_mass, set_mixing_info
          use hydro_rotation, only: set_rotation_info, set_i_rot
-         use solve_hydro, only: set_luminosity_by_category
          use winds, only: set_mdot
          use star_utils, only: &
             eval_integrated_total_energy_profile, eval_deltaM_total_energy_integrals, &
-            set_phase_of_evolution
+            set_phase_of_evolution, set_luminosity_by_category
          use profile
 
          logical, intent(in) :: first_try
          integer, intent(in) :: id
 
          type (star_info), pointer :: s
-         integer :: ierr, time0, clock_rate, &
+         integer :: ierr, &
             j, k, j_cnt, mdot_redo_cnt, max_mdot_redo_cnt, cnt, max_cnt, nz
+         integer(8) :: time0, clock_rate
          logical :: okay, trace, skip_global_corr_coeff_limit, &
             have_too_large_wind_mdot, have_too_small_wind_mdot, &
             ignored_first_step, was_in_implicit_wind_limit
@@ -592,7 +524,7 @@
             w_div_w_crit, w_div_w_crit_prev, mstar_dot, mstar_dot_prev, abs_mstar_delta, &
             explicit_mdot, max_wind_mdot, wind_mdot, r_phot, kh_timescale, dmskhf, dmsfac, &
             too_large_wind_mdot, too_small_wind_mdot, boost, mstar_dot_nxt, total, &
-            surf_w_div_w_crit_limit, dt, time, max_dt, total_energy, &
+            surf_omega_div_omega_crit_limit, dt, time, max_dt, total_energy, &
             new_R_center, amplitude, flash_max, &
             dm_nz, dm_m1, r_m1, v_m1, A_nz, A_m1, A_center, new_v_center, min_v_center
             
@@ -734,6 +666,7 @@
             if (do_step_part2 /= keep_going) return
             ! when reach here, have taken the step successfully
             ! but might not satisfy the implicit mdot requirements.
+
             mdot_action = select_mdot_action(ierr)
             if (failed('select_mdot_action')) return
             if (do_step_part2 /= keep_going) return
@@ -743,10 +676,14 @@
          end do implicit_mdot_loop
 
          s% solver_iter = 0 ! to indicate that no longer doing solver iterations
-         
+
          if (.not. s% RSP_flag) then
             call set_final_vars(s, dt, ierr)
             if (failed('set_final_vars')) return
+            if (s% okay_to_set_mlt_vc .and. .not. s% have_mlt_vc) then
+               s% have_mlt_vc = .true.
+            end if
+            s% okay_to_set_mlt_vc = .false.         
          end if
 
          if (.not. okay_energy_conservation()) return
@@ -760,13 +697,13 @@
             end if
          end if
 
-         call eval_integrated_total_energy_profile(s, s%total_energy_integral_surface, -1, ierr)
-         call eval_integrated_total_energy_profile(s, s%total_energy_integral_center, 1, ierr)
-
          call set_luminosity_by_category(s) ! final values for use in selecting timestep
          call set_power_info(s)
 
          s% total_angular_momentum = total_angular_momentum(s)
+
+         ! do_report needs to be called now because checks for redo and retry rely on
+         ! data stored by do_report.
          call do_report(s, ierr)
          if (failed('do_report')) return
          call set_phase_of_evolution(s)
@@ -799,7 +736,7 @@
 
             mstar_dot = 0
             w_div_w_crit = -1
-            surf_w_div_w_crit_limit = s% surf_w_div_w_crit_limit
+            surf_omega_div_omega_crit_limit = s% surf_omega_div_omega_crit_limit
             mdot_redo_cnt = 0
             max_mdot_redo_cnt = s% max_mdot_redo_cnt
 
@@ -835,12 +772,17 @@
 
 
          integer function select_mdot_action(ierr)
+            use hydro_rotation, only: set_surf_avg_rotation_info
             integer, intent(out) :: ierr
             include 'formats'
+            
             select_mdot_action = exit_loop
-            if (s% mstar_dot == 0) return
+            if (s% mstar_dot == 0 .or. max_mdot_redo_cnt <= 0) return
+               ! the test of max_mdot_redo_cnt <= 0 belongs here.  it was erroneously placed
+               ! after possible select_mdot_action = cycle_loop, return.  BP: Apr 25, 2021.
+            
             if (iwind_redo_cnt < iwind_max_redo_cnt .and. iwind_lambda > 0d0) then
-               ! check if mdot calculated at end of step is close enought to what used
+               ! check mdot calculated at end of step
                call get_phot_info(s, ph_x, ph_x, ph_x, ph_L, ph_x, ph_x, ph_x, ph_x, ph_x, ph_k)
                call set_mdot(s, ph_L, s% mstar, s% Teff, ierr)
                if (ierr /= 0) then
@@ -856,32 +798,23 @@
                   s% need_to_setvars = .true.
                   s% mstar_dot = explicit_mdot + &
                      iwind_lambda*(implicit_mdot - explicit_mdot)
-                  if (.false.) write(*,3) 'implicit mdot: diff/new old new next', &
-                     iwind_redo_cnt, s% model_number, &
-                     1d0 - explicit_mdot/implicit_mdot, &
-                     explicit_mdot, implicit_mdot, s% mstar_dot
                   explicit_mdot = s% mstar_dot
                   do_step_part2 = prepare_for_new_try(s)
                   if (do_step_part2 /= keep_going) return
                   iwind_redo_cnt = iwind_redo_cnt + 1
                   s% need_to_setvars = .true.
-                  !cycle implicit_mdot_loop
                   select_mdot_action = cycle_loop
                   return
                end if
                iwind_max_redo_cnt = iwind_redo_cnt ! done with implicit wind
-               if (.false.) write(*,3) 'implicit mdot: diff/new old new', &
-                  iwind_redo_cnt, s% model_number, &
-                  1d0 - explicit_mdot/implicit_mdot, explicit_mdot, implicit_mdot
             end if
 
-            ! check for omega > omega_crit
-
-            if (.not. s% rotation_flag .or. max_mdot_redo_cnt <= 0) then
-               !exit implicit_mdot_loop
+            if (.not. s% rotation_flag) then
                select_mdot_action = exit_loop
                return
             end if
+            
+            ! check for omega > omega_crit
 
             mstar_dot_prev = mstar_dot
             mstar_dot = s% mstar_dot
@@ -913,14 +846,13 @@
                   return
                end if
                write(*,*)
-               if (w_div_w_crit > surf_w_div_w_crit_limit) then
-                  write(*,1) 'retry: w_div_w_crit > surf_w_div_w_crit_limit', &
-                     w_div_w_crit, surf_w_div_w_crit_limit
+               if (w_div_w_crit > surf_omega_div_omega_crit_limit) then
+                  write(*,1) 'retry: w_div_w_crit > surf_omega_div_omega_crit_limit', &
+                     w_div_w_crit, surf_omega_div_omega_crit_limit
                   do_step_part2 = retry
                   s% result_reason = nonzero_ierr
                   return
                end if
-               !exit implicit_mdot_loop
                select_mdot_action = exit_loop
                return
             end if
@@ -931,15 +863,14 @@
             ! i.e. if bigger mass loss makes w_div_w_crit worse,
             ! then in an unstable situation and will remove mass until regain stability.
 
-            if (w_div_w_crit <= surf_w_div_w_crit_limit &
+            if (w_div_w_crit <= surf_omega_div_omega_crit_limit &
                   .and. mdot_redo_cnt == 0) then
                s% was_in_implicit_wind_limit = .false.
-               !exit implicit_mdot_loop
                select_mdot_action = exit_loop
                return
             end if
 
-            if (w_div_w_crit <= surf_w_div_w_crit_limit &
+            if (w_div_w_crit <= surf_omega_div_omega_crit_limit &
                   .and. s% mstar_dot == explicit_mdot) then
                !exit implicit_mdot_loop
                select_mdot_action = exit_loop
@@ -954,7 +885,6 @@
                if (.true.) write(*,1) &
                   'dt too small for fix to fix w > w_crit; min_years_dt_for_redo_mdot', &
                   dt/secyer, s% min_years_dt_for_redo_mdot
-               !exit implicit_mdot_loop
                select_mdot_action = exit_loop
                return
             end if
@@ -987,7 +917,6 @@
                abs_mstar_delta = abs(s% mstar_dot)
 
                s% need_to_setvars = .true.
-               !cycle implicit_mdot_loop
                select_mdot_action = cycle_loop
                return
 
@@ -996,15 +925,14 @@
             end if
 
             ! have already done at least one correction -- check if okay now
-            if (w_div_w_crit <= surf_w_div_w_crit_limit .and. &
+            if (w_div_w_crit <= surf_omega_div_omega_crit_limit .and. &
                   have_too_small_wind_mdot .and. &
                   abs((wind_mdot-too_small_wind_mdot)/wind_mdot) < &
-                     s% surf_w_div_w_crit_tol) then
+                     s% surf_omega_div_omega_crit_tol) then
                write(*,3) 'OKAY', s% model_number, mdot_redo_cnt, w_div_w_crit, &
                   log10(abs(s% mstar_dot)/(Msun/secyer))
                write(*,*)
-               !exit implicit_mdot_loop ! in bounds so accept it
-               select_mdot_action = exit_loop
+               select_mdot_action = exit_loop ! in bounds so accept it
                return
             end if
 
@@ -1017,13 +945,12 @@
                   s% result_reason = nonzero_ierr
                   return
                end if
-               !exit implicit_mdot_loop
                select_mdot_action = exit_loop
                return
             end if
 
-            if (w_div_w_crit > surf_w_div_w_crit_limit &
-                  .and. w_div_w_crit_prev >= surf_w_div_w_crit_limit &
+            if (w_div_w_crit > surf_omega_div_omega_crit_limit &
+                  .and. w_div_w_crit_prev >= surf_omega_div_omega_crit_limit &
                   .and. -mstar_dot >= max_wind_mdot) then
                write(*,3) 'failed to fix w > w_crit', &
                   s% model_number, mdot_redo_cnt, w_div_w_crit, &
@@ -1034,7 +961,7 @@
                return
             end if
 
-            if (w_div_w_crit >= surf_w_div_w_crit_limit) then ! wind too small
+            if (w_div_w_crit >= surf_omega_div_omega_crit_limit) then ! wind too small
                !write(*,*) "entering too small wind mdot"
                if (.not. have_too_small_wind_mdot) then
                   !write(*,*) "setting too small wind mdot"
@@ -1044,7 +971,7 @@
                   !write(*,*) "changing too small wind mdot"
                   too_small_wind_mdot = wind_mdot
                end if
-            else if (w_div_w_crit < surf_w_div_w_crit_limit) then ! wind too large
+            else if (w_div_w_crit < surf_omega_div_omega_crit_limit) then ! wind too large
                !write(*,*) "entering too large wind mdot"
                if (.not. have_too_large_wind_mdot) then
                   !write(*,*) "setting too large wind mdot"
@@ -1063,7 +990,7 @@
 
             if (have_too_large_wind_mdot .and. have_too_small_wind_mdot) then
                if (abs((too_large_wind_mdot-too_small_wind_mdot)/too_large_wind_mdot) &
-                   < s% surf_w_div_w_crit_tol) then
+                   < s% surf_omega_div_omega_crit_tol) then
                   write(*,*) "too_large_wind_mdot good enough, using it"
                   s% mstar_dot = -too_large_wind_mdot
                else
@@ -1137,7 +1064,7 @@
             grada = alfa*s% grada(k) + beta*s% grada(k-1)
             Pgas = alfa*s% Pgas(k) + beta*s% Pgas(k-1)
             Prad = alfa*s% Prad(k) + beta*s% Prad(k-1)
-            P = alfa*s% P(k) + beta*s% P(k-1)
+            P = alfa*s% Peos(k) + beta*s% Peos(k-1)
             opacity = alfa*s% opacity(k) + beta*s% opacity(k-1)
 
             write(*,2) 'at end of step', s% model_number
@@ -1165,12 +1092,13 @@
             integer :: nz, k, ierr
             real(dp) :: phase1_sources_and_sinks, phase2_sources_and_sinks, phase2_work, &
                phase1_total_energy_from_mdot, phase2_total_energy_from_mdot, &
-               expected_sum_cell_others, expected_sum_cell_sources, &
+               expected_sum_cell_others, expected_sum_cell_sources, L_theta, &
                diff_total_gravitational_energy, diff_total_internal_energy, diff_total_kinetic_energy, &
                diff_total_rotational_kinetic_energy, diff_total_turbulent_energy, &
-               virial, total_radiation, L_surf, sum_cell_de, sum_cell_dEturb, &
+               virial, total_radiation, L_surf, sum_cell_de, sum_cell_detrb, &
                sum_cell_dke, sum_cell_dpe, sum_cell_dL, sum_cell_ergs_error, sum_cell_others, &
-               sum_cell_sources, sum_cell_terms, sum_cell_work, total_energy_from_pre_mixing
+               sum_cell_sources, sum_cell_terms, sum_cell_work, total_energy_from_pre_mixing,&
+               total_energy_from_fixed_m_grav
                
             include 'formats'
 
@@ -1234,10 +1162,11 @@
                s% total_eps_mdot = dt*dot_product(s% dm(1:nz), s% eps_mdot(1:nz))
             end if
                
-            virial = 3*sum(s% dm(1:nz)*s% P(1:nz)/s% rho(1:nz))
+            virial = 3*sum(s% dm(1:nz)*s% Peos(1:nz)/s% rho(1:nz))
             s% virial_thm_P_avg = virial
 
-            s% total_eps_grav = dt*dot_product(s% dm(1:nz), s% eps_grav(1:nz))
+            s% total_eps_grav = dt*dot_product(s% dm(1:nz), s% eps_grav_ad(1:nz)% val)
+
             if (s% u_flag .and. s% total_eps_grav /= 0d0) then ! .or. s% use_dedt_form_of_energy_eqn) then
                write(*,2) 'u_flag energy accounting ignores total_eps_grav', s% model_number, s% total_eps_grav
                s% total_eps_grav = 0
@@ -1330,17 +1259,18 @@
             phase2_total_energy_from_mdot = &
                dt*dot_product(s% dm(1:nz), s% eps_mdot(1:nz))
             
-            s% total_extra_heating = dt*dot_product(s% dm(1:nz), s% extra_heat(1:nz))
+            s% total_extra_heating = dt*dot_product(s% dm(1:nz), s% extra_heat(1:nz)%val)
 
             phase2_work = dt*(s% work_outward_at_surface - s% work_inward_at_center)
             
             if (.not. s% RSP_flag) then
-               if (s% using_Fraley_time_centering .and. &
-                     s% include_L_in_Fraley_time_centering) then
-                  L_surf = 0.5d0*(s% L(1) + s% L_start(1))
+               if (s% using_velocity_time_centering .and. &
+                     s% include_L_in_velocity_time_centering) then
+                  L_theta = s% L_theta_for_velocity_time_centering
                else
-                  L_surf = s% L(1)
+                  L_theta = 1d0
                end if
+               L_surf = L_theta*s% L(1) + (1d0 - L_theta)*s% L_start(1)
                total_radiation = dt*(L_surf - s% L_center)
             end if
 
@@ -1349,7 +1279,21 @@
             !   + s% total_energy_change_from_mdot &
             !   + s% mdot_adiabatic_surface &
             !   - phase2_total_energy_from_mdot
-               
+
+            ! during the newton iterations, m_grav remains fixed,
+            ! even though the mass_corrections respond to the change in composition.
+            ! This means there is a term
+            !    -sum dm G Delta(m_grav) / r
+            ! being neglected.
+            ! after the iterations, we update m_grav before doing the energy accounting.
+            ! this changes the potential energy so we need to correct by that amount.
+            if (s% use_mass_corrections) then
+               total_energy_from_fixed_m_grav = &
+                    -dot_product(s% cgrav(1:nz)/s%r(1:nz)*(s%m_grav(1:nz)-s%m_grav_start(1:nz)), s% dm(1:nz))
+            else
+               total_energy_from_fixed_m_grav = 0
+            end if
+
             phase1_total_energy_from_mdot = &
                  s% energy_change_from_do_adjust_mass_and_calculate_eps_mdot &
                + s% mdot_adiabatic_surface ! ??
@@ -1375,7 +1319,25 @@
 
             s% total_energy_sources_and_sinks = &
                phase1_sources_and_sinks + phase2_sources_and_sinks
-
+            if (is_bad(s% total_energy_sources_and_sinks)) then
+               write(*,2) 's% total_energy_sources_and_sinks', s% model_number, s% total_energy_sources_and_sinks
+               write(*,2) 'phase1_sources_and_sinks', s% model_number, phase1_sources_and_sinks
+               write(*,2) 'phase2_sources_and_sinks', s% model_number, phase2_sources_and_sinks
+               write(*,2) 'total_energy_from_pre_mixing', s% model_number, total_energy_from_pre_mixing
+               write(*,2) 's% total_WD_sedimentation_heating', s% model_number, s% total_WD_sedimentation_heating
+               write(*,2) 'phase2_total_energy_from_mdot', s% model_number, phase2_total_energy_from_mdot
+               write(*,2) 's% total_nuclear_heating', s% model_number, s% total_nuclear_heating
+               write(*,2) 's% total_non_nuc_neu_cooling', s% model_number, s% total_non_nuc_neu_cooling
+               write(*,2) 's% total_irradiation_heating', s% model_number, s% total_irradiation_heating
+               write(*,2) 's% total_extra_heating', s% model_number, s% total_extra_heating
+               write(*,2) 'phase2_work', s% model_number, phase2_work
+               write(*,2) 's% work_outward_at_surface', s% model_number, s% work_outward_at_surface
+               write(*,2) 's% work_inward_at_center', s% model_number, s% work_inward_at_center
+               !write(*,2) '', s% model_number, 
+               !write(*,2) '', s% model_number, 
+               stop 'okay_energy_conservation'
+            end if
+  
             s% error_in_energy_conservation = &
                s% total_energy_end - (s% total_energy_old + s% total_energy_sources_and_sinks)
 
@@ -1388,7 +1350,12 @@
             s% total_rotational_kinetic_energy = s% total_rotational_kinetic_energy_end
             s% total_turbulent_energy = s% total_turbulent_energy_end
             s% total_energy = s% total_energy_end
-         
+
+            ! provide info about non-conservation due to mass corrections
+            if (s% use_mass_corrections) then
+               write(*,2) 'INFO: use_mass_corrections incurred rel_E_err', s% model_number, -total_energy_from_fixed_m_grav/s% total_energy
+            end if
+
             if (s% model_number == s% energy_conservation_dump_model_number &
                   .and. .not. s% doing_relax) then
 
@@ -1407,8 +1374,7 @@
                write(*,2) 's% total_energy_sources_and_sinks', s% model_number, s% total_energy_sources_and_sinks
                write(*,*)
                
-               if (s% use_dedt_form_with_total_energy_conservation .and. &
-                   s% always_use_dedt_form_of_energy_eqn) then
+               if (s% always_use_dedt_form_of_energy_eqn) then
                   
                   write(*,*)
                   write(*,*) 'for debugging phase1_sources_and_sinks'
@@ -1470,21 +1436,17 @@
                   write(*,2) 'L_center', s% model_number, s% L_center
                   write(*,*)
                   
-                  
-                  
-                  
-                   
                   sum_cell_dL = dt*dot_product(s% dm(1:nz), s% dL_dm(1:nz))
                   sum_cell_sources = dt*dot_product(s% dm(1:nz), s% energy_sources(1:nz))
                   sum_cell_others = dt*dot_product(s% dm(1:nz), s% energy_others(1:nz))
                   sum_cell_work = dt*dot_product(s% dm(1:nz), s% dwork_dm(1:nz))
-                  sum_cell_dEturb = dt*dot_product(s% dm(1:nz), s% dEturb_dt(1:nz))
+                  sum_cell_detrb = dt*dot_product(s% dm(1:nz), s% detrbdt(1:nz))
                   sum_cell_dke = dt*dot_product(s% dm(1:nz), s% dkedt(1:nz))
                   sum_cell_dpe = dt*dot_product(s% dm(1:nz), s% dpedt(1:nz))
                   sum_cell_de = dt*dot_product(s% dm(1:nz), s% dedt(1:nz))
                   sum_cell_terms = &
                      - sum_cell_dL + sum_cell_sources + sum_cell_others - sum_cell_work &
-                     - sum_cell_dEturb - sum_cell_dke - sum_cell_dpe - sum_cell_de
+                     - sum_cell_detrb - sum_cell_dke - sum_cell_dpe - sum_cell_de
                   sum_cell_terms = -sum_cell_terms ! to make it the same sign as sum_cell_ergs_error
                   sum_cell_ergs_error = sum(s% ergs_error(1:nz))
                   
@@ -1537,9 +1499,9 @@
                   !write(*,2) 'rel err ', s% model_number, &
                   !   ( - diff_total_rotational_kinetic_energy)/s% total_energy, &
                   !   , diff_total_rotational_kinetic_energy
-                  write(*,2) 'rel err sum_cell_dEturb', s% model_number, &
-                     (sum_cell_dEturb - diff_total_turbulent_energy)/s% total_energy, &
-                     sum_cell_dEturb, diff_total_turbulent_energy
+                  write(*,2) 'rel err sum_cell_detrb', s% model_number, &
+                     (sum_cell_detrb - diff_total_turbulent_energy)/s% total_energy, &
+                     sum_cell_detrb, diff_total_turbulent_energy
                   write(*,*)
                      
                      
@@ -1658,15 +1620,9 @@
 
          nz = s% nz
          dt = s% dt
-         s% extra_heat(1:nz) = s% extra_power_source
-         s% d_extra_heat_dlndm1(1:nz) = 0d0
-         s% d_extra_heat_dlnd00(1:nz) = 0d0
-         s% d_extra_heat_dlndp1(1:nz) = 0d0
-         s% d_extra_heat_dlnTm1(1:nz) = 0d0
-         s% d_extra_heat_dlnT00(1:nz) = 0d0
-         s% d_extra_heat_dlnTp1(1:nz) = 0d0
-         s% d_extra_heat_dlnR00(1:nz) = 0d0
-         s% d_extra_heat_dlnRp1(1:nz) = 0d0
+         do k=1,nz
+            s% extra_heat(k) = s% extra_power_source
+         end do
          
          if (s% use_other_energy) then
             call s% other_energy(s% id, ierr)
@@ -1719,17 +1675,21 @@
 
          if (s% duration_for_inject_extra_ergs_sec > 0) then
             end_time = start_time + s% duration_for_inject_extra_ergs_sec
-         else
+         else if (s% max_age_in_seconds > 0) then
             end_time = s% max_age_in_seconds
+         else if (s% max_age_in_days > 0) then
+            end_time = s% max_age_in_days*(60*60*24)
+         else
+            end_time = s% max_age*secyer
          end if
          if (s% time_old > end_time) return
          
          target_injection_ergs = &
             s% inject_until_reach_model_with_total_energy - s% total_energy_initial
          target_injection_time = end_time - start_time
-         s% inject_extra_ergs_sec = target_injection_ergs/target_injection_time               
+         s% inject_extra_ergs_sec = target_injection_ergs/target_injection_time 
          left_to_inject = &
-            s% inject_until_reach_model_with_total_energy - s% total_energy_start
+            s% inject_until_reach_model_with_total_energy - s% total_energy_old
          qp1 = 0d0
          qmin = max(0d0, Msun*s% base_of_inject_extra_ergs_sec - s% M_center)/s% xmstar
          qmax = min(1d0, qmin + Msun*s% total_mass_for_inject_extra_ergs_sec/s% xmstar)
@@ -1743,8 +1703,7 @@
          if (is_bad(extra)) then
             write(*,2) 'extra', s% model_number, extra
             write(*,2) 'left_to_inject', s% model_number, left_to_inject
-            write(*,2) 's% total_energy_initial', s% model_number, s% total_energy_initial
-            write(*,2) 's% total_energy_start', s% model_number, s% total_energy_start
+            write(*,2) 's% total_energy_old', s% model_number, s% total_energy_old
             stop 'check_for_extra_heat'
          end if
          do k=nz,1,-1
@@ -1768,9 +1727,8 @@
          use report, only: do_report
          use hydro_vars, only: set_vars_if_needed
          use mlt_info, only: set_gradT_excess_alpha
-         use solve_hydro, only: set_luminosity_by_category
-         use star_utils, only: min_dr_div_cs, save_for_d_dt, &
-            total_angular_momentum, eval_Ledd
+         use star_utils, only: min_dr_div_cs, get_remnant_mass, &
+            total_angular_momentum, eval_Ledd, set_luminosity_by_category
 
          type (star_info), pointer :: s
          character (len=*), intent(in) :: str
@@ -1787,10 +1745,9 @@
          nz = s% nz
 
          if (.not. s% RSP_flag) then
-            call save_for_d_dt(s)
             call set_vars_if_needed(s, s% dt, str, ierr)
             if (failed('set_vars_if_needed')) return     
-            s% edv(1:s% species, 1:s% nz) = 0 ! edv is used by do_report
+            s% edv(1:s% species, 1:s% nz) = 0
             call set_luminosity_by_category(s)
             s% total_angular_momentum = total_angular_momentum(s)
             call do_report(s, ierr)
@@ -1798,20 +1755,18 @@
          end if
 
          ! save a few things from start of step that will need later
-         s% min_dr_div_cs_start = min_dr_div_cs(s,k)
          if (s% rotation_flag) then
             s% surf_r_equatorial = s% r_equatorial(1)
          else
             s% surf_r_equatorial = s% r(1)
          end if
          s% starting_T_center = s% T(nz)
-         s% surf_opacity = s% opacity(1)
          s% surf_csound = s% csound(1)
          s% surf_rho = s% rho(1)
          s% prev_Ledd = eval_Ledd(s,ierr)
          if (failed('eval_Ledd ierr')) return
          
-         if (.not. (s% RSP_flag .or. s% Eturb_flag)) then
+         if (.not. s% RSP_flag) then
             call set_gradT_excess_alpha(s, ierr)
             if (failed('set_gradT_excess_alpha ierr')) return
          end if
@@ -1835,14 +1790,14 @@
       integer function prepare_for_new_step(s)
          use evolve_support, only: new_generation
          use chem_def
-         use star_utils, only: use_xh_to_set_rho_to_dm_div_dV
-         use report, only: set_phot_info
+         use star_utils, only: use_xh_to_set_rho_to_dm_div_dV, set_phot_info
          use hydro_vars, only: set_vars_if_needed
 
          type (star_info), pointer :: s
 
          integer :: ierr, k, j, k0_old, k1_old, k0_new, k1_new
-         real(dp) :: total_energy, force_timestep_min, delta_E, sum_delta_E, total_radiation
+         real(dp) :: total_energy, force_timestep_min, delta_E, sum_delta_E, &
+            force_timestep, total_radiation
          real(dp), pointer :: energy_profile_after_remesh(:)
          logical :: trace
 
@@ -1857,6 +1812,7 @@
             write(*, *) 's% dt_next', s% dt_next
             prepare_for_new_step = terminate
             if ((s% time >= s% max_age*secyer .and. s% max_age > 0) .or. &
+                (s% time >= s% max_age_in_days*(60*60*24) .and. s% max_age_in_days > 0) .or. &
                 (s% time >= s% max_age_in_seconds .and. s% max_age_in_seconds > 0)) then
                s% result_reason = result_reason_normal
                s% termination_code = t_max_age
@@ -1888,6 +1844,7 @@
                s% prev_mesh_j_rot(k) = s% j_rot(k)
                s% prev_mesh_omega(k) = s% omega(k)
                s% prev_mesh_dq(k) = s% dq(k)
+               s% prev_mesh_mlt_vc(k) = s% mlt_vc(k)
                s% prev_mesh_species_or_nvar_hydro_changed = .false.
             end do
             s% prev_mesh_nz = s% nz
@@ -1904,7 +1861,7 @@
          
          call set_vars_if_needed(s, s% dt_next, 'prepare_for_new_step', ierr)
          if (failed('set_vars_if_needed ierr')) return
-         call set_phot_info(s)
+         call set_phot_info(s) ! this sets Teff and other stuff
          
          call new_generation(s, ierr)
          if (failed('new_generation ierr')) return
@@ -1921,9 +1878,13 @@
          else if ((s% time + s% dt_next) > s% max_age_in_seconds &
                   .and. s% max_age_in_seconds > 0) then
             s% dt_next = max(0d0, s% max_age_in_seconds - s% time)
+         else if ((s% time + s% dt_next) > s% max_age_in_days*(60*60*24) &
+                  .and. s% max_age_in_days > 0) then
+            s% dt_next = max(0d0, s% max_age_in_days*(60*60*24) - s% time)
          end if
          
          s% dt = s% dt_next
+            
          force_timestep_min = s% force_timestep_min
          if (force_timestep_min == 0) &
             force_timestep_min = secyer*s% force_timestep_min_years
@@ -1931,7 +1892,14 @@
             s% dt = min(s% dt*s% force_timestep_min_factor, force_timestep_min)
             write(*,2) 'force increase in timestep', s% model_number, s% dt
          end if
+         
+         force_timestep = s% force_timestep
+         if (force_timestep == 0) &
+            force_timestep = secyer*s% force_timestep_years
+         if (force_timestep > 0) s% dt = force_timestep
+         
          s% dt_start = s% dt
+         s% time_step = s% dt/secyer
          
          if (is_bad(s% dt)) then
             write(*,1) 's% dt', s% dt
@@ -2015,7 +1983,7 @@
          s% solver_iter = 0
          s% solver_adjust_iter = 0
          
-         nvar = s% nvar
+         nvar = s% nvar_total
          nvar_hydro = s% nvar_hydro
          nz = s% nz
          s% model_number = s% model_number_old + 1
@@ -2065,13 +2033,15 @@
 
             do k = 1, nz
                do j=1,nvar_hydro
-                  s% xh(j,k) = s% xh_old(j,k) ! start from copy of old structure
+                  s% xh(j,k) = s% xh_old(j,k)
                end do
                do j=1,s% species
-                  s% xa(j,k) = s% xa_old(j,k) ! start from copy of old composition
+                  s% xa(j,k) = s% xa_old(j,k)
                end do
-               s% dq(k) = s% dq_old(k) ! start with same dq's
+               s% dq(k) = s% dq_old(k)
+               s% mlt_vc(k) = s% mlt_vc_old(k)
             end do
+            s% okay_to_set_mlt_vc = .true.
             
             call set_qs(s, nz, s% q, s% dq, ierr)
             if (ierr /= 0) then
@@ -2155,6 +2125,9 @@
             s% dt_next = -s% time
          else if ((s% time + s% dt_next) > s% max_age*secyer .and. s% max_age > 0) then
             s% dt_next = max(0d0, s% max_age*secyer - s% time)
+         else if ((s% time + s% dt_next) > s% max_age_in_days*(60*60*24) &
+                  .and. s% max_age_in_days > 0) then
+            s% dt_next = max(0d0, s% max_age_in_days*(60*60*24) - s% time)
          else if ((s% time + s% dt_next) > s% max_age_in_seconds &
                   .and. s% max_age_in_seconds > 0) then
             s% dt_next = max(0d0, s% max_age_in_seconds - s% time)
@@ -2162,6 +2135,8 @@
                   s% max_years_for_timestep > 0) then
             if (s% max_age > 0) then
                remaining_years = s% max_age - s% star_age
+            else if (s% max_age_in_days > 0) then
+               remaining_years = (s% max_age_in_days*(60*60*24) - s% time)/secyer
             else if (s% max_age_in_seconds > 0) then
                remaining_years = (s% max_age_in_seconds - s% time)/secyer
             else
@@ -2267,6 +2242,7 @@
                   s% dq_old(k) = s% prev_mesh_dq(k)
                   s% omega_old(k) = s% prev_mesh_omega(k)
                   s% j_rot_old(k) = s% prev_mesh_j_rot(k)
+                  s% mlt_vc_old(k) = s% prev_mesh_mlt_vc(k)
                end do
                call normalize_dqs(s, s% prev_mesh_nz, s% dq_old, ierr)
                if (ierr /= 0) then
@@ -2279,7 +2255,6 @@
          
          if (s% trace_evolve) write(*,'(/,a)') 'prepare_to_retry'
          
-         s% bad_max_corr_cnt = 0
          s% retry_cnt = s% retry_cnt + 1
          if (s% retry_limit > 0 .and. s% retry_cnt > s% retry_limit) then
             s% dt_start = sqrt(s% dt*s% dt_start)
@@ -2291,6 +2266,7 @@
 
          retry_factor = s% timestep_factor_for_retries
          s% dt = s% dt*retry_factor
+         s% time_step = s% dt/secyer
          if (len_trim(s% retry_message) > 0) then
             if (s% retry_message_k > 0) then
                write(*,'(a, 2i8)') ' retry: ' // trim(s% retry_message), s% retry_message_k, s% model_number
@@ -2318,7 +2294,10 @@
 
          if (s% max_years_for_timestep > 0) &
             s% max_timestep = secyer*s% max_years_for_timestep
-         if (s% max_timestep > 0) s% dt = min(s% dt, s% max_timestep)
+         if (s% max_timestep > 0 .and. s% dt > s% max_timestep) then
+            s% dt = s% max_timestep
+            s% time_step = s% dt/secyer
+         end if
 
          call set_current_to_old(s)
          
@@ -2346,15 +2325,11 @@
       subroutine report_problems(s,str)
          type (star_info), pointer :: s
          character (len=*), intent(in) :: str
-         write(*,*)
          write(*,*) 'stopping because of problems ' // trim(str)
-         write(*,*)
       end subroutine report_problems
 
 
-      integer function finish_step( &
-            id, do_photo, &
-            ierr)
+      integer function finish_step(id, ierr)
          ! returns keep_going or terminate
          ! if don't return keep_going, then set result_reason to say why.
          use evolve_support, only: output
@@ -2364,8 +2339,6 @@
          use alloc, only: size_work_arrays
 
          integer, intent(in) :: id
-         logical, intent(in) :: do_photo ! if true, then save "photo" for restart
-
          integer, intent(out) :: ierr
 
          type (star_info), pointer :: s
@@ -2412,12 +2385,14 @@
 
          call check(2)
 
-         will_do_photo = do_photo
-         if(s% photo_interval > 0) then
-            if(mod(s% model_number, s% photo_interval) == 0) will_do_photo = .true.
-         end if
-         if(s% solver_save_photo_call_number > 0)then
-            if(s% solver_call_number == s% solver_save_photo_call_number - 1) will_do_photo = .true.
+         will_do_photo = .false.
+         if (.not. s% doing_relax) then
+            if(s% photo_interval > 0) then
+               if(mod(s% model_number, s% photo_interval) == 0) will_do_photo = .true.
+            end if
+            if(s% solver_save_photo_call_number > 0)then
+               if(s% solver_call_number == s% solver_save_photo_call_number - 1) will_do_photo = .true.
+            end if
         end if
 
          if (will_do_photo) then

@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019 Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019 The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -252,7 +252,6 @@
             out = weak_rhs_nuclide_id(ir)
             Qx = chem_isos% mass_excess(in) - chem_isos% mass_excess(out)
 
-#ifdef USE_HDF5
             if (use_suzuki_tables) then
                ! now, if there's a suzuki reaction, use that one instead
                call create_weak_dict_key(weak_lhs_nuclide_name(ir), weak_rhs_nuclide_name(ir), key)
@@ -281,7 +280,6 @@
                   ierr = 0
                end if
             end if
-#endif
 
           ! neg is true for electron capture and positron emission
           neg = ((chem_isos% Z(in) - chem_isos% Z(out)) == 1.0d0)
@@ -328,6 +326,7 @@
          contains
          
          subroutine show_stuff
+            integer :: i
             include 'formats'
             write(*,1) 'T9', T9
             write(*,1) 'lYeRho', lYeRho

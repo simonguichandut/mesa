@@ -7,7 +7,7 @@
       show_log_description_at_start = .false.
 
       load_saved_model = .true.
-      saved_model_name = 'co_wd_settled.mod'
+      load_model_filename = 'co_wd_settled.mod'
       ! comes from final.mod produced by make_co_wd as of version 14731
 
       save_model_when_terminate = .true.
@@ -30,9 +30,14 @@
 
 &eos
 	  use_Skye = .true.
+          use_PC = .false.
+          
+          ! For more accurate C/O phase diagram
+          Skye_solid_mixing_rule = "Ogata"
+
    !dbg = .true.
-   logT_lo = 6.59473
-   logT_hi = 6.59473
+!   logT_lo = 6.59473
+!   logT_hi = 6.59473
 / ! end of eos namelist
 
 
@@ -42,10 +47,6 @@
 
       kap_file_prefix = 'gs98'
       use_Type2_opacities = .true.
-
-      ! use Blouin et al. (2020) corrections
-      ! see run_star_extras
-      use_other_elect_cond_opacity = .false.
 
 / ! end of kap namelist
 
@@ -72,9 +73,6 @@
       diffusion_use_full_net = .true.
       do_WD_sedimentation_heating = .true.
       do_diffusion_heating = .false.
-      diffusion_gamma_full_on = 174d0
-      diffusion_gamma_full_off = 176d0
-
 
       mesh_delta_coeff = 0.75
       

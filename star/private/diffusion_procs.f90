@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2012-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2012-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -1023,7 +1023,7 @@
                T_term = (T_full_off - T_min) / (T_full_off - T_full_on)
             end if
 
-            lim = gamma_term*T_term
+            lim = gamma_term*T_term*(1d0 - s% phase(k))
             if (lim <= 0d0) then
                limit_coeffs_face(k) = 0d0
                k_max = k-1
@@ -1163,7 +1163,7 @@
 
 
          subroutine do1(k)
-            use ionization_lib, only: eval_typical_charge
+            use mod_typical_charge, only: eval_typical_charge
             integer, intent(in) :: k
             integer :: i
 

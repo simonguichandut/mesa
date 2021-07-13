@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -93,13 +93,12 @@
 
       
       subroutine burn_1_zone( &
-            handle, species, num_reactions, t_start, t_end, starting_x, &
+            net_handle, eos_handle, species, num_reactions, t_start, t_end, starting_x, &
             ntimes, times, log10Ts_f1, log10Rhos_f1, etas_f1, dxdt_source_term, &
             rate_factors, weak_rate_factor, &
             reaction_Qs, reaction_neuQs, &
             screening_mode,  &
             stptry_in, max_steps, eps, odescal, &
-            okay_to_reuse_rate_screened, &
             use_pivoting, trace, burn_dbg, burner_finish_substep, &
             burn_lwork, burn_work_array, &
             net_lwork, net_work_array, &
@@ -116,7 +115,7 @@
          use net_initialize, only: work_size
          use net_approx21, only: approx21_nrat
          
-         integer, intent(in) :: handle
+         integer, intent(in) :: net_handle, eos_handle
          integer, intent(in) :: species
          integer, intent(in) :: num_reactions
          real(dp), intent(in) :: t_start, t_end, starting_x(:) ! (species)
@@ -138,7 +137,6 @@
          real(dp), intent(in) :: stptry_in
          integer, intent(in) :: max_steps ! maximal number of allowed steps.
          real(dp), intent(in) :: eps, odescal ! tolerances.  e.g., set both to 1d-6
-         logical, intent(in) :: okay_to_reuse_rate_screened
          logical, intent(in) :: use_pivoting
          logical, intent(in) :: trace, burn_dbg
          interface
@@ -159,7 +157,7 @@
          
          type (Net_General_Info), pointer :: g
          integer :: ijac, lrd, lid, lout, i, j, ir, idid, sz
-         logical :: okay, reuse_rate_raw, have_set_rate_screened
+         logical :: okay, have_set_rate_screened
          real(dp) :: temp, rho, eta, lgT, lgRho, r, prev_lgRho, prev_lgT
          
          integer :: stpmax, imax_dydx, nstp
@@ -202,7 +200,6 @@
          save_x => save_x_a
          n => net_info_target
          
-         reuse_rate_raw = .false. ! must evaluate 1st time
          have_set_rate_screened = .false.
          
          lgT = log10Ts_f1(1)
@@ -214,7 +211,7 @@
          prev_lgRho = -1d99
          
          ierr = 0
-         call get_net_ptr(handle, g, ierr)
+         call get_net_ptr(net_handle, g, ierr)
          if (ierr /= 0) then
             if (report_ierr) write(*,*) 'invalid handle for burn_1_zone'
             return
@@ -272,7 +269,7 @@
             screening_mode, &
             rate_screened, rate_screened_dT, rate_screened_dRho, &
             rate_raw, rate_raw_dT, rate_raw_dRho, burn_lwork, burn_work_array, &
-            .false., .false., iwork, ierr)
+            iwork, ierr)
          if (dbg) write(*,*) 'done setup_net_info'
          if (ierr /= 0) then
             if (dbg) write(*,*) 'failed in setup_net_info'
@@ -334,7 +331,7 @@
             real(dp) :: dxdt_sum, dxdt_sum_aprox21, &
                Z_plus_N, xsum, r, r1, r2
             integer :: i, ir, ci, j, k, ibad
-            logical :: okay, reuse_rates
+            logical :: okay
 
             real(dp), target :: f21_a(species)
             real(dp), pointer :: f21(:)
@@ -344,8 +341,7 @@
             ierr = 0
             nfcn = nfcn + 1
             dfdx => dfdx_arry
-            reuse_rates = .false. ! use_aprox21_rates .or. set_aprox21_rates
-            call jakob_or_derivs(x,y,f,dfdx,reuse_rates,ierr)
+            call jakob_or_derivs(x,y,f,dfdx,ierr)
             if (ierr /= 0) return            
          
          end subroutine burner_derivs
@@ -362,31 +358,29 @@
             real(dp), pointer :: dfdy21(:,:)
             real(dp) :: Z_plus_N, df_t, df_m
             integer :: i, ci, j, cj
-            logical :: okay, reuse_rates
+            logical :: okay
             include 'formats'
 
             ierr = 0
             njac = njac + 1
             f => f_arry
 
-            reuse_rates = .false.
-            call jakob_or_derivs(x,y,f,dfdy,reuse_rates,ierr)
+            call jakob_or_derivs(x,y,f,dfdy,ierr)
             if (ierr /= 0) return
                      
          end subroutine burner_jakob
 
-         subroutine jakob_or_derivs(time,y,f,dfdy,reuse_rates,ierr)
+         subroutine jakob_or_derivs(time,y,f,dfdy,ierr)
             use chem_lib, only: basic_composition_info
             use chem_def, only: chem_isos, num_categories, category_name, ih1
             use net_eval, only: eval_net
             use rates_def, only: rates_reaction_id_max, i_rate, i_rate_dT, i_rate_dRho
             use interp_1d_lib, only: interp_value
-            use eos_def, only: num_helm_results, h_etaele
-            use eos_lib, only: eos_get_helm_results
+            use eos_def, only: num_eos_basic_results, num_eos_d_dxa_results, i_eta
+            use eos_lib, only: eosDT_get
          
             real(dp) :: time, y(:), f(:)
             real(dp), pointer :: dfdy(:,:)
-            logical, intent(in) :: reuse_rates
             integer, intent(out) :: ierr
          
             real(dp) :: rho, lgRho, T, lgT, rate_limit, rat, dratdt, dratdd
@@ -400,7 +394,7 @@
             real(dp) :: d_dxdt_dT(species)
             real(dp) :: d_dxdt_dx(species, species)
             
-            logical :: reuse_rate_screened, rates_only, dxdt_only, okay
+            logical :: rates_only, dxdt_only, okay
             integer :: i, j, k, ir
 
             real(dp), pointer, dimension(:) :: actual_Qs, actual_neuQs
@@ -409,9 +403,9 @@
             
             real(dp), target :: x_a(species), dfdx_a(species,species)
             real(dp), pointer :: x(:), dfdx(:,:)
-            real(dp) :: res(num_helm_results)
-      
-            real(dp), parameter :: coulomb_temp_cut = 1d6, coulomb_den_cut = 1d3
+
+            real(dp), dimension(num_eos_basic_results) :: res, d_dlnd, d_dlnT
+            real(dp) :: d_dxa(num_eos_d_dxa_results,species)
          
             include 'formats'
          
@@ -469,30 +463,22 @@
                species, g% chem_id, x, xh, xhe, z, &
                abar, zbar, z2bar, z53bar, ye, mass_correction, sumx)
             
-            if (.not. (okay_to_reuse_rate_screened .and. &
-                       have_set_rate_screened)) then
-               call eos_get_helm_results( &
-                  xh, abar, zbar, rho, lgRho, T, lgT, &
-                  coulomb_temp_cut, coulomb_den_cut, &
-                  .true., .false., .false., &
-                  5d0, 4.5d0, & ! logT_ion_HELM, logT_neutral_HELM
-                  res, ierr)
-               if (ierr /= 0) then
-                  if (report_ierr) write(*,*) 'failed in eos_get_helm_results'
-                  return
-               end if
-               eta = res(h_etaele)
-               d_eta_dlnT = 0
-               d_eta_dlnRho = 0
+
+            call eosDT_get( &
+               eos_handle, species, g% chem_id, g% net_iso, x, &
+               Rho, lgRho, T, lgT, &
+               res, d_dlnd, d_dlnT, d_dxa, ierr)
+            if (ierr /= 0) then
+               if (report_ierr) write(*,*) 'failed in eosDT_get'
+               return
             end if
+            eta = res(i_eta)
+            d_eta_dlnT = d_dlnT(i_eta)
+            d_eta_dlnRho = d_dlnd(i_eta)
+
             
             rates_only = .false.
             dxdt_only = (size(dfdy,dim=1) == 0)
-            
-            if (reuse_rate_raw) & ! check if really is okay
-               reuse_rate_raw = (prev_lgT == lgT .and. prev_lgRho == lgRho)
-            reuse_rate_screened = &
-               (reuse_rate_raw .and. okay_to_reuse_rate_screened)
             
             call eval_net( &
                n, g, rates_only, dxdt_only, &
@@ -501,15 +487,12 @@
                abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
                rate_factors, weak_rate_factor, &
                reaction_Qs, reaction_neuQs, &
-               reuse_rate_raw, reuse_rate_screened, &
                eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
                dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
                screening_mode, &
                eps_nuc_categories, eps_neu_total, &
                net_lwork, net_work_array, &
                actual_Qs, actual_neuQs, from_weaklib, .false., ierr)
-
-            reuse_rate_raw = .true. ! after 1st call can reuse since T and Rho constant
             
             if (size(f,dim=1) > 0) then
                do j = 1, species

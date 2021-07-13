@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -46,27 +46,19 @@
       contains
 
 
-      subroutine do_get_data_for_history_columns( &
-            s, &
-            ierr)
+      subroutine do_get_data_for_history_columns(s, ierr)
          type (star_info), pointer :: s
-
          integer, intent(out) :: ierr
          logical, parameter :: write_flag = .false.
-         call do_history_info( &
-            s, &
-            write_flag, ierr)
+         call do_history_info(s, write_flag, ierr)
       end subroutine do_get_data_for_history_columns
 
 
       subroutine write_history_info(s, ierr)
          type (star_info), pointer :: s
-
          integer, intent(out) :: ierr
          logical, parameter :: write_flag = .true.
-         call do_history_info( &
-            s, &
-            write_flag, ierr)
+         call do_history_info(s, write_flag, ierr)
       end subroutine write_history_info
 
 
@@ -285,13 +277,13 @@
             call dealloc
             return
          end if
-         
-         if (.not. s% v_flag) then
-            v_surf = s% r(1)*s% dlnR_dt(1)
-         else if (s% using_Fraley_time_centering) then
-            v_surf = s% vc(1)
-         else
+
+         if (s% u_flag) then
+            v_surf = s% u(1)
+         else if (s% v_flag) then
             v_surf = s% v(1)
+         else
+            v_surf = 0d0
          end if
 
          if (s% initial_mass > s% he_core_mass) then
@@ -477,12 +469,20 @@
 
          subroutine do_extra_col(pass, j, col_offset)
             integer, intent(in) :: pass, j, col_offset
+            integer :: int_val
+            include 'formats'
             if (pass == 1) then
                if (write_flag) write(io, fmt=int_fmt, advance='no') j + col_offset
             else if (pass == 2) then
                call do_name(j + col_offset, extra_col_names(j))
             else if (pass == 3) then
-               call do_val(j + col_offset, extra_col_vals(j))
+               int_val = int(extra_col_vals(j))
+               if (abs(extra_col_vals(j) - dble(int_val)) < &
+                     1d-10*max(1d-10,abs(extra_col_vals(j)))) then
+                  call do_int_val(j + col_offset, int_val)
+               else
+                  call do_val(j + col_offset, extra_col_vals(j))
+               end if
             end if
          end subroutine do_extra_col
 
@@ -1192,7 +1192,7 @@
             m_div_h = chem_M_div_h(s% X(k),s% Z(k),s% job% initial_zfracs)
             if (k > 0) then
                i = c - log_lum_band_offset
-               val = get_lum_band_by_id(i, safe_log10(s% photosphere_T), &
+               val = get_lum_band_by_id(i, safe_log10(s% Teff), &
                   s% photosphere_logg, m_div_h, s% photosphere_L, ierr)
                if (ierr /= 0) return
             end if
@@ -1204,7 +1204,7 @@
             if (k > 0) then
                i = c - lum_band_offset
                !val = get_lum_band_by_id(i,safe_log10(s% T(k)),safe_log10(s% grav(k)),m_div_h,s% L(k)/lsun, ierr)
-               val = get_lum_band_by_id(i, safe_log10(s% photosphere_T), &
+               val = get_lum_band_by_id(i, safe_log10(s% Teff), &
                   s% photosphere_logg, m_div_h, s% photosphere_L, ierr)
                val=val*lsun
                if (ierr /= 0) return
@@ -1216,7 +1216,7 @@
             if (k > 0) then
                i = c - abs_mag_offset
                !val = get_abs_mag_by_id(i,safe_log10(s% T(k)),safe_log10(s% grav(k)),m_div_h,s% L(k)/lsun, ierr)
-               val = get_abs_mag_by_id(i, safe_log10(s% photosphere_T), &
+               val = get_abs_mag_by_id(i, safe_log10(s% Teff), &
                   s% photosphere_logg, m_div_h, s% photosphere_L, ierr)
                if (ierr /= 0) return
             end if
@@ -1227,7 +1227,7 @@
             if (k > 0) then
                i = c - bc_offset
                !val = get_bc_by_id(i,safe_log10(s% T(k)),safe_log10(s% grav(k)),m_div_h, ierr)
-               val = get_bc_by_id(i, safe_log10(s% photosphere_T), &
+               val = get_bc_by_id(i, safe_log10(s% Teff), &
                   s% photosphere_logg, m_div_h, ierr)
                if (ierr /= 0) return
             end if
@@ -1292,6 +1292,8 @@
                val = s% star_age*secyer/60/60
             case(h_star_age_day)
                val = s% star_age*secyer/60/60/24
+            case(h_star_age_yr)
+               val = s% star_age
             case(h_day)
                val = s% star_age*secyer/60/60/24
 
@@ -1300,7 +1302,7 @@
             case(h_log_dt)
                val = safe_log10(s% time_step)
             case(h_time_step_sec)
-               val = s% time_step*secyer
+               val = s% dt
             case(h_log_dt_sec)
                val = safe_log10(s% time_step*secyer)
             case(h_time_step_days)
@@ -1683,8 +1685,6 @@
             case(h_log_mesh_adjust_KE_conservation)
                val = safe_log10(s% mesh_adjust_KE_conservation)
 
-            case(h_rms_dvdt_div_v)
-               val = eval_rms_dvdt_div_v(s, 1, s% nz)
            case(h_total_IE_div_IE_plus_KE)
                val = s% total_internal_energy_end / &
                         (s% total_internal_energy_end + s% total_radial_kinetic_energy_end)
@@ -1792,7 +1792,7 @@
                val = safe_log10(abs(s% error_in_energy_conservation/s% total_energy_end))
                
            case(h_tot_E_equ_err)
-               val = sum(s% E_residual(1:nz)*s% dm(1:nz))
+               val = sum(s% ergs_error(1:nz))
            case(h_tot_E_err)
                val = s% error_in_energy_conservation
            case(h_rel_E_err)
@@ -1820,53 +1820,20 @@
                if (s% total_energy_end /= 0d0) &
                   val = safe_log10(abs(s% cumulative_energy_error/s% total_energy_end))
 
-           case(h_log_residual_norm)
-               val = safe_log10(s% residual_norm)
-           case(h_log_max_residual)
-               val = safe_log10(s% max_residual)
-
-           case(h_log_max_dvdt_residual)
-               val = safe_log10(maxval(abs(s% v_residual(1:nz))))
-           case(h_log_max_lnd_residual)
-               val = safe_log10(maxval(abs(s% lnd_residual(1:nz))))
-           case(h_log_max_dEdt_residual)
-               val = safe_log10(maxval(abs(s% E_residual(1:nz))))
-           case(h_log_max_drdt_residual)
-               val = safe_log10(maxval(abs(s% lnR_residual(1:nz))))
-
-           case(h_avg_v_residual)
-               val = dot_product(s% dq(1:nz),s% v_residual(1:nz))
-           case(h_log_avg_v_residual)
-               val = safe_log10(abs(dot_product(s% dq(1:nz),s% v_residual(1:nz))))
-
-           case(h_max_abs_v_residual)
-               k = maxloc(abs(s% v_residual(1:nz)),dim=1)
-               val = s% v_residual(k)
-           case(h_log_max_abs_v_residual)
-               val = safe_log10(maxval(abs(s% v_residual(1:nz))))
-
-           case(h_avg_E_residual)
-               val = dot_product(s% dq(1:nz),s% E_residual(1:nz))/ln10
-           case(h_log_avg_E_residual)
-               val = safe_log10(abs(dot_product(s% dq(1:nz),s% E_residual(1:nz)))/ln10)
-
-           case(h_max_abs_E_residual)
-               val = maxval(abs(s% E_residual(1:nz)))/ln10
-           case(h_log_max_abs_E_residual)
-               val = safe_log10(maxval(abs(s% E_residual(1:nz)))/ln10)
-
             case(h_u_surf_km_s)
-               if (s% u_flag) val = s% u_face(1)*1d-5
+               if (s% u_flag) val = s% u_face_ad(1)%val*1d-5
             case(h_u_surf)
-               if (s% u_flag) val = s% u_face(1)
+               if (s% u_flag) val = s% u_face_ad(1)%val
             case(h_u_div_csound_max)
                if (s% u_flag) val = maxval(abs(s% u(1:nz))/s% csound(1:nz))
             case(h_u_div_csound_surf)
-               if (s% u_flag) val = s% u_face(1)/s% csound_face(1)
+               if (s% u_flag) val = s% u_face_ad(1)%val/s% csound_face(1)
 
             case(h_surf_escape_v)
                val = sqrt(2*s% cgrav(1)*s% m(1)/(s% r(1)))
             case(h_v_surf_div_escape_v)
+               val = v_surf/sqrt(2*s% cgrav(1)*s% m(1)/(s% r(1)))
+            case(h_v_div_vesc)
                val = v_surf/sqrt(2*s% cgrav(1)*s% m(1)/(s% r(1)))
             case(h_v_surf_km_s)
                val = v_surf*1d-5
@@ -1884,14 +1851,12 @@
                else if (s% v_flag) then
                   val = s% v(1) / s% csound(1)
                else
-                  val = 0d0 ! s% r(1)*s% dlnR_dt(1)
+                  val = 0d0
                end if
-            case(h_bound_mass)
-               val = get_bound_mass(s)/Msun
-            case(h_ejecta_mass)
+            case(h_remnant_M)
+               val = get_remnant_mass(s)/Msun
+            case(h_ejecta_M)
                val = get_ejecta_mass(s)/Msun
-            case(h_ejecta_total_energy)
-               val = get_ejecta_total_energy(s)
 
             case(h_log_L_div_Ledd)
                Ledd = eval_Ledd(s, ierr)
@@ -1956,20 +1921,6 @@
             case(h_surf_avg_logRho)
                val = s% logRho_avg_surf
 
-            case(h_luminosity_for_BB_outer_BC)
-               if (s% tau_for_L_BB >= 0) then
-                  val = s% L_for_BB_outer_BC/Lsun
-               else
-                  val = s% L(1)/Lsun
-               end if
-            case(h_logL_for_BB_outer_BC)
-               if (s% tau_for_L_BB >= 0) then
-                  val = s% L_for_BB_outer_BC/Lsun
-               else
-                  val = s% L(1)/Lsun
-               end if
-               val = safe_log10(val)
-
             case(h_v_wind_Km_per_s)
                val = 1d-5*s% opacity(1)*max(0d0,-s% mstar_dot)/ &
                         (pi4*s% photosphere_r*Rsun*s% tau_base)
@@ -1986,11 +1937,10 @@
                val = if_rot(s% rotational_mdot_boost)
 
             case(h_min_Pgas_div_P)
-               val = minval(s% Pgas(1:nz)/s% P(1:nz))
+               val = minval(s% Pgas(1:nz)/s% Peos(1:nz))
 
             case(h_center_degeneracy)
                val = s% center_degeneracy
-
             case(h_log_center_eps_nuc)
                val = safe_log10(s% center_eps_nuc)
             case(h_center_eps_nuc)
@@ -1999,26 +1949,12 @@
                val = s% d_center_eps_nuc_dlnT
             case(h_d_center_eps_nuc_dlnd)
                val = s% d_center_eps_nuc_dlnd
-
-            case(h_center_dlogT)
-               val = s% dt*center_value(s, s% dlnT_dt)/ln10
-            case(h_center_dlogRho)
-               val = s% dt*center_value(s, s% dlnd_dt)/ln10
-
-            case(h_center_dlnT_dt)
-               val = center_value(s, s% dlnT_dt)
-            case(h_center_dlnd_dt)
-               val = center_value(s, s% dlnd_dt)
-
-            case(h_center_dL_dm)
-               val = center_value(s, s% dL_dm_expected)
             case(h_center_eps_grav)
-               val = center_value(s, s% eps_grav)
-
+               val = center_value(s, s% eps_grav_ad(1:nz)% val)
             case(h_center_non_nuc_neu)
                val = s% center_non_nuc_neu
             case(h_center_gamma)
-               val = s% center_gamma
+               val = center_value(s, s% gam)
             case(h_center_zbar)
                val = s% center_zbar
             case(h_center_abar)
@@ -2129,6 +2065,26 @@
                int_val = s% co_core_k
                is_int_val = .true.
 
+            case(h_one_core_mass)
+               val = s% one_core_mass
+            case(h_one_core_radius)
+               val = s% one_core_radius
+            case(h_one_core_lgT)
+               val = s% one_core_lgT
+            case(h_one_core_lgRho)
+               val = s% one_core_lgRho
+            case(h_one_core_L)
+               val = s% one_core_L
+            case(h_one_core_v)
+               val = s% one_core_v
+            case(h_one_core_omega)
+               val = if_rot(s% one_core_omega)
+            case(h_one_core_omega_div_omega_crit)
+               val = if_rot(s% one_core_omega_div_omega_crit)
+            case(h_one_core_k)
+               int_val = s% one_core_k
+               is_int_val = .true.
+
             case(h_fe_core_mass)
                val = s% fe_core_mass
             case(h_fe_core_radius)
@@ -2173,48 +2129,34 @@
                val = s% star_mass - s% he_core_mass
             case(h_envelope_fraction_left)
                val = envelope_fraction_left
-            case(h_tau10_mass)
-               val = s% tau10_mass
-            case(h_tau10_radius)
-               val = s% tau10_radius
-            case(h_tau10_lgP)
-               val = s% tau10_lgP
-            case(h_tau10_T)
-               val = exp10(s% tau10_lgT)
-            case(h_tau10_lgT)
-               val = s% tau10_lgT
-            case(h_tau10_lgRho)
-               val = s% tau10_lgRho
-            case(h_tau10_L)
-               val = s% tau10_L
-            case(h_tau100_mass)
-               val = s% tau100_mass
-            case(h_tau100_radius)
-               val = s% tau100_radius
-            case(h_tau100_lgP)
-               val = s% tau100_lgP
-            case(h_tau100_T)
-               val = exp10(s% tau100_lgT)
-            case(h_tau100_lgT)
-               val = s% tau100_lgT
-            case(h_tau100_lgRho)
-               val = s% tau100_lgRho
-            case(h_tau100_L)
-               val = s% tau100_L
             case(h_dynamic_timescale)
                val = s% dynamic_timescale
             case(h_kh_timescale)
                val = s% kh_timescale
             case(h_nuc_timescale)
                val = s% nuc_timescale
+            case(h_dt_div_max_tau_conv)
+               val = s% dt/s% max_conv_time_scale
+            case(h_dt_div_min_tau_conv)
+               val = s% dt/s% min_conv_time_scale
+            case(h_max_tau_conv)
+               val = s% max_conv_time_scale
+            case(h_min_tau_conv)
+               val = s% min_conv_time_scale
+            case(h_log_max_tau_conv)
+               val = safe_log10(s% max_conv_time_scale)
+            case(h_log_min_tau_conv)
+               val = safe_log10(s% min_conv_time_scale)
+            case(h_tau_QHSE_yrs)
+               val = s% max_QHSE_time_scale/secyer
             case(h_eps_grav_integral)
-               val = dot_product(s% dm(1:nz), s% eps_grav(1:nz))/Lsun
+               val = dot_product(s% dm(1:nz), s% eps_grav_ad(1:nz)% val)/Lsun
             case(h_extra_L)
-               val = dot_product(s% dm(1:nz), s% extra_heat(1:nz))/Lsun
+               val = dot_product(s% dm(1:nz), s% extra_heat(1:nz)%val)/Lsun
             case(h_log_extra_L)
-               val = safe_log10(dot_product(s% dm(1:nz), s% extra_heat(1:nz))/Lsun)
+               val = safe_log10(dot_product(s% dm(1:nz), s% extra_heat(1:nz)%val)/Lsun)
             case(h_log_abs_Lgrav)
-               val = safe_log10(abs(dot_product(s% dm(1:nz), s% eps_grav(1:nz))/Lsun))
+               val = safe_log10(abs(dot_product(s% dm(1:nz), s% eps_grav_ad(1:nz)%val)/Lsun))
             case(h_log_Lnuc)
                power_photo = dot_product(s% dm(1:nz), s% eps_nuc_categories(iphoto,1:nz))/Lsun
                val = safe_log10(s% power_nuc_burn - power_photo)
@@ -2234,44 +2176,6 @@
                k = maxloc(s% eps_nuc(1:nz), dim=1)
                val = (1d0 - s% q(k) + 0.5d0*s% dq(k))*s% xmstar/Msun
 
-            case(h_trace_mass_location)
-               val = s% trace_mass_location
-            case(h_trace_mass_radius)
-               val = s% trace_mass_radius
-            case(h_trace_mass_lgT)
-               val = s% trace_mass_lgT
-            case(h_trace_mass_lgRho)
-               val = s% trace_mass_lgRho
-            case(h_trace_mass_L)
-               val = s% trace_mass_L
-            case(h_trace_mass_v)
-               val = s% trace_mass_v
-            case(h_trace_mass_omega)
-               val = if_rot(s% trace_mass_omega)
-            case(h_trace_mass_omega_div_omega_crit)
-               val = if_rot(s% trace_mass_omega_div_omega_crit)
-
-            case(h_trace_mass_lgP)
-               val = s% trace_mass_lgP
-            case(h_trace_mass_g)
-               val = s% trace_mass_g
-            case(h_trace_mass_X)
-               val = s% trace_mass_X
-            case(h_trace_mass_Y)
-               val = s% trace_mass_Y
-            case(h_trace_mass_edv_H)
-               val = s% trace_mass_edv_H
-            case(h_trace_mass_edv_He)
-               val = s% trace_mass_edv_He
-            case(h_trace_mass_scale_height)
-               val = s% trace_mass_scale_height
-            case(h_trace_mass_dlnX_dr)
-               val = s% trace_mass_dlnX_dr
-            case(h_trace_mass_dlnY_dr)
-               val = s% trace_mass_dlnY_dr
-            case(h_trace_mass_dlnRho_dr)
-               val = s% trace_mass_dlnRho_dr
-
             case(h_diffusion_time_H_He_bdy)
                if (s% he_core_k > 0) then
                   val = (s% tau(s% he_core_k) - s% tau_factor*s% tau_base)* &
@@ -2279,104 +2183,12 @@
                end if
             case(h_temperature_H_He_bdy)
                if (s% he_core_k > 0) val = s% T(s% he_core_k)
-
-            case(h_max_abs_v_velocity)
-               val = s% max_abs_v_velocity
-            case(h_max_abs_v_csound)
-               val = s% max_abs_v_csound
-            case(h_max_abs_v_v_div_cs)
-               val = s% max_abs_v_v_div_cs
-            case(h_max_abs_v_lgT)
-               val = s% max_abs_v_lgT
-            case(h_max_abs_v_lgRho)
-               val = s% max_abs_v_lgRho
-            case(h_max_abs_v_lgP)
-               val = s% max_abs_v_lgP
-            case(h_max_abs_v_mass)
-               val = s% max_abs_v_mass
-            case(h_max_abs_v_radius)
-               val = s% max_abs_v_radius
-            case(h_max_abs_v_radius_cm)
-               val = s% max_abs_v_radius*Rsun
-            case(h_max_abs_v_lgR)
-               val = safe_log10(s% max_abs_v_radius)
-            case(h_max_abs_v_lgR_cm)
-               val = safe_log10(s% max_abs_v_radius*Rsun)
-            case(h_max_abs_v_L)
-               val = s% max_abs_v_L
-            case(h_max_abs_v_gamma1)
-               val = s% max_abs_v_gamma1
-            case(h_max_abs_v_entropy)
-               val = s% max_abs_v_entropy
-            case(h_max_abs_v_eps_nuc)
-               val = s% max_abs_v_eps_nuc
-            case(h_max_abs_v_E0) ! 4/3 pi R^3 crad T^4
-               val = s% max_abs_v_radius*Rsun
-               val = four_thirds_pi*val*val*val*crad*exp10(4*s% max_abs_v_lgT)
                
             case(h_total_ni_co_56)
                if (s% net_iso(ico56) > 0 .and. s% net_iso(ini56) > 0) &
                   val = dot_product(s% dm(1:nz), &
                      s% xa(s% net_iso(ico56),1:nz) + &
                      s% xa(s% net_iso(ini56),1:nz))/Msun
-               
-            case(h_inner_mach1_velocity)
-               val = s% inner_mach1_velocity
-            case(h_inner_mach1_csound)
-               val = s% inner_mach1_csound
-            case(h_inner_mach1_v_div_cs)
-               if (s% inner_mach1_csound > 0) &
-                  val = s% inner_mach1_velocity/s% inner_mach1_csound
-            case(h_inner_mach1_lgT)
-               val = s% inner_mach1_lgT
-            case(h_inner_mach1_lgRho)
-               val = s% inner_mach1_lgRho
-            case(h_inner_mach1_lgP)
-               val = s% inner_mach1_lgP
-            case(h_inner_mach1_q)
-               val = s% inner_mach1_q
-            case(h_inner_mach1_tau)
-               val = s% inner_mach1_tau
-            case(h_inner_mach1_mass)
-               val = s% inner_mach1_mass
-            case(h_inner_mach1_radius)
-               val = s% inner_mach1_radius
-            case(h_inner_mach1_gamma1)
-               val = s% inner_mach1_gamma1
-            case(h_inner_mach1_entropy)
-               val = s% inner_mach1_entropy
-            case(h_inner_mach1_k)
-               int_val = s% inner_mach1_k
-               is_int_val = .true.
-
-            case(h_outer_mach1_velocity)
-               val = s% outer_mach1_velocity
-            case(h_outer_mach1_csound)
-               val = s% outer_mach1_csound
-            case(h_outer_mach1_v_div_cs)
-               if (s% outer_mach1_csound > 0) &
-                  val = s% outer_mach1_velocity/s% outer_mach1_csound
-            case(h_outer_mach1_lgT)
-               val = s% outer_mach1_lgT
-            case(h_outer_mach1_lgRho)
-               val = s% outer_mach1_lgRho
-            case(h_outer_mach1_lgP)
-               val = s% outer_mach1_lgP
-            case(h_outer_mach1_q)
-               val = s% outer_mach1_q
-            case(h_outer_mach1_tau)
-               val = s% outer_mach1_tau
-            case(h_outer_mach1_mass)
-               val = s% outer_mach1_mass
-            case(h_outer_mach1_radius)
-               val = s% outer_mach1_radius
-            case(h_outer_mach1_gamma1)
-               val = s% outer_mach1_gamma1
-            case(h_outer_mach1_entropy)
-               val = s% outer_mach1_entropy
-            case(h_outer_mach1_k)
-               int_val = s% outer_mach1_k
-               is_int_val = .true.
 
             case(h_shock_velocity)
                if (s% shock_k > 0) val = s% shock_velocity
@@ -2413,27 +2225,6 @@
                if (s% shock_k > 0) int_val = s% shock_k
                is_int_val = .true.
 
-            case(h_max_T_shell_binding_energy)
-               val = s% max_T_shell_binding_energy
-            case(h_max_T_lgP_thin_shell)
-               val = s% max_T_lgP_thin_shell
-            case(h_max_T_lgT)
-               val = s% max_T_lgT
-            case(h_max_T_lgP)
-               val = s% max_T_lgP
-            case(h_max_T_mass)
-               val = s% max_T_mass
-            case(h_max_T_radius)
-               val = s% max_T_radius
-            case(h_max_T_lgRho)
-               val = s% max_T_lgRho
-            case(h_max_T_L)
-               val = s% max_T_L
-            case(h_max_T_entropy)
-               val = s% max_T_entropy
-            case(h_max_T_eps_nuc)
-               val = s% max_T_eps_nuc
-
             case(h_surface_optical_depth)
                val = s% tau_base*s% tau_factor
             case(h_log_surf_optical_depth)
@@ -2450,9 +2241,9 @@
             case(h_surface_cell_entropy)
                val = s% entropy(1)
             case(h_log_surf_cell_P)
-               val = s% lnP(1)/ln10
+               val = s% lnPeos(1)/ln10
             case(h_log_surf_cell_pressure)
-               val = s% lnP(1)/ln10
+               val = s% lnPeos(1)/ln10
             case(h_log_surf_cell_z)
                val = 0
                if (s% net_iso(ih1) /= 0) val = val + s% xa(s% net_iso(ih1),1)
@@ -2547,7 +2338,7 @@
             case(h_cz_logP)
                if (s% largest_conv_mixing_region /= 0) then
                   k = s% mixing_region_bottom(s% largest_conv_mixing_region)
-                  val = s% lnP(k)/ln10
+                  val = s% lnPeos(k)/ln10
                end if
             case(h_cz_log_column_depth)
                if (s% largest_conv_mixing_region /= 0) then
@@ -2673,7 +2464,7 @@
             case(h_cz_top_logP)
                if (s% largest_conv_mixing_region /= 0) then
                   k = s% mixing_region_top(s% largest_conv_mixing_region)
-                  val = s% lnP(k)/ln10
+                  val = s% lnPeos(k)/ln10
                end if
             case(h_cz_top_log_column_depth)
                if (s% largest_conv_mixing_region /= 0) then
@@ -2855,16 +2646,6 @@
                if (s% calculate_Brunt_N2) val = get_int_k_r_dr(s,3,2d0)
             case(h_int_k_r_dr_0pt5_nu_max_Sl3)
                if (s% calculate_Brunt_N2) val = get_int_k_r_dr(s,3,0.5d0)
-
-            case (h_surface_extra_Pgas)
-               val = s% surface_extra_Pgas
-
-            case (h_min_L)
-               val = minval(s% L(1:nz))/Lsun
-            case (h_min_dL_dm)
-               val = minval(s% dL_dm_expected(1:nz))
-            case (h_min_dL_dm_m)
-               val = s% m(minloc(s% dL_dm_expected(1:nz),dim=1))/Msun
 
             case (h_k_below_const_q)
                int_val = s% k_below_const_q
@@ -3089,6 +2870,23 @@
 
             case(h_retries)
                int_val = s% num_retries
+               is_int_val = .true.
+
+            case(h_using_TDC)
+               if (s% using_TDC) then
+                  int_val = 1
+               else
+                  int_val = 0
+               end if
+               is_int_val = .true.
+
+            case (h_TDC_num_cells)
+               val = 0
+               do k=1,nz
+                  if (s% tdc_num_iters(k) > 0) then
+                     val = val + 1
+                  end if
+               end do
                is_int_val = .true.
                
             case default
@@ -3364,6 +3162,7 @@
          include 'formats'
 
          get1_hist_value = .false.
+
          call integer_dict_lookup(s% history_names_dict, name, i, ierr)
          if (ierr /= 0 .or. i <= 0) return ! didn't find it
          if (associated(s% pgstar_hist)) then
@@ -3376,7 +3175,7 @@
             end if
          end if
 
-         ! try extras
+         ! try extras 1st
          if (associated(s% how_many_extra_history_columns) .and. &
              associated(s% data_for_extra_history_columns)) then
             num_extra_cols = s% how_many_extra_history_columns(s% id)
@@ -3456,7 +3255,7 @@
          else if (s% v_flag) then
             v_surf = s% v(1)
          else
-            v_surf = s% r(1)*s% dlnR_dt(1)
+            v_surf = 0d0
          end if
 
          if (s% initial_mass > s% he_core_mass) then

@@ -5,7 +5,7 @@
       change_initial_net = .true.      
       new_net_name = 'co_burn_plus.net'
 
-      !pgstar_flag = .true.
+      pgstar_flag = .true.
 
 / ! end of star_job namelist
 
@@ -23,6 +23,7 @@
 / ! end of kap namelist
 
 &controls
+
       initial_mass = 10
       initial_z = 0.02d0 
 
@@ -43,9 +44,7 @@
       mixing_length_alpha = 2
       use_Ledoux_criterion = .true.
       alpha_semiconvection = 0.01
-      thermohaline_coeff = 2
-
-      okay_to_reduce_gradT_excess = .true.
+      thermohaline_coeff = 100
 
 ! mixing
        overshoot_scheme(1) = 'exponential'

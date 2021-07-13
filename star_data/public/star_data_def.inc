@@ -74,7 +74,8 @@
       integer, parameter :: Tlim_dt_div_dt_cell_collapse = Tlim_dmstar + 1
       integer, parameter :: Tlim_dt_div_min_dr_div_cs = Tlim_dt_div_dt_cell_collapse + 1
       integer, parameter :: Tlim_lgL = Tlim_dt_div_min_dr_div_cs + 1
-      integer, parameter :: Tlim_max_timestep = Tlim_lgL + 1
+      integer, parameter :: Tlim_force_timestep = Tlim_lgL + 1
+      integer, parameter :: Tlim_max_timestep = Tlim_force_timestep + 1
       integer, parameter :: Tlim_timestep_hold = Tlim_max_timestep + 1
       integer, parameter :: Tlim_dX_div_X_cntr = Tlim_timestep_hold + 1
       integer, parameter :: Tlim_lg_XHe_cntr = Tlim_dX_div_X_cntr + 1
@@ -129,19 +130,18 @@
       integer, parameter :: t_HB_limit = t_log_max_temp_lower_limit + 1 
       integer, parameter :: t_star_mass_min_limit = t_HB_limit + 1 
       integer, parameter :: t_star_mass_max_limit = t_star_mass_min_limit + 1 
-      integer, parameter :: t_bound_mass_min_limit = t_star_mass_max_limit + 1 
-      integer, parameter :: t_bound_mass_max_limit = t_bound_mass_min_limit + 1 
-      
-      integer, parameter :: t_star_species_mass_min_limit = t_bound_mass_max_limit + 1 
-      integer, parameter :: t_star_species_mass_max_limit = t_star_species_mass_min_limit + 1 
-      
+      integer, parameter :: t_remnant_mass_min_limit = t_star_mass_max_limit + 1 
+      integer, parameter :: t_ejecta_mass_max_limit = t_remnant_mass_min_limit + 1 
+      integer, parameter :: t_star_species_mass_min_limit = t_ejecta_mass_max_limit + 1 
+      integer, parameter :: t_star_species_mass_max_limit = t_star_species_mass_min_limit + 1       
       integer, parameter :: t_xmstar_min_limit = t_star_species_mass_max_limit + 1 
       integer, parameter :: t_xmstar_max_limit = t_xmstar_min_limit + 1 
       integer, parameter :: t_envelope_mass_limit = t_xmstar_max_limit + 1 
       integer, parameter :: t_envelope_fraction_left_limit = t_envelope_mass_limit + 1 
       integer, parameter :: t_he_core_mass_limit = t_envelope_fraction_left_limit + 1 
       integer, parameter :: t_co_core_mass_limit = t_he_core_mass_limit + 1 
-      integer, parameter :: t_fe_core_mass_limit = t_co_core_mass_limit + 1 
+      integer, parameter :: t_one_core_mass_limit = t_co_core_mass_limit + 1 
+      integer, parameter :: t_fe_core_mass_limit = t_one_core_mass_limit + 1 
       integer, parameter :: t_neutron_rich_core_mass_limit = t_fe_core_mass_limit + 1 
       integer, parameter :: t_he_layer_mass_lower_limit = t_neutron_rich_core_mass_limit + 1 
       integer, parameter :: t_abs_diff_lg_LH_lg_Ls_limit = t_he_layer_mass_lower_limit + 1 
@@ -151,8 +151,7 @@
       integer, parameter :: t_delta_nu_upper_limit = t_delta_nu_lower_limit + 1 
       integer, parameter :: t_delta_Pg_lower_limit = t_delta_nu_upper_limit + 1 
       integer, parameter :: t_delta_Pg_upper_limit = t_delta_Pg_lower_limit + 1 
-      integer, parameter :: t_mach1_mass_upper_limit = t_delta_Pg_upper_limit + 1 
-      integer, parameter :: t_shock_mass_upper_limit = t_mach1_mass_upper_limit + 1 
+      integer, parameter :: t_shock_mass_upper_limit = t_delta_Pg_upper_limit + 1 
       integer, parameter :: t_photosphere_m_sub_M_center_limit = t_shock_mass_upper_limit + 1 
       integer, parameter :: t_photosphere_m_lower_limit = t_photosphere_m_sub_M_center_limit + 1 
       integer, parameter :: t_photosphere_m_upper_limit = t_photosphere_m_lower_limit + 1 
@@ -258,16 +257,16 @@
       
       
       ! auto_diff constants for solver variables
-      ! used to access auto_diff_real_18var_order1 d1Array
+      ! used to access auto_diff_real_star_order1 d1Array
       integer, parameter :: i_lnd_m1 = 1
       integer, parameter :: i_lnd_00 = 2
       integer, parameter :: i_lnd_p1 = 3
       integer, parameter :: i_lnT_m1 = 4
       integer, parameter :: i_lnT_00 = 5
       integer, parameter :: i_lnT_p1 = 6
-      integer, parameter :: i_eturb_m1 = 7
-      integer, parameter :: i_eturb_00 = 8
-      integer, parameter :: i_eturb_p1 = 9
+      integer, parameter :: i_w_m1 = 7
+      integer, parameter :: i_w_00 = 8
+      integer, parameter :: i_w_p1 = 9
       integer, parameter :: i_lnR_m1 = 10
       integer, parameter :: i_lnR_00 = 11
       integer, parameter :: i_lnR_p1 = 12
@@ -277,6 +276,17 @@
       integer, parameter :: i_L_m1 = 16
       integer, parameter :: i_L_00 = 17
       integer, parameter :: i_L_p1 = 18
+      integer, parameter :: i_hp_m1 = 19
+      integer, parameter :: i_hp_00 = 20
+      integer, parameter :: i_hp_p1 = 21
+      integer, parameter :: i_xtra1_m1 = 22
+      integer, parameter :: i_xtra1_00 = 23
+      integer, parameter :: i_xtra1_p1 = 24
+      integer, parameter :: i_xtra2_m1 = 25
+      integer, parameter :: i_xtra2_00 = 26
+      integer, parameter :: i_xtra2_p1 = 27
+      integer, parameter :: auto_diff_star_num_vars = i_xtra2_p1
+      character (len=128) :: auto_diff_star_d1_names(auto_diff_star_num_vars)
       
 
       ! mesh cell types
@@ -316,8 +326,9 @@
       integer, parameter :: variable_change_limits = 14
       integer, parameter :: explicit_hydro_failed = 15
       integer, parameter :: abs_rel_run_E_err = 16
+      integer, parameter :: forced_stop = 17
       
-      integer, parameter :: num_reasons = 16
+      integer, parameter :: num_reasons = 17
       
       character (len=strlen) :: result_reason_str(num_reasons)
          
@@ -381,12 +392,12 @@
 
       integer, parameter :: max_Abundance_num_isos_to_show = 1000
       
-      integer, parameter :: max_num_Profile_Panels = 10
-      integer, parameter :: max_num_History_Panels = 10
-      integer, parameter :: max_num_Color_Magnitude = 10
+      integer, parameter :: max_num_Profile_Panels = 16
+      integer, parameter :: max_num_History_Panels = 16
+      integer, parameter :: max_num_Color_Magnitude = 16
       integer, parameter :: max_num_Summary_Profile_Lines = 16
       integer, parameter :: max_num_Summary_History_Lines = 16
-      integer, parameter :: max_num_Other_plots = 10
+      integer, parameter :: max_num_Other_plots = 16
       
       integer, parameter :: i_TRho_Profile = 1
       integer, parameter :: i_logg_logT = i_TRho_Profile + 1
@@ -527,58 +538,6 @@
       end type pgstar_hist_node
 
       
-      ! Basic MLT results
-      
-      integer, parameter :: mlt_gradT = 1 ! actual temperature gradient dlnT/dlnP
-      
-      integer, parameter :: mlt_gradr = 2 ! radiative temperature gradient
-            ! dlnT/dlnP required for purely radiative transport
-      
-      integer, parameter :: mlt_gradL = 3 ! Ledoux criterion temperature gradient
-            ! Ledoux stable if gradL > gradr
-      
-      integer, parameter :: mlt_scale_height = 4 ! [cm]
-            ! if alt_scale_height is false, then the usual P/(grav*rho)
-            ! otherwise, min of the usual and sound speed * hydro time scale, sqrt(P/G)/rho
-      
-      integer, parameter :: mlt_Lambda = 5 ! mixing_length [cm]
-            ! mixing_length_alpha * scale_height
-      
-      integer, parameter :: mlt_convection_velocity = 6 ! [cm/sec]
-            ! note that where the convective efficiency is small, the velocity becomes large
-            ! and MLT can actually return supersonic convection velocities in some cases
-      
-      integer, parameter :: mlt_D = 7 ! diffusion coefficient in units of cm^2/second
-            ! D = convection_velocity*mixing_length/3
-
-      integer, parameter :: mlt_D_semi = 8 ! diffusion coefficient for semiconvective mixing
-
-      integer, parameter :: mlt_D_thrm = 9 ! diffusion coefficient for thermohaline mixing
-      
-      integer, parameter :: mlt_Gamma = 10 ! convective efficiency
-      
-      integer, parameter :: mlt_debug = 11
-            
-      integer, parameter :: num_mlt_results = 11
-      
-      
-      ! partials
-
-      integer, parameter :: mlt_dlnd00 = 1
-      integer, parameter :: mlt_dlnT00 = mlt_dlnd00 + 1
-      integer, parameter :: mlt_dlndm1 = mlt_dlnT00 + 1
-      integer, parameter :: mlt_dlnTm1 = mlt_dlndm1 + 1
-      integer, parameter :: mlt_dlnR = mlt_dlnTm1 + 1
-      integer, parameter :: mlt_dL = mlt_dlnR + 1
-      integer, parameter :: mlt_cv_var = mlt_dL + 1
-      integer, parameter :: mlt_w_div_wc_var = mlt_cv_var + 1
-      
-      integer, parameter :: num_mlt_partials = mlt_w_div_wc_var
-
-      character (len=24) :: mlt_partial_str(num_mlt_partials)
-
-
-
       integer, parameter :: max_generations = 3
       integer, parameter :: net_name_len = strlen
       integer, parameter :: name_len = 80           
@@ -591,6 +550,8 @@
       integer, parameter :: max_num_accretion_species = 250
 
       integer, parameter :: max_num_diffusion_classes = 100
+      
+      integer, parameter :: num_termination_code_strings = 9
       
       integer, parameter :: num_xa_function = 9           
       integer, parameter :: num_mesh_logX = 9
@@ -613,6 +574,7 @@
       integer, parameter :: num_x_ctrls = 100
       
       integer, parameter :: GYRE_MODEL_VERSION = 101
+      integer, parameter :: GSM_MODEL_VERSION = 110
 
       ! interfaces for procedure pointers
       abstract interface
@@ -691,10 +653,10 @@
          end subroutine other_adjust_mdot_interface
       
       
-         subroutine other_after_enter_setmatrix_interface(id, ierr)
+         subroutine other_after_solver_setmatrix_interface(id, ierr)
             integer, intent(in) :: id
             integer, intent(out) :: ierr
-         end subroutine other_after_enter_setmatrix_interface
+         end subroutine other_after_solver_setmatrix_interface
       
       
          subroutine other_j_for_adjust_J_lost_interface(id, starting_j_rot_surf, j_for_mass_loss, ierr)
@@ -917,7 +879,7 @@
                x, temp, log10temp, rho, log10rho,  &
                abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
                rate_factors, weak_rate_factor, &
-               reaction_Qs, reaction_neuQs, reuse_rate_raw, reuse_rate_screened, &
+               reaction_Qs, reaction_neuQs, &
                eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
                dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
                screening_mode,  &
@@ -944,7 +906,6 @@
             real(dp), intent(in) :: weak_rate_factor
             real(dp), pointer, intent(in) :: reaction_Qs(:) ! (rates_reaction_id_max)
             real(dp), pointer, intent(in) :: reaction_neuQs(:) ! (rates_reaction_id_max)
-            logical, intent(in) :: reuse_rate_raw, reuse_rate_screened ! if true. use given rate_screened
             real(dp), intent(out) :: eps_nuc ! ergs/g/s from burning after subtract reaction neutrinos
             real(dp), intent(out) :: d_eps_nuc_dT
             real(dp), intent(out) :: d_eps_nuc_dRho
@@ -960,79 +921,36 @@
             real(dp), pointer :: work(:) ! (lwork)
             integer, intent(out) :: ierr ! 0 means okay
          end subroutine other_net_get_interface
-      
-      
-         subroutine other_mlt_interface( &
-            id, k, cgrav, m, mstar, r, L, X, &            
-            T_face, rho_face, P_face, &
-            chiRho_face, chiT_face, &
-            Cp_face, opacity_face, grada_face, &            
-            alfa, beta, & ! f_face = alfa*f_00 + beta*f_m1
-            T_00, T_m1, rho_00, rho_m1, P_00, P_m1, &
-            chiRho_for_partials_00, chiT_for_partials_00, &
-            chiRho_for_partials_m1, chiT_for_partials_m1, &
-            chiRho_00, d_chiRho_00_dlnd, d_chiRho_00_dlnT, &
-            chiRho_m1, d_chiRho_m1_dlnd, d_chiRho_m1_dlnT, &
-            chiT_00, d_chiT_00_dlnd, d_chiT_00_dlnT, &
-            chiT_m1, d_chiT_m1_dlnd, d_chiT_m1_dlnT, &
-            Cp_00, d_Cp_00_dlnd, d_Cp_00_dlnT, &
-            Cp_m1, d_Cp_m1_dlnd, d_Cp_m1_dlnT, &
-            opacity_00, d_opacity_00_dlnd, d_opacity_00_dlnT, &
-            opacity_m1, d_opacity_m1_dlnd, d_opacity_m1_dlnT, &
-            grada_00, d_grada_00_dlnd, d_grada_00_dlnT, &
-            grada_m1, d_grada_m1_dlnd, d_grada_m1_dlnT, &            
-            gradr_factor, d_gradr_factor_dw, gradL_composition_term, &
-            alpha_semiconvection, semiconvection_option, &
-            thermohaline_coeff, thermohaline_option, &
-            dominant_iso_for_thermohaline, &
-            mixing_length_alpha, alt_scale_height, remove_small_D_limit, &
-            MLT_option, Henyey_y_param, Henyey_nu_param, &
-            normal_mlt_gradT_factor, &
-            max_conv_vel, dt, tau, just_gradr, &
-            mixing_type, mlt_basics, mlt_partials1, ierr)
-            use const_def, only: dp
-            integer, intent(in) :: id ! id for star         
-            integer, intent(in) :: k ! cell number or 0 if not for a particular cell         
-            real(dp), intent(in) :: &
-               cgrav, m, mstar, r, L, X, &            
-               T_face, rho_face, P_face, &
-               chiRho_face, chiT_face, &
-               Cp_face, opacity_face, grada_face, &            
-               alfa, beta, &
-               T_00, T_m1, rho_00, rho_m1, P_00, P_m1, &
-               chiRho_for_partials_00, chiT_for_partials_00, &
-               chiRho_for_partials_m1, chiT_for_partials_m1, &
-               chiRho_00, d_chiRho_00_dlnd, d_chiRho_00_dlnT, &
-               chiRho_m1, d_chiRho_m1_dlnd, d_chiRho_m1_dlnT, &
-               chiT_00, d_chiT_00_dlnd, d_chiT_00_dlnT, &
-               chiT_m1, d_chiT_m1_dlnd, d_chiT_m1_dlnT, &
-               Cp_00, d_Cp_00_dlnd, d_Cp_00_dlnT, &
-               Cp_m1, d_Cp_m1_dlnd, d_Cp_m1_dlnT, &
-               opacity_00, d_opacity_00_dlnd, d_opacity_00_dlnT, &
-               opacity_m1, d_opacity_m1_dlnd, d_opacity_m1_dlnT, &
-               grada_00, d_grada_00_dlnd, d_grada_00_dlnT, &
-               grada_m1, d_grada_m1_dlnd, d_grada_m1_dlnT, &
-               gradr_factor, d_gradr_factor_dw, gradL_composition_term, &
-               alpha_semiconvection, thermohaline_coeff, mixing_length_alpha, &
-               Henyey_y_param, Henyey_nu_param, &
-               max_conv_vel, dt, tau, remove_small_D_limit, &
-               normal_mlt_gradT_factor
-            logical, intent(in) :: alt_scale_height
-            character (len=*), intent(in) :: thermohaline_option, MLT_option, semiconvection_option
-            integer, intent(in) :: dominant_iso_for_thermohaline
-            logical, intent(in) :: just_gradr
-            integer, intent(out) :: mixing_type
-            real(dp), intent(inout) :: mlt_basics(:) ! (num_mlt_results)
-            real(dp), intent(inout), pointer :: mlt_partials1(:) ! =(num_mlt_partials, num_mlt_results)
-            integer, intent(out) :: ierr
-         end subroutine other_mlt_interface
 
          
          subroutine other_adjust_mlt_gradT_fraction_interface(id, ierr)
             integer, intent(in) :: id
             integer, intent(out) :: ierr
          end subroutine other_adjust_mlt_gradT_fraction_interface
-      
+
+
+         subroutine other_mlt_results_interface(id, k, MLT_option, &  ! NOTE: k=0 is a valid arg
+               r, L, T, P, opacity, rho, chiRho, chiT, Cp, gradr, grada, scale_height, &
+               iso, XH1, cgrav, m, gradL_composition_term, mixing_length_alpha, &
+               alpha_semiconvection, thermohaline_coeff, &
+               mixing_type, gradT, Y_face, conv_vel, D, Gamma, ierr)
+            use const_def, only: dp
+            use auto_diff
+            integer, intent(in) :: id
+            integer, intent(in) :: k
+            character (len=*), intent(in) :: MLT_option
+            type(auto_diff_real_star_order1), intent(in) :: &
+               r, L, T, P, opacity, rho, chiRho, chiT, Cp, gradr, grada, scale_height
+            integer, intent(in) :: iso
+            real(dp), intent(in) :: &
+               XH1, cgrav, m, gradL_composition_term, &
+               mixing_length_alpha, alpha_semiconvection, thermohaline_coeff
+            integer, intent(out) :: mixing_type
+            type(auto_diff_real_star_order1), intent(out) :: &
+               gradT, Y_face, conv_vel, D, Gamma
+            integer, intent(out) :: ierr
+         end subroutine other_mlt_results_interface
+
       
          subroutine other_after_set_mixing_info_interface(id, ierr)
             integer, intent(in) :: id
@@ -1047,249 +965,6 @@
             integer, intent(out) :: ierr
          end subroutine other_diffusion_interface
 
-
-         subroutine other_eosDT_get_interface( &
-                 id, k, handle, & 
-                 species, chem_id, net_iso, xa, &
-                 Rho, log10Rho, T, log10T, & 
-                 res, d_dlnRho_const_T, d_dlnT_const_Rho, d_dxa_const_TRho, ierr)
-            use const_def, only: dp
-
-            ! INPUT
-         
-            integer, intent(in) :: id ! star id if available; 0 otherwise
-            integer, intent(in) :: k ! cell number or 0 if not for a particular cell         
-            integer, intent(in) :: handle ! eos handle
-
-            integer, intent(in) :: species
-            integer, pointer :: chem_id(:) ! maps species to chem id
-               ! index from 1 to species
-               ! value is between 1 and num_chem_isos         
-            integer, pointer :: net_iso(:) ! maps chem id to species number
-               ! index from 1 to num_chem_isos (defined in chem_def)
-               ! value is 0 if the iso is not in the current net
-               ! else is value between 1 and number of species in current net
-            real(dp), intent(in) :: xa(:) ! mass fractions
-         
-            real(dp), intent(in) :: Rho, log10Rho ! the density
-               ! provide both if you have them.  else pass one and set the other to arg_not_provided
-               ! "arg_not_provided" is defined in mesa const_def
-            
-            real(dp), intent(in) :: T, log10T ! the temperature
-               ! provide both if you have them.  else pass one and set the other to arg_not_provided
-                     
-            ! OUTPUT
-         
-            real(dp), intent(inout) :: res(:) ! (num_eos_basic_results)
-            ! partial derivatives of the basic results wrt lnd and lnT
-            real(dp), intent(inout) :: d_dlnRho_const_T(:) ! (num_eos_basic_results)  
-            ! d_dlnRho_c_T(i) = d(res(i))/dlnd|T
-            real(dp), intent(inout) :: d_dlnT_const_Rho(:) ! (num_eos_basic_results) 
-            ! d_dlnT(i) = d(res(i))/dlnT|Rho
-            real(dp), intent(inout) :: d_dxa_const_TRho(:,:) ! (num_eos_d_dxa_results,species)
-            ! d_dxa(i,j) = d(res(i))/dxa(j)|T,Rho
-         
-            integer, intent(out) :: ierr ! 0 means AOK.
-         
-         end subroutine other_eosDT_get_interface
-      
-      
-         subroutine other_eosDE_get_interface( &
-                  handle, Z, X, abar, zbar, &
-                  species, chem_id, net_iso, xa, &
-                  energy, log10E, rho, log10Rho, log10T_guess, &
-                  T, log10T, res, d_dlnRho_const_T, d_dlnT_const_Rho, &
-                  d_dabar_const_TRho, d_dzbar_const_TRho, ierr)
-
-            use eos_def
-
-            ! INPUT
-         
-            integer, intent(in) :: handle
-
-            real(dp), intent(in) :: Z ! the metals mass fraction
-            real(dp), intent(in) :: X ! the hydrogen mass fraction
-            
-            real(dp), intent(in) :: abar
-               ! mean atomic number (nucleons per nucleus; grams per mole)
-            real(dp), intent(in) :: zbar ! mean charge per nucleus
-         
-            integer, intent(in) :: species
-            integer, pointer :: chem_id(:) ! maps species to chem id
-               ! index from 1 to species
-               ! value is between 1 and num_chem_isos         
-            integer, pointer :: net_iso(:) ! maps chem id to species number
-               ! index from 1 to num_chem_isos (defined in chem_def)
-               ! value is 0 if the iso is not in the current net
-               ! else is value between 1 and number of species in current net
-            real(dp), intent(in) :: xa(:) ! mass fractions
-         
-            real(dp), intent(in) :: energy, log10E ! the internal energy
-               ! provide both if you have them.  else pass one and set the other to arg_not_provided
-               ! "arg_not_provided" is defined in mesa const_def
-            
-            real(dp), intent(in) :: Rho, log10Rho ! the density
-               ! provide both if you have them.  else pass one and set the other to arg_not_provided
-            
-            real(dp), intent(in) :: log10T_guess ! guess for logT to use if off table
-                     
-            ! OUTPUT
-         
-            real(dp), intent(out) :: T, log10T
-         
-            real(dp), intent(inout) :: res(:) ! (num_eos_basic_results)
-         
-            ! partial derivatives of the basic results
-         
-            real(dp), intent(inout) :: d_dlnRho_const_T(:) ! (num_eos_basic_results) 
-            ! d_dlnRho_const_T(i) = d(res(i))/dlnd|T,X where X = composition
-            real(dp), intent(inout) :: d_dlnT_const_Rho(:) ! (num_eos_basic_results) 
-            ! d_dlnT(i) = d(res(i))/dlnT|Rho,X where X = composition
-
-            real(dp), intent(inout) :: d_dabar_const_TRho(:) ! (num_eos_basic_results) 
-            ! d_dabar(i) = d(res(i))/dabar|TRho,zbar
-            real(dp), intent(inout) :: d_dzbar_const_TRho(:) ! (num_eos_basic_results) 
-            ! d_dzbar(i) = d(res(i))/dzbar|TRho,abar
-         
-            integer, intent(out) :: ierr ! 0 means AOK.
-
-         end subroutine other_eosDE_get_interface
-      
-      
-         subroutine other_eosDT_get_T_interface( &
-                  id, k, handle, Z, X, abar, zbar, &
-                  species, chem_id, net_iso, xa, &
-                  logRho, which_other, other_value, &
-                  logT_tol, other_tol, max_iter, logT_guess, & 
-                  logT_bnd1, logT_bnd2, other_at_bnd1, other_at_bnd2, &
-                  logT_result, res, d_dlnRho_const_T, d_dlnT_const_Rho, &
-                  d_dabar_const_TRho, d_dzbar_const_TRho, &
-                  eos_calls, ierr)
-     
-            ! finds log10 T given values for density and 'other', and initial guess for temperature.
-            ! does up to max_iter attempts until logT changes by less than tol.
-         
-            ! 'other' can be any of the basic result variables for the eos
-            ! specify 'which_other' by means of the definitions in eos_def (e.g., i_lnE)
-         
-            use const_def, only: dp
-
-            integer, intent(in) :: id ! star id if available; 0 otherwise
-            integer, intent(in) :: k ! cell number or 0 if not for a particular cell         
-            integer, intent(in) :: handle
-
-            real(dp), intent(in) :: Z ! the metals mass fraction
-            real(dp), intent(in) :: X ! the hydrogen mass fraction
-            
-            real(dp), intent(in) :: abar
-               ! mean atomic number (nucleons per nucleus; grams per mole)
-            real(dp), intent(in) :: zbar ! mean charge per nucleus
-         
-            integer, intent(in) :: species
-            integer, pointer :: chem_id(:) ! maps species to chem id
-               ! index from 1 to species
-               ! value is between 1 and num_chem_isos         
-            integer, pointer :: net_iso(:) ! maps chem id to species number
-               ! index from 1 to num_chem_isos (defined in chem_def)
-               ! value is 0 if the iso is not in the current net
-               ! else is value between 1 and number of species in current net
-            real(dp), intent(in) :: xa(:) ! mass fractions
-         
-            real(dp), intent(in) :: logRho ! log10 of density
-            integer, intent(in) :: which_other ! from eos_def.  e.g., i_lnE
-            real(dp), intent(in) :: other_value ! desired value for the other variable
-            real(dp), intent(in) :: other_tol
-         
-            real(dp), intent(in) :: logT_tol
-            integer, intent(in) :: max_iter ! max number of iterations        
-
-            real(dp), intent(in) :: logT_guess ! log10 of temperature
-            real(dp), intent(in) :: logT_bnd1, logT_bnd2 ! bounds for logT
-               ! if don't know bounds, just set to arg_not_provided (defined in const_def)
-            real(dp), intent(in) :: other_at_bnd1, other_at_bnd2 ! values at bounds
-               ! if don't know these values, just set to arg_not_provided (defined in const_def)
-
-            real(dp), intent(out) :: logT_result ! log10 of temperature
-            real(dp), intent(inout) :: res(:) ! (num_eos_basic_results)
-            real(dp), intent(inout) :: d_dlnRho_const_T(:) ! (num_eos_basic_results) 
-            real(dp), intent(inout) :: d_dlnT_const_Rho(:) ! (num_eos_basic_results)
-            real(dp), intent(inout) :: d_dabar_const_TRho(:) ! (num_eos_basic_results) 
-            real(dp), intent(inout) :: d_dzbar_const_TRho(:) ! (num_eos_basic_results) 
-         
-            integer, intent(out) :: eos_calls
-            integer, intent(out) :: ierr ! 0 means AOK.
-
-         end subroutine other_eosDT_get_T_interface
-      
-
-         subroutine other_eosDT_get_Rho_interface( &
-                  id, k, handle, Z, X, abar, zbar, &
-                  species, chem_id, net_iso, xa, &
-                  logT, which_other, other_value, &
-                  logRho_tol, other_tol, max_iter, logRho_guess,  &
-                  logRho_bnd1, logRho_bnd2, other_at_bnd1, other_at_bnd2, &
-                  logRho_result, res, d_dlnRho_const_T, d_dlnT_const_Rho, &
-                  d_dabar_const_TRho, d_dzbar_const_TRho, &
-                  eos_calls, ierr)
-     
-            ! finds log10 Rho given values for temperature and 'other', and initial guess for density.
-            ! does up to max_iter attempts until logRho changes by less than tol.
-         
-            ! 'other' can be any of the basic result variables for the eos
-            ! specify 'which_other' by means of the definitions in eos_def (e.g., i_lnE)
-         
-            use const_def, only: dp
-         
-            integer, intent(in) :: id ! star id if available; 0 otherwise
-            integer, intent(in) :: k ! cell number or 0 if not for a particular cell         
-            integer, intent(in) :: handle
-
-            real(dp), intent(in) :: Z ! the metals mass fraction
-            real(dp), intent(in) :: X ! the hydrogen mass fraction
-            
-            real(dp), intent(in) :: abar
-               ! mean atomic number (nucleons per nucleus; grams per mole)
-            real(dp), intent(in) :: zbar ! mean charge per nucleus
-         
-            integer, intent(in) :: species
-            integer, pointer :: chem_id(:) ! maps species to chem id
-               ! index from 1 to species
-               ! value is between 1 and num_chem_isos         
-            integer, pointer :: net_iso(:) ! maps chem id to species number
-               ! index from 1 to num_chem_isos (defined in chem_def)
-               ! value is 0 if the iso is not in the current net
-               ! else is value between 1 and number of species in current net
-            real(dp), intent(in) :: xa(:) ! mass fractions
-         
-            real(dp), intent(in) :: logT ! log10 of temperature
-
-            integer, intent(in) :: which_other ! from eos_def.  e.g., i_lnE
-            real(dp), intent(in) :: other_value ! desired value for the other variable
-            real(dp), intent(in) :: other_tol
-         
-            real(dp), intent(in) :: logRho_tol
-
-            integer, intent(in) :: max_iter ! max number of Newton iterations        
-
-            real(dp), intent(in) :: logRho_guess ! log10 of density
-            real(dp), intent(in) :: logRho_bnd1, logRho_bnd2 ! bounds for logRho
-               ! if don't know bounds, just set to arg_not_provided (defined in const_def)
-            real(dp), intent(in) :: other_at_bnd1, other_at_bnd2 ! values at bounds
-               ! if don't know these values, just set to arg_not_provided (defined in const_def)
-
-            real(dp), intent(out) :: logRho_result ! log10 of density
-
-            real(dp), intent(inout) :: res(:) ! (num_eos_basic_results)
-            real(dp), intent(inout) :: d_dlnRho_const_T(:) ! (num_eos_basic_results) 
-            real(dp), intent(inout) :: d_dlnT_const_Rho(:) ! (num_eos_basic_results)
-            real(dp), intent(inout) :: d_dabar_const_TRho(:) ! (num_eos_basic_results) 
-            real(dp), intent(inout) :: d_dzbar_const_TRho(:) ! (num_eos_basic_results) 
-
-            integer, intent(out) :: eos_calls
-            integer, intent(out) :: ierr ! 0 means AOK.
-
-         end subroutine other_eosDT_get_Rho_interface
-      
 
          subroutine other_kap_get_interface( &
                id, k, handle, species, chem_id, net_iso, xa, &
@@ -1418,12 +1093,12 @@
       
          subroutine other_surface_PT_interface(id, &
                skip_partials, &
-               Teff, lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
+               lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
                lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, ierr)
             use const_def, only: dp
             integer, intent(in) :: id
             logical, intent(in) :: skip_partials
-            real(dp), intent(out) :: Teff, &
+            real(dp), intent(out) :: &
                lnT_surf, dlnT_dL, dlnT_dlnR, dlnT_dlnM, dlnT_dlnkap, &
                lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap
             integer, intent(out) :: ierr
@@ -1450,6 +1125,11 @@
          subroutine other_set_current_to_old_interface(id)
             integer, intent(in) :: id
          end subroutine other_set_current_to_old_interface
+      
+      
+         subroutine other_set_pgstar_controls_interface(id)
+            integer, intent(in) :: id
+         end subroutine other_set_pgstar_controls_interface
       
       
          subroutine other_astero_freq_corr_interface(id, ierr)

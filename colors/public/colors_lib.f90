@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -65,17 +65,20 @@
          integer, intent(in) :: num_files
          integer, dimension(:), intent(in) :: num_colors
          character(len=*), dimension(:), intent(in) :: fnames 
-         integer, intent(inout) :: ierr
+         integer, intent(out) :: ierr
          
          ierr=0
-         
+
+!$OMP critical (color_init)
          if (.not. color_is_initialized) then
             call do_colors_init(num_files,fnames,num_colors,ierr)
-            if(ierr/=0)THEN
-               ierr=-1
-               write(*,*) "colors_init failed"
-               return
-            endif
+         endif
+!$OMP end critical (color_init)
+
+         if(ierr/=0)THEN
+            ierr=-1
+            write(*,*) "colors_init failed"
+            return
          endif
          
       end subroutine colors_init

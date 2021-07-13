@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -51,14 +51,17 @@
          
          integer :: imax, iat0, iat, ir, i, j, irho
          integer, parameter :: mp = 4
-         real(dp) :: dtab(num_reactions), ddtab(num_reactions), fac
-         real(dp), pointer :: rattab_f(:,:,:)
-         real(dp) :: logtemp
+         real(dp), allocatable :: dtab(:), ddtab(:)
+         real(dp), pointer :: rattab_f(:,:,:) 
+         real(dp) :: logtemp, fac
          
          include 'formats'
-         
+
          ierr = 0
-         
+
+         nullify(rattab_f)
+         allocate(dtab(num_reactions), ddtab(num_reactions))
+
          rattab_f(1:4,1:nT8s,1:num_reactions) => rattab_f1(1:4*nT8s*num_reactions)
 
          do i = 1,num_reactions
@@ -122,7 +125,7 @@
 
          do i=1,num_reactions
             if(raw_rate_factor(i).gt. max_safe_rate_for_any_temp) then
-               write(*,*) "Rate has exceeded a sensible limit for reaction rates"
+               write(*,*) "Rate has exceeded any sensible limit for a reaction rate"
                write(*,*) trim(reaction_Name(reaction_id(i)))
                write(*,*) raw_rate_factor(i),max_safe_rate_for_any_temp,raw_rate_factor(i)/max_safe_rate_for_any_temp
                call mesa_error(__FILE__,__LINE__)
@@ -139,6 +142,8 @@
          if(logtemp .ge. max_safe_logT_for_rates) then
             rate_raw_dT(1:num_reactions) = 0d0
          end if
+
+         nullify(rattab_f)
          
          contains
          
@@ -198,8 +203,9 @@
          
          integer :: i, j, operr, ir, num_to_add_to_cache,thread_num
          real(dp) :: logT, btemp
-         real(dp), pointer :: work(:), work1(:), f1(:), rattab_f(:,:,:)
-         integer, pointer :: reaction_id(:)
+         real(dp), pointer ::  work1(:)=>null(), f1(:)=>null(), rattab_f(:,:,:)=>null()
+         integer, pointer :: reaction_id(:) =>null()
+         real(dp), allocatable, target :: work(:,:)
 
          logical :: all_okay, a_okay, all_in_cache
          
@@ -290,18 +296,20 @@
          end if
 
          if (nrattab > 1) then ! create interpolants
-            allocate(work(nrattab*mp_work_size*utils_OMP_GET_MAX_THREADS()), stat=ierr)
+            allocate(work(nrattab*mp_work_size,utils_OMP_GET_MAX_THREADS()), stat=ierr)
+            call fill_with_NaNs_2D(work)
             if (ierr /= 0) return
 !$OMP PARALLEL DO PRIVATE(i,operr,work1,f1,thread_num)
             do i=1,num_reactions
                thread_num=utils_OMP_GET_THREAD_NUM()+1
-               work1(1:nrattab*mp_work_size) =>  &
-                     work(nrattab*mp_work_size*(thread_num-1)+1:nrattab*mp_work_size*thread_num)
+               work1(1:nrattab*mp_work_size) => work(1:nrattab*mp_work_size,thread_num)
                rattab_f(1,1:nrattab,i) = rattab(i,1:nrattab)
                f1(1:4*nT8s) => rattab_f1(1+4*nT8s*(i-1):4*nT8s*i)
                call interp_m3q(logttab, nrattab, f1, mp_work_size, work1,  &
                         'rates do_make_rate_tables', operr)
                if (operr /= 0) ierr = -1
+               nullify(f1)
+               call fill_with_NaNs(work1)
             end do
 !$OMP END PARALLEL DO
             deallocate(work)
@@ -362,7 +370,6 @@
          integer :: io_unit, ios, ir, which, j, ierr, rir
          real(dp), parameter :: tiny = 1d-6
          character (len=maxlen_reaction_Name) :: name
-         real(dp), pointer :: rates(:)
          
          logical, parameter :: show_read_cache = .false.
          logical :: reverse_is_table
@@ -579,14 +586,12 @@
          integer, intent(out) :: ierr
       
          integer :: i, ir
-         type (T_Factors), target ::  tfs
-         type (T_Factors), pointer :: tf
+         type (T_Factors) :: tf
 
          include 'formats'
          
          ierr = 0
 
-         tf => tfs
          call tfactors(tf, logT, btemp)
          call set_raw_rates( &
                num_reactions, reaction_id, which_rates, btemp, tf, rates, ierr)

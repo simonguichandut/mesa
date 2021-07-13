@@ -14,7 +14,7 @@
 
    initial_zfracs = 6
    
-   !pgstar_flag = .true.
+   pgstar_flag = .true.
 
 / !end of star_job namelist
 
@@ -36,6 +36,9 @@
 
 
 &controls
+
+   xa_central_upper_limit_species(1) = 'c12'
+   xa_central_upper_limit(1) = 0.2d0
    
    ! limit max_model_number as part of test_suite
    max_model_number = 6000
@@ -47,7 +50,7 @@
    use_dedt_form_of_energy_eqn = .true.
 
    mixing_length_alpha = 1.8d0
-   MLT_option = 'Henyey'
+   MLT_option = 'Cox'
 
    use_Ledoux_criterion = .true.
    alpha_semiconvection = 0.1
@@ -76,12 +79,9 @@
    predictive_zone_loc(2) = 'surf' 
    predictive_bdy_loc(2) = 'any'
 
-   varcontrol_target = 1d-4
+   !varcontrol_target = 1d-4
 
    delta_HR_limit = 0.002
-
-   xa_central_upper_limit_species(1) = 'c12'
-   xa_central_upper_limit(1) = 0.2d0
 
 
 ! output controls

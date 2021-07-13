@@ -1,5 +1,5 @@
 module auto_diff_real_2var_order2_module
-      use const_def
+      use const_def, only: dp, ln10, pi
       use utils_lib
       use support_functions
       use math_lib
@@ -16,6 +16,8 @@ module auto_diff_real_2var_order2_module
       operator(.ge.), &
       make_unop, &
       make_binop, &
+      sign, &
+      safe_sqrt, &
       operator(-), &
       exp, &
       expm1, &
@@ -133,6 +135,14 @@ module auto_diff_real_2var_order2_module
    interface make_binop
       module procedure make_binary_operator
    end interface make_binop
+   
+   interface sign
+      module procedure sign_self
+   end interface sign
+   
+   interface safe_sqrt
+      module procedure safe_sqrt_self
+   end interface safe_sqrt
    
    interface operator(-)
       module procedure unary_minus_self
@@ -638,6 +648,36 @@ module auto_diff_real_2var_order2_module
       binary%d1val1_d1val2 = q0*y%d1val2 + q1*y%d1val1 + x%d1val1*x%d1val2*z_d2x + x%d1val1_d1val2*z_d1x + y%d1val1*y%d1val2*z_d2y + y%d1val1_d1val2*z_d1y
       binary%d2val2 = 2.0_dp*q1*y%d1val2 + x%d2val2*z_d1x + y%d2val2*z_d1y + z_d2x*pow2(x%d1val2) + z_d2y*pow2(y%d1val2)
    end function make_binary_operator
+   
+   function sign_self(x) result(unary)
+      type(auto_diff_real_2var_order2), intent(in) :: x
+      type(auto_diff_real_2var_order2) :: unary
+      unary%val = sgn(x%val)
+      unary%d1val1 = 0.0_dp
+      unary%d1val2 = 0.0_dp
+      unary%d2val1 = 0.0_dp
+      unary%d1val1_d1val2 = 0.0_dp
+      unary%d2val2 = 0.0_dp
+   end function sign_self
+   
+   function safe_sqrt_self(x) result(unary)
+      type(auto_diff_real_2var_order2), intent(in) :: x
+      type(auto_diff_real_2var_order2) :: unary
+      real(dp) :: q3
+      real(dp) :: q2
+      real(dp) :: q1
+      real(dp) :: q0
+      q0 = sqrt(x%val*Heaviside(x%val))
+      q1 = 0.5_dp*q0*powm1(x%val)
+      q2 = 2.0_dp*x%val
+      q3 = 0.25_dp*q0*powm1(pow2(x%val))
+      unary%val = q0
+      unary%d1val1 = q1*x%d1val1
+      unary%d1val2 = q1*x%d1val2
+      unary%d2val1 = q3*(q2*x%d2val1 - pow2(x%d1val1))
+      unary%d1val1_d1val2 = q3*(q2*x%d1val1_d1val2 - x%d1val1*x%d1val2)
+      unary%d2val2 = q3*(q2*x%d2val2 - pow2(x%d1val2))
+   end function safe_sqrt_self
    
    function unary_minus_self(x) result(unary)
       type(auto_diff_real_2var_order2), intent(in) :: x

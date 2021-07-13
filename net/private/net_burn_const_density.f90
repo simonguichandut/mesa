@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2016-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2016-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -91,7 +91,7 @@
 
       
       subroutine burn_const_density_1_zone( &
-            handle, species, nvar, num_reactions, t_start, t_end, &
+            net_handle, eos_handle, species, nvar, num_reactions, t_start, t_end, &
             starting_x, starting_log10T, log10Rho, &
             get_eos_info_for_burn_at_const_density, &
             rate_factors, weak_rate_factor, reaction_Qs, reaction_neuQs, &
@@ -112,7 +112,7 @@
          use net_initialize, only: work_size
          use net_approx21, only: approx21_nrat
          
-         integer, intent(in) :: handle, species, nvar, num_reactions
+         integer, intent(in) :: net_handle, eos_handle, species, nvar, num_reactions
          real(dp), intent(in) :: t_start, t_end, starting_x(:) ! (species)
          real(dp), intent(in) :: starting_log10T, log10Rho
          interface
@@ -209,7 +209,7 @@
          prev_lgRho = -1d99
          
          ierr = 0
-         call get_net_ptr(handle, g, ierr)
+         call get_net_ptr(net_handle, g, ierr)
          if (ierr /= 0) then
             write(*,*) 'invalid handle for burn_const_density_1_zone'
             return
@@ -269,7 +269,7 @@
             screening_mode, &
             rate_screened, rate_screened_dT, rate_screened_dRho, &
             rate_raw, rate_raw_dT, rate_raw_dRho, burn_lwork, burn_work_array, &
-            .false., .false., iwork, ierr)
+            iwork, ierr)
          if (dbg) write(*,*) 'done setup_net_info'
          if (ierr /= 0) then
             if (dbg) write(*,*) 'failed in setup_net_info'
@@ -339,7 +339,7 @@
             real(dp) :: dxdt_sum, dxdt_sum_aprox21, &
                Z_plus_N, xsum, r, r1, r2
             integer :: i, ir, ci, j, k, ibad
-            logical :: okay, reuse_rates
+            logical :: okay
 
             real(dp), target :: f21_a(nvar)
             real(dp), pointer :: f21(:)
@@ -349,8 +349,7 @@
             ierr = 0
             nfcn = nfcn + 1
             dfdx => dfdx_arry
-            reuse_rates = .false. ! use_aprox21_rates .or. set_aprox21_rates
-            call jakob_or_derivs(x,y,f,dfdx,reuse_rates,ierr)
+            call jakob_or_derivs(x,y,f,dfdx,ierr)
             if (ierr /= 0) return            
          
          end subroutine burner_derivs
@@ -367,31 +366,26 @@
             real(dp), pointer :: dfdy21(:,:)
             real(dp) :: Z_plus_N, df_t, df_m
             integer :: i, ci, j, cj
-            logical :: okay, reuse_rates
+            logical :: okay
             include 'formats'
 
             ierr = 0
             njac = njac + 1
             f => f_arry
 
-            reuse_rates = .false.
-            call jakob_or_derivs(x,y,f,dfdy,reuse_rates,ierr)
+            call jakob_or_derivs(x,y,f,dfdy,ierr)
             if (ierr /= 0) return
                      
          end subroutine burner_jakob
 
-         subroutine jakob_or_derivs(time,y,f,dfdy,reuse_rates,ierr)
+         subroutine jakob_or_derivs(time,y,f,dfdy,ierr)
             use chem_lib, only: basic_composition_info
             use net_eval, only: eval_net
             use rates_def, only: rates_reaction_id_max, i_rate, i_rate_dT, i_rate_dRho
             use interp_1d_lib, only: interp_value
-            use eos_def, only: num_helm_results, h_etaele, h_detat, h_Cv, h_dcvdt
-            use eos_lib, only: eos_get_helm_results
-            use chem_def, only: ih1
          
             real(dp) :: time, y(:), f(:)
             real(dp), pointer :: dfdy(:,:)
-            logical, intent(in) :: reuse_rates
             integer, intent(out) :: ierr
          
             real(dp) :: T, lgT, rate_limit, rat, dratdt, dratdd
@@ -413,7 +407,6 @@
             
             real(dp), target :: x_a(nvar), dfdx_a(nvar,nvar)
             real(dp), pointer :: x(:), dfdx(:,:)
-            real(dp) :: res(num_helm_results)
             real(dp) :: d_eta_dlnRho
          
             include 'formats'
@@ -449,7 +442,8 @@
                abar, zbar, z2bar, z53bar, ye, mass_correction, sumx)
                
             call get_eos_info_for_burn_at_const_density( &
-               z, xh, abar, zbar, x, rho, lgRho, T, lgT, &
+               eos_handle, species, g% chem_id, g% net_iso, x, &
+               Rho, lgRho, T, lgT, &
                Cv, d_Cv_dlnT, eta, d_eta_dlnT, ierr)
             if (ierr /= 0) then
                !write(*,*) 'failed in get_eos_info_for_burn_at_const_density'
@@ -482,7 +476,6 @@
                abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
                rate_factors, weak_rate_factor, &
                reaction_Qs, reaction_neuQs, &
-               .false., .false., &
                eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
                dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
                screening_mode,  &

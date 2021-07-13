@@ -5,6 +5,8 @@ pi = symbols('pi')
 
 # Supported unary functions
 unary_operators = [
+	(lambda x: sign(x), 'sign'),
+	(lambda x: sqrt(x * Heaviside(x)), 'safe_sqrt'),
 	(lambda x: -1*x, 'unary_minus'),
 	(lambda x: exp(x), 'exp'),
 	(lambda x: expm1(x), 'expm1'),

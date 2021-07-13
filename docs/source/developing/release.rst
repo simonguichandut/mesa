@@ -15,7 +15,18 @@ General steps
 Source code updates
 -------------------
 
-- Update :file:`data/version_number`
+- Create :file:`data/version_number`
+
+MESA release versions will have a human-readable version number
+instead of the auto-generated git commit id.  Immediately before
+release, this file should be created and commited.  Because this file
+is normally ignored (via ``.gitignore``), it must be explicitly added
+via ``git add -f``.
+
+- Update version number in :file:`docs/source/conf.py`
+
+The variables ``release`` and ``version`` in the ``Project
+information`` section should be set.
 
 
 Documentation
@@ -28,7 +39,7 @@ Documentation
 
 - A release notes document should be written
 
-- Sync the reST reference documentation with the {star, binary, astero} defaults files by running the script ``defaults2rst`` (in ``/docs``) and committing the changes
+- The release branch or tag should be added to the `list of active versions on ReadTheDocs <https://readthedocs.org/projects/mesa-doc/versions/>`__.
 
 
 Testing
@@ -61,11 +72,6 @@ Additional checks that are not essential but should be done if there is time.
 
 Release steps
 -------------
-
-- Run the release script inside ``$MESA_DIR``
-
-.. note::
-    This checks out a version of MESA, builds a zip file, and uploads it to SourceForge
 
 - Upload release to Zenodo
 - Send email to mesa-users

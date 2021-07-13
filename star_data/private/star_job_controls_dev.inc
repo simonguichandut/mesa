@@ -1,6 +1,8 @@
-      logical :: change_Eturb_flag, change_initial_Eturb_flag, new_Eturb_flag
-      integer :: change_Eturb_flag_at_model_number
+      logical :: change_RSP2_flag, change_initial_RSP2_flag, new_RSP2_flag
+      integer :: change_RSP2_flag_at_model_number
+      logical :: create_RSP2_model
       
+   
       logical :: change_conv_vel_flag, change_initial_conv_vel_flag, new_conv_vel_flag
       real(dp) :: logT_for_conv_vel_flag
       
@@ -13,6 +15,7 @@
          remove_surface_turn_off_energy_sources_and_sinks, &
          remove_surface_by_relax_to_star_cut
 
+      
 
       logical :: load_saved_photo
       character (len=strlen) :: saved_photo_name

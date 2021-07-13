@@ -1,7 +1,8 @@
    
       model_number ! counting from the start of the run
       day ! elapsed simulated time in days since the start of the run
-      
+      star_age_day
+
       rsp_phase
       !rsp_GRPDV
       rsp_GREKM
@@ -37,8 +38,6 @@
       luminosity ! luminosity in Lsun units
       L_center
       !gravity 
-      !log_surf_pressure
-      !log_surf_density
    
       log_L ! log10 luminosity in Lsun units
       effective_T

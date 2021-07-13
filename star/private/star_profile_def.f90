@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2014-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2014-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -57,7 +57,8 @@
       integer, parameter :: p_lum_rad = p_lum_adv + 1
       integer, parameter :: p_log_abs_lum_erg_s = p_lum_rad + 1
       integer, parameter :: p_lum_erg_s = p_log_abs_lum_erg_s + 1
-      integer, parameter :: p_luminosity = p_lum_erg_s + 1
+      integer, parameter :: p_L = p_lum_erg_s + 1
+      integer, parameter :: p_luminosity = p_L + 1
       integer, parameter :: p_log_g = p_luminosity + 1
       integer, parameter :: p_grav = p_log_g + 1
       integer, parameter :: p_r_div_g = p_grav + 1
@@ -72,9 +73,9 @@
       integer, parameter :: p_log_L_div_Ledd = p_log_Ledd + 1
       integer, parameter :: p_lum_div_Ledd = p_log_L_div_Ledd + 1
       integer, parameter :: p_signed_log_power = p_lum_div_Ledd + 1
-      integer, parameter :: p_vel_km_per_s = p_signed_log_power + 1
-      integer, parameter :: p_log_abs_dvdt_div_v = p_vel_km_per_s + 1
-      integer, parameter :: p_log_abs_v = p_log_abs_dvdt_div_v + 1
+      integer, parameter :: p_v_kms = p_signed_log_power + 1
+      integer, parameter :: p_vel_km_per_s = p_v_kms + 1
+      integer, parameter :: p_log_abs_v = p_vel_km_per_s + 1
       integer, parameter :: p_superad_reduction_factor = p_log_abs_v + 1
       integer, parameter :: p_gradT_excess_effect = p_superad_reduction_factor + 1
       integer, parameter :: p_log_diff_grads = p_gradT_excess_effect + 1
@@ -133,34 +134,20 @@
 
       integer, parameter :: p_log_dr_div_R = p_dr_div_R + 1
       integer, parameter :: p_r_div_R = p_log_dr_div_R + 1
-      integer, parameter :: p_log_dr_div_rmid = p_r_div_R + 1
+      integer, parameter :: p_log_dr = p_r_div_R + 1
+      integer, parameter :: p_log_dr_div_rmid = p_log_dr + 1
       integer, parameter :: p_dr_div_rmid = p_log_dr_div_rmid + 1
       integer, parameter :: p_dlogR = p_dr_div_rmid + 1
-      integer, parameter :: p_log_dr = p_dlogR + 1
 
-      integer, parameter :: p_lnR_residual = p_log_dr + 1
-      integer, parameter :: p_lnd_residual = p_lnR_residual + 1
-      integer, parameter :: p_equL_residual = p_lnd_residual + 1
-      integer, parameter :: p_cell_internal_energy_fraction_start = p_equL_residual + 1
+      integer, parameter :: p_cell_internal_energy_fraction_start = p_dlogR + 1
       integer, parameter :: p_cell_internal_energy_fraction = p_cell_internal_energy_fraction_start + 1
       
       integer, parameter :: p_log_rel_E_err = p_cell_internal_energy_fraction + 1
       integer, parameter :: p_ergs_error_integral = p_log_rel_E_err + 1
       integer, parameter :: p_ergs_rel_error_integral = p_ergs_error_integral + 1
       integer, parameter :: p_ergs_error = p_ergs_rel_error_integral + 1
-      integer, parameter :: p_E_residual = p_ergs_error + 1
-      integer, parameter :: p_Et_residual = p_E_residual + 1
-      integer, parameter :: p_log_Et_residual = p_Et_residual + 1
-      integer, parameter :: p_dvdt_residual = p_log_Et_residual + 1
-      integer, parameter :: p_v_residual = p_dvdt_residual + 1
-      integer, parameter :: p_log_E_residual = p_v_residual + 1
-      integer, parameter :: p_log_lnR_residual = p_log_E_residual + 1
-      integer, parameter :: p_log_lnd_residual = p_log_lnR_residual + 1
-      integer, parameter :: p_log_equL_residual = p_log_lnd_residual + 1
-      integer, parameter :: p_log_dvdt_residual = p_log_equL_residual + 1
-      integer, parameter :: p_log_v_residual = p_log_dvdt_residual + 1
 
-      integer, parameter :: p_t_rad = p_log_v_residual + 1
+      integer, parameter :: p_t_rad = p_ergs_error + 1
       integer, parameter :: p_log_t_rad = p_t_rad + 1
       integer, parameter :: p_log_dt_cs_div_dr = p_log_t_rad + 1
       integer, parameter :: p_dt_cs_div_dr = p_log_dt_cs_div_dr + 1
@@ -199,7 +186,8 @@
       integer, parameter :: p_kap_frac_op_mono = p_kap_frac_Compton + 1
       integer, parameter :: p_extra_opacity_factor = p_kap_frac_op_mono + 1
       integer, parameter :: p_log_kap_times_factor = p_extra_opacity_factor + 1
-      integer, parameter :: p_log_opacity = p_log_kap_times_factor + 1
+      integer, parameter :: p_log_kap = p_log_kap_times_factor + 1
+      integer, parameter :: p_log_opacity = p_log_kap + 1
       integer, parameter :: p_energy = p_log_opacity + 1
       integer, parameter :: p_logM = p_energy + 1
       integer, parameter :: p_logtau_sub_xlogtau = p_logM + 1
@@ -245,13 +233,11 @@
       integer, parameter :: p_log_rho_times_r3 = p_eos_frac_CMS + 1
       integer, parameter :: p_rho_times_r3 = p_log_rho_times_r3 + 1
       integer, parameter :: p_v_times_t_div_r = p_rho_times_r3 + 1
-      integer, parameter :: p_d_v_div_r = p_v_times_t_div_r + 1
-      integer, parameter :: p_v_div_r = p_d_v_div_r + 1
+      integer, parameter :: p_v_div_r = p_v_times_t_div_r + 1
 
       integer, parameter :: p_log_c_div_tau = p_v_div_r + 1
       integer, parameter :: p_log_v_escape = p_log_c_div_tau + 1
-      integer, parameter :: p_v_escape = p_log_v_escape + 1
-      integer, parameter :: p_v_div_vesc = p_v_escape + 1
+      integer, parameter :: p_v_div_vesc = p_log_v_escape + 1
       integer, parameter :: p_v_div_v_escape = p_v_div_vesc + 1
       integer, parameter :: p_v_div_cs = p_v_div_v_escape + 1
       integer, parameter :: p_v_div_csound = p_v_div_cs + 1
@@ -343,8 +329,8 @@
       integer, parameter :: p_rel_diff_chiT_for_partials = p_rel_diff_chiRho_for_partials + 1
       integer, parameter :: p_QQ = p_rel_diff_chiT_for_partials + 1
 
-      integer, parameter :: p_phase = p_QQ + 1
-      integer, parameter :: p_latent_ddlnT = p_phase + 1
+      integer, parameter :: p_eos_phase = p_QQ + 1
+      integer, parameter :: p_latent_ddlnT = p_eos_phase + 1
       integer, parameter :: p_latent_ddlnRho = p_latent_ddlnT + 1
 
       integer, parameter :: p_x_mass_fraction_H = p_latent_ddlnRho + 1
@@ -373,10 +359,7 @@
       integer, parameter :: p_log_abs_eps_nuc = p_signed_log_eps_nuc + 1
       integer, parameter :: p_eps_nuc = p_log_abs_eps_nuc + 1
 
-      integer, parameter :: p_burn_sum_xa_err_before_fix = p_eps_nuc + 1
-      integer, parameter :: p_burn_log_abs_sum_xa_err_before_fix = p_burn_sum_xa_err_before_fix + 1
-
-      integer, parameter :: p_eps_nuc_neu_total = p_burn_log_abs_sum_xa_err_before_fix + 1
+      integer, parameter :: p_eps_nuc_neu_total = p_eps_nuc + 1
       integer, parameter :: p_non_nuc_neu = p_eps_nuc_neu_total + 1
 
       integer, parameter :: p_nonnucneu_plas = p_non_nuc_neu + 1
@@ -404,13 +387,7 @@
 
       integer, parameter :: p_log_P_face = p_P_face + 1
 
-      integer, parameter :: p_hse_ratio = p_log_P_face + 1
-      integer, parameter :: p_hse_ratio_gyre = p_hse_ratio + 1
-
-      integer, parameter :: p_dvdt_RTI_diffusion = p_hse_ratio_gyre + 1
-      integer, parameter :: p_dlnddt_RTI_diffusion = p_dvdt_RTI_diffusion + 1
-
-      integer, parameter :: p_dlnP_dlnR = p_dlnddt_RTI_diffusion + 1
+      integer, parameter :: p_dlnP_dlnR = p_log_P_face + 1
       integer, parameter :: p_dlnRho_dlnR = p_dlnP_dlnR + 1
 
       integer, parameter :: p_gradP_div_rho = p_dlnRho_dlnR + 1
@@ -453,10 +430,14 @@
       integer, parameter :: p_log_mlt_Gamma = p_log_gradT_div_gradr + 1
       integer, parameter :: p_log_mlt_vc = p_log_mlt_Gamma + 1
       integer, parameter :: p_conv_vel_div_mlt_vc = p_log_mlt_vc + 1
-      integer, parameter :: p_mlt_vc = p_conv_vel_div_mlt_vc + 1
-      integer, parameter :: p_super_ad = p_mlt_vc + 1
+      integer, parameter :: p_mlt_vc = p_conv_vel_div_mlt_vc + 1      
+      integer, parameter :: p_mlt_D = p_mlt_vc + 1
+      integer, parameter :: p_mlt_gradT = p_mlt_D + 1
+      integer, parameter :: p_mlt_log_abs_Y = p_mlt_gradT + 1
+      integer, parameter :: p_tdc_num_iters = p_mlt_log_abs_Y + 1
+      integer, parameter :: p_mlt_Y_face = p_tdc_num_iters + 1
 
-      integer, parameter :: p_delta_r = p_super_ad + 1
+      integer, parameter :: p_delta_r = p_mlt_Y_face + 1
       integer, parameter :: p_delta_L = p_delta_r + 1
       integer, parameter :: p_delta_cell_vol = p_delta_L + 1
       integer, parameter :: p_delta_entropy = p_delta_cell_vol + 1
@@ -466,8 +447,7 @@
       integer, parameter :: p_delta_mu = p_delta_eps_nuc + 1
       integer, parameter :: p_log_D_conv = p_delta_mu + 1
 
-      integer, parameter :: p_log_D_smooth = p_log_D_conv + 1
-      integer, parameter :: p_log_D_leftover = p_log_D_smooth + 1
+      integer, parameter :: p_log_D_leftover = p_log_D_conv  + 1
       integer, parameter :: p_log_D_semi = p_log_D_leftover + 1
       integer, parameter :: p_log_D_anon = p_log_D_semi + 1
       integer, parameter :: p_log_D_ovr = p_log_D_anon + 1
@@ -517,62 +497,20 @@
       integer, parameter :: p_log_conv_vel = p_log_sig_mix + 1
       integer, parameter :: p_conv_vel_div_L_vel = p_log_conv_vel + 1
       integer, parameter :: p_conv_vel_div_csound = p_conv_vel_div_L_vel + 1
-      integer, parameter :: p_log_tau_conv_yrs = p_conv_vel_div_csound + 1
-      integer, parameter :: p_mixing_type = p_log_tau_conv_yrs + 1
-      integer, parameter :: p_conv_mixing_type = p_mixing_type + 1
+      integer, parameter :: p_mix_type = p_conv_vel_div_csound + 1
+      integer, parameter :: p_mixing_type = p_mix_type + 1
 
-      integer, parameter :: p_log_mlt_D_mix = p_conv_mixing_type + 1
+      integer, parameter :: p_log_mlt_D_mix = p_mixing_type + 1
       integer, parameter :: p_log_cp_T_div_t_sound = p_log_mlt_D_mix + 1
       integer, parameter :: p_log_t_thermal = p_log_cp_T_div_t_sound + 1
       integer, parameter :: p_log_t_sound = p_log_t_thermal + 1
       integer, parameter :: p_pressure_scale_height_cm = p_log_t_sound + 1
       integer, parameter :: p_pressure_scale_height = p_pressure_scale_height_cm + 1
 
-      integer, parameter :: p_grada_sub_actual_gradT = p_pressure_scale_height + 1
-      integer, parameter :: p_gradT_sub_actual_gradT = p_grada_sub_actual_gradT + 1
-      integer, parameter :: p_actual_gradT = p_gradT_sub_actual_gradT + 1
-
-      integer, parameter :: p_grad_superad_actual = p_actual_gradT + 1
-      integer, parameter :: p_grad_superad = p_grad_superad_actual + 1
-      integer, parameter :: p_gradT_sub_grada = p_grad_superad + 1
+      integer, parameter :: p_gradT_sub_grada = p_pressure_scale_height + 1
       integer, parameter :: p_gradT = p_gradT_sub_grada + 1
       integer, parameter :: p_gradr = p_gradT + 1
-
-      integer, parameter :: p_d_gradT_dlnd00 = p_gradr + 1
-      integer, parameter :: p_d_gradT_dlnT00 = p_d_gradT_dlnd00 + 1
-      integer, parameter :: p_d_gradT_dlndm1 = p_d_gradT_dlnT00 + 1
-      integer, parameter :: p_d_gradT_dlnTm1 = p_d_gradT_dlndm1 + 1
-      integer, parameter :: p_d_gradT_dlnR = p_d_gradT_dlnTm1 + 1
-      integer, parameter :: p_d_gradT_dln_cvpv0 = p_d_gradT_dlnR + 1
-      integer, parameter :: p_d_gradT_dL = p_d_gradT_dln_cvpv0 + 1
-
-      integer, parameter :: p_accel_div_grav = p_d_gradT_dL + 1
-
-      integer, parameter :: p_dlnd_dt_const_q = p_accel_div_grav + 1
-      integer, parameter :: p_dlnT_dt_const_q = p_dlnd_dt_const_q + 1
-
-      integer, parameter :: p_dlnd = p_dlnT_dt_const_q + 1
-      integer, parameter :: p_dlnT = p_dlnd + 1
-      integer, parameter :: p_dlnR = p_dlnT + 1
-
-      integer, parameter :: p_dlnd_dt = p_dlnR + 1
-      integer, parameter :: p_dlnT_dt = p_dlnd_dt + 1
-      integer, parameter :: p_dlnR_dt = p_dlnT_dt + 1
-      integer, parameter :: p_dr_dt = p_dlnR_dt + 1
-      integer, parameter :: p_du_dt = p_dr_dt + 1
-      integer, parameter :: p_dv_dt = p_du_dt + 1
-
-      integer, parameter :: p_signed_dlnd = p_dv_dt + 1
-      integer, parameter :: p_signed_dlnT = p_signed_dlnd + 1
-
-      integer, parameter :: p_dt_dm_eps_grav = p_signed_dlnT + 1
-
-      integer, parameter :: p_dm_de = p_dt_dm_eps_grav + 1
-      integer, parameter :: p_dt_dL = p_dm_de + 1
-
-      integer, parameter :: p_ds_from_eps_grav = p_dt_dL + 1
-      integer, parameter :: p_del_entropy = p_ds_from_eps_grav + 1
-      integer, parameter :: p_cno_div_z = p_del_entropy + 1
+      integer, parameter :: p_cno_div_z = p_gradr + 1
 
       integer, parameter :: p_dE = p_cno_div_z + 1
       integer, parameter :: p_dr = p_dE + 1
@@ -633,17 +571,17 @@
       integer, parameter :: p_log_L_div_CpTMdot = p_log_mdot_v + 1
       integer, parameter :: p_cs_at_cell_bdy = p_log_L_div_CpTMdot + 1
 
-      integer, parameter :: p_total_energy_integral_outward = p_cs_at_cell_bdy + 1
-      integer, parameter :: p_total_energy_integral = p_total_energy_integral_outward + 1
-      integer, parameter :: p_total_energy_sign = p_total_energy_integral + 1
+      integer, parameter :: p_total_energy_sign = p_cs_at_cell_bdy + 1
       integer, parameter :: p_total_energy = p_total_energy_sign + 1
       
-      integer, parameter :: p_Pturb = p_total_energy + 1
-      integer, parameter :: p_log_Pturb = p_Pturb + 1
-      integer, parameter :: p_Eturb = p_log_Pturb + 1
-      integer, parameter :: p_log_Eturb = p_Eturb + 1
-      integer, parameter :: p_avQ = p_log_Eturb + 1
-      integer, parameter :: p_Hp_face = p_avQ + 1
+      integer, parameter :: p_Ptrb = p_total_energy + 1
+      integer, parameter :: p_log_Ptrb = p_Ptrb + 1
+      integer, parameter :: p_log_w = p_log_Ptrb + 1
+      integer, parameter :: p_w = p_log_w + 1
+      integer, parameter :: p_etrb = p_w + 1
+      integer, parameter :: p_log_etrb = p_etrb + 1
+      integer, parameter :: p_Pvsc = p_log_etrb + 1
+      integer, parameter :: p_Hp_face = p_Pvsc + 1
       integer, parameter :: p_Y_face = p_Hp_face + 1
       integer, parameter :: p_PII_face = p_Y_face + 1
       integer, parameter :: p_Chi = p_PII_face + 1
@@ -660,9 +598,7 @@
       integer, parameter :: p_Lt = p_Lc_div_L + 1
       integer, parameter :: p_Lt_div_L = p_Lt + 1
 
-      integer, parameter :: p_rsp_vt_div_cs = p_Lt_div_L + 1
-      integer, parameter :: p_rsp_vt = p_rsp_vt_div_cs + 1
-      integer, parameter :: p_rsp_log_erad = p_rsp_vt + 1
+      integer, parameter :: p_rsp_log_erad = p_Lt_div_L + 1
       integer, parameter :: p_rsp_erad = p_rsp_log_erad + 1
       integer, parameter :: p_rsp_logEt = p_rsp_erad + 1
       integer, parameter :: p_rsp_Et = p_rsp_logEt + 1
@@ -683,8 +619,8 @@
       integer, parameter :: p_rsp_log_heat_exchange_timescale = p_rsp_Y_face + 1
       integer, parameter :: p_rsp_log_dt_div_heat_exchange_timescale = p_rsp_log_heat_exchange_timescale + 1
       integer, parameter :: p_rsp_heat_exchange_timescale = p_rsp_log_dt_div_heat_exchange_timescale + 1
-      integer, parameter :: p_rsp_avQ = p_rsp_heat_exchange_timescale + 1
-      integer, parameter :: p_rsp_Chi = p_rsp_avQ + 1
+      integer, parameter :: p_rsp_Pvsc = p_rsp_heat_exchange_timescale + 1
+      integer, parameter :: p_rsp_Chi = p_rsp_Pvsc + 1
       integer, parameter :: p_rsp_gradT = p_rsp_Chi + 1
       integer, parameter :: p_rsp_Lr_div_L = p_rsp_gradT + 1
       integer, parameter :: p_rsp_Lc_div_L = p_rsp_Lr_div_L + 1
@@ -698,9 +634,7 @@
       integer, parameter :: p_d_u_div_rmid_start = p_rsp_WORKC + 1
       integer, parameter :: p_d_u_div_rmid = p_d_u_div_rmid_start + 1
 
-      integer, parameter :: p_conv_vel_residual = p_d_u_div_rmid + 1
-      integer, parameter :: p_log_conv_vel_residual = p_conv_vel_residual + 1
-      integer, parameter :: p_dconv_vel_dt = p_log_conv_vel_residual + 1
+      integer, parameter :: p_dconv_vel_dt = p_d_u_div_rmid + 1
 
       integer, parameter :: p_cell_ie_div_star_ie = p_dconv_vel_dt + 1
       integer, parameter :: p_log_cell_specific_IE = p_cell_ie_div_star_ie + 1
@@ -762,20 +696,20 @@
       integer, parameter :: p_sl2_sub_omega2 = p_brunt_N2_sub_omega2 + 1
       integer, parameter :: p_k_r_integral = p_sl2_sub_omega2 + 1
 
-      integer, parameter :: p_num_steps = p_k_r_integral + 1
-      integer, parameter :: p_mtx_solve = p_num_steps + 1
-      integer, parameter :: p_mtx_factor = p_mtx_solve + 1
+      integer, parameter :: p_log_dt_div_tau_conv = p_k_r_integral + 1
+      integer, parameter :: p_dt_div_tau_conv = p_log_dt_div_tau_conv + 1
+      integer, parameter :: p_tau_conv = p_dt_div_tau_conv + 1
+      integer, parameter :: p_tau_qhse = p_tau_conv + 1
+      integer, parameter :: p_tau_epsnuc = p_tau_qhse + 1
+      integer, parameter :: p_tau_cool = p_tau_epsnuc + 1
       
-      integer, parameter :: p_max_abs_xa_corr = p_mtx_factor + 1
+      integer, parameter :: p_max_abs_xa_corr = p_tau_cool + 1
       integer, parameter :: p_log_zFe = p_max_abs_xa_corr + 1
       integer, parameter :: p_zFe = p_log_zFe + 1
-      integer, parameter :: p_log_u_residual = p_zFe + 1
-      integer, parameter :: p_u_residual = p_log_u_residual + 1
-      integer, parameter :: p_u = p_u_residual + 1
+      integer, parameter :: p_u = p_zFe + 1
       integer, parameter :: p_u_face = p_u + 1
       integer, parameter :: p_dPdr_dRhodr_info = p_u_face + 1
-      integer, parameter :: p_signed_log_ergs_err = p_dPdr_dRhodr_info + 1
-      integer, parameter :: p_RTI_du_diffusion_kick = p_signed_log_ergs_err + 1
+      integer, parameter :: p_RTI_du_diffusion_kick = p_dPdr_dRhodr_info + 1
       integer, parameter :: p_log_du_kick_div_du = p_RTI_du_diffusion_kick + 1
       
       integer, parameter :: p_col_id_max = p_log_du_kick_div_du
@@ -799,6 +733,7 @@
 
          profile_column_name(p_zone) = 'zone'
          profile_column_name(p_k) = 'k'
+         profile_column_name(p_L) = 'L'
          profile_column_name(p_luminosity) = 'luminosity'
          profile_column_name(p_lum_erg_s) = 'lum_erg_s'
          profile_column_name(p_log_abs_lum_erg_s) = 'log_abs_lum_erg_s'
@@ -810,7 +745,7 @@
          profile_column_name(p_lum_conv) = 'lum_conv'
          profile_column_name(p_lum_conv_MLT) = 'lum_conv_MLT'
 
-         profile_column_name(p_lum_conv_div_lum_Edd) = 'p_lum_conv_MLT'
+         profile_column_name(p_lum_conv_div_lum_Edd) = 'lum_conv_div_lum_Edd'
          profile_column_name(p_lum_rad_div_L_Edd) = 'lum_rad_div_L_Edd'
          profile_column_name(p_lum_rad_div_L) = 'lum_rad_div_L'
          profile_column_name(p_lum_conv_div_L) = 'lum_conv_div_L'
@@ -834,15 +769,15 @@
          profile_column_name(p_lum_div_Ledd) = 'lum_div_Ledd'
          profile_column_name(p_log_L_div_Ledd) = 'log_L_div_Ledd'
          profile_column_name(p_signed_log_power) = 'signed_log_power'
-         profile_column_name(p_log_abs_dvdt_div_v) = 'log_abs_dvdt_div_v'
          profile_column_name(p_log_abs_v) = 'log_abs_v'
          profile_column_name(p_log_diff_grads) = 'log_diff_grads'
          profile_column_name(p_diff_grads) = 'diff_grads'
          profile_column_name(p_gradT_excess_effect) = 'gradT_excess_effect'
-         profile_column_name(p_superad_reduction_factor) = 'superad_red'
+         profile_column_name(p_superad_reduction_factor) = 'superad_reduction_factor'
 
          profile_column_name(p_v) = 'v'
          profile_column_name(p_velocity) = 'velocity'
+         profile_column_name(p_v_kms) = 'v_kms'
          profile_column_name(p_vel_km_per_s) = 'vel_km_per_s'
          profile_column_name(p_radius_km) = 'radius_km'
          profile_column_name(p_radius_cm) = 'radius_cm'
@@ -910,28 +845,12 @@
          profile_column_name(p_log_dr) = 'log_dr'
          profile_column_name(p_dlogR) = 'dlogR'
 
-         profile_column_name(p_lnR_residual) = 'lnR_residual'
-         profile_column_name(p_lnd_residual) = 'lnd_residual'
-
          profile_column_name(p_cell_internal_energy_fraction_start) = 'cell_internal_energy_fraction_start'
          profile_column_name(p_cell_internal_energy_fraction) = 'cell_internal_energy_fraction'
          profile_column_name(p_ergs_error) = 'ergs_error'
          profile_column_name(p_log_rel_E_err) = 'log_rel_E_err'
          profile_column_name(p_ergs_error_integral) = 'ergs_error_integral'
          profile_column_name(p_ergs_rel_error_integral) = 'ergs_rel_error_integral'
-         profile_column_name(p_E_residual) = 'E_residual'
-         profile_column_name(p_equL_residual) = 'equL_residual'
-         profile_column_name(p_dvdt_residual) = 'dvdt_residual'
-         profile_column_name(p_v_residual) = 'v_residual'
-
-         profile_column_name(p_Et_residual) = 'Et_residual'
-         profile_column_name(p_log_Et_residual) = 'log_Et_residual'
-         profile_column_name(p_log_E_residual) = 'log_E_residual'
-         profile_column_name(p_log_lnR_residual) = 'log_lnR_residual'
-         profile_column_name(p_log_lnd_residual) = 'log_lnd_residual'
-         profile_column_name(p_log_equL_residual) = 'log_equL_residual'
-         profile_column_name(p_log_dvdt_residual) = 'log_dvdt_residual'
-         profile_column_name(p_log_v_residual) = 'log_v_residual'
 
          profile_column_name(p_t_rad) = 't_rad'
          profile_column_name(p_log_t_rad) = 'log_t_rad'
@@ -960,6 +879,7 @@
          profile_column_name(p_tau) = 'tau'
          profile_column_name(p_extra_opacity_factor) = 'extra_opacity_factor'
          profile_column_name(p_log_kap_times_factor) = 'log_kap_times_factor'
+         profile_column_name(p_log_kap) = 'log_kap'
          profile_column_name(p_log_opacity) = 'log_opacity'
          profile_column_name(p_kap_frac_lowT) = 'kap_frac_lowT'
          profile_column_name(p_kap_frac_highT) = 'kap_frac_highT'
@@ -1011,11 +931,9 @@
          profile_column_name(p_rho_times_r3) = 'rho_times_r3'
          profile_column_name(p_v_times_t_div_r) = 'v_times_t_div_r'
          profile_column_name(p_v_div_r) = 'v_div_r'
-         profile_column_name(p_d_v_div_r) = 'd_v_div_r'
          
          profile_column_name(p_log_c_div_tau) = 'log_c_div_tau'
          profile_column_name(p_log_v_escape) = 'log_v_escape'
-         profile_column_name(p_v_escape) = 'v_escape'
          profile_column_name(p_v_div_v_escape) = 'v_div_v_escape'
          profile_column_name(p_v_div_vesc) = 'v_div_vesc'
          profile_column_name(p_v_div_cs) = 'v_div_cs'
@@ -1100,7 +1018,7 @@
          profile_column_name(p_chiT) = 'chiT'
          profile_column_name(p_QQ) = 'QQ'
 
-         profile_column_name(p_phase) = 'eos_phase'
+         profile_column_name(p_eos_phase) = 'eos_phase'
          profile_column_name(p_latent_ddlnT) = 'latent_ddlnT'
          profile_column_name(p_latent_ddlnRho) = 'latent_ddlnRho'
 
@@ -1125,8 +1043,6 @@
          profile_column_name(p_eps_nuc) = 'eps_nuc'
          profile_column_name(p_signed_log_eps_nuc) = 'signed_log_eps_nuc'
          profile_column_name(p_log_abs_eps_nuc) = 'log_abs_eps_nuc'
-         profile_column_name(p_burn_sum_xa_err_before_fix) = 'burn_sum_xa_err_before_fix'
-         profile_column_name(p_burn_log_abs_sum_xa_err_before_fix) = 'burn_log_abs_sum_xa_err_before_fix'
 
          profile_column_name(p_d_epsnuc_dlnd) = 'd_epsnuc_dlnd'
          profile_column_name(p_d_epsnuc_dlnT) = 'd_epsnuc_dlnT'
@@ -1162,23 +1078,14 @@
          profile_column_name(p_P_face) = 'P_face'
          profile_column_name(p_log_P_face) = 'log_P_face'
 
-         profile_column_name(p_hse_ratio) = 'hse_ratio'
-         profile_column_name(p_hse_ratio_gyre) = 'hse_ratio_gyre'
-
          profile_column_name(p_dlnP_dlnR) = 'dlnP_dlnR'
          profile_column_name(p_dlnRho_dlnR) = 'dlnRho_dlnR'
          profile_column_name(p_gradP_div_rho) = 'gradP_div_rho'
          profile_column_name(p_dPdr_div_grav) = 'dPdr_div_grav'
 
-         profile_column_name(p_dvdt_RTI_diffusion) = 'dvdt_RTI_diffusion'
-         profile_column_name(p_dlnddt_RTI_diffusion) = 'dlnddt_RTI_diffusion'
          profile_column_name(p_log_abs_eps_grav_dm_div_L) = 'log_abs_eps_grav_dm_div_L'
          profile_column_name(p_eps_grav_composition_term) = 'eps_grav_composition_term'
-
-         profile_column_name(p_dt_dm_eps_grav) = 'dt_dm_eps_grav'
          profile_column_name(p_dm_eps_grav) = 'dm_eps_grav'
-         profile_column_name(p_dm_de) = 'dm_de'
-         profile_column_name(p_dt_dL) = 'dt_dL'
 
          profile_column_name(p_eps_grav_plus_eps_mdot) = 'eps_grav_plus_eps_mdot'
          profile_column_name(p_ergs_eps_grav_plus_eps_mdot) = 'ergs_eps_grav_plus_eps_mdot'
@@ -1200,8 +1107,6 @@
 
          profile_column_name(p_grada_sub_gradT) = 'grada_sub_gradT'
          profile_column_name(p_gradT_sub_grada) = 'gradT_sub_grada'
-         profile_column_name(p_grad_superad) = 'grad_superad'
-         profile_column_name(p_grad_superad_actual) = 'grad_superad_actual'
 
          profile_column_name(p_gradT_sub_a) = 'gradT_sub_a'
          profile_column_name(p_gradT_div_grada) = 'gradT_div_grada'
@@ -1216,7 +1121,11 @@
          profile_column_name(p_log_mlt_vc) = 'log_mlt_vc'
          profile_column_name(p_conv_vel_div_mlt_vc) = 'conv_vel_div_mlt_vc'
          profile_column_name(p_mlt_vc) = 'mlt_vc'
-         profile_column_name(p_super_ad) = 'super_ad'
+         profile_column_name(p_mlt_D) = 'mlt_D'
+         profile_column_name(p_mlt_gradT) = 'mlt_gradT'
+         profile_column_name(p_mlt_Y_face) = 'mlt_Y_face'
+         profile_column_name(p_mlt_log_abs_Y) = 'mlt_log_abs_Y'
+         profile_column_name(p_tdc_num_iters) = 'tdc_num_iters'
 
          profile_column_name(p_delta_r) = 'delta_r'
          profile_column_name(p_delta_L) = 'delta_L'
@@ -1227,7 +1136,6 @@
          profile_column_name(p_delta_eps_nuc) = 'delta_eps_nuc'
          profile_column_name(p_delta_mu) = 'delta_mu'
          profile_column_name(p_log_D_conv) = 'log_D_conv'
-         profile_column_name(p_log_D_smooth) = 'log_D_smooth'
          profile_column_name(p_log_D_leftover) = 'log_D_leftover'
          profile_column_name(p_log_D_semi) = 'log_D_semi'
          profile_column_name(p_log_D_ovr) = 'log_D_ovr'
@@ -1278,8 +1186,8 @@
          profile_column_name(p_log_conv_vel) = 'log_conv_vel'
          profile_column_name(p_conv_vel_div_csound) = 'conv_vel_div_csound'
          profile_column_name(p_conv_vel_div_L_vel) = 'conv_vel_div_L_vel'
-         profile_column_name(p_conv_mixing_type) = 'conv_mixing_type'
-         profile_column_name(p_log_tau_conv_yrs) = 'log_tau_conv_yrs'
+
+         profile_column_name(p_mix_type) = 'mix_type'
          profile_column_name(p_mixing_type) = 'mixing_type'
          profile_column_name(p_log_mlt_D_mix) = 'log_mlt_D_mix'
          profile_column_name(p_log_cp_T_div_t_sound) = 'log_cp_T_div_t_sound'
@@ -1287,45 +1195,11 @@
          profile_column_name(p_log_t_sound) = 'log_t_sound'
          profile_column_name(p_pressure_scale_height_cm) = 'pressure_scale_height_cm'
          profile_column_name(p_pressure_scale_height) = 'pressure_scale_height'
-         profile_column_name(p_actual_gradT) = 'actual_gradT'
-         profile_column_name(p_gradT_sub_actual_gradT) = 'gradT_sub_actual_gradT'
-         profile_column_name(p_grada_sub_actual_gradT) = 'grada_sub_actual_gradT'
-
-         profile_column_name(p_d_gradT_dlnd00) = 'd_gradT_dlnd00'
-         profile_column_name(p_d_gradT_dlnT00) = 'd_gradT_dlnT00'
-         profile_column_name(p_d_gradT_dlndm1) = 'd_gradT_dlndm1'
-         profile_column_name(p_d_gradT_dlnTm1) = 'd_gradT_dlnTm1'
-         profile_column_name(p_d_gradT_dlnR) = 'd_gradT_dlnR'
-         profile_column_name(p_d_gradT_dL) = 'd_gradT_dL'
-         profile_column_name(p_d_gradT_dln_cvpv0) = 'd_gradT_dln_cvpv0'
 
          profile_column_name(p_gradT) = 'gradT'
          profile_column_name(p_gradr) = 'gradr'
 
-         profile_column_name(p_accel_div_grav) = 'accel_div_grav'
-
-         profile_column_name(p_dlnd_dt_const_q) = 'dlnd_dt_const_q'
-         profile_column_name(p_dlnT_dt_const_q) = 'dlnT_dt_const_q'
-
-         profile_column_name(p_dlnd_dt) = 'dlnd_dt'
-         profile_column_name(p_dlnT_dt) = 'dlnT_dt'
-         profile_column_name(p_dlnR_dt) = 'dlnR_dt'
-         profile_column_name(p_dr_dt) = 'dr_dt'
-         profile_column_name(p_dv_dt) = 'dv_dt'
-         profile_column_name(p_du_dt) = 'du_dt'
-
-         profile_column_name(p_dlnd) = 'dlnd'
-         profile_column_name(p_dlnT) = 'dlnT'
-         profile_column_name(p_dlnR) = 'dlnR'
-
-
-         profile_column_name(p_del_entropy) = 'del_entropy'
-         profile_column_name(p_ds_from_eps_grav) = 'ds_from_eps_grav'
-
          profile_column_name(p_cno_div_z) = 'cno_div_z'
-
-         profile_column_name(p_signed_dlnd) = 'signed_dlnd'
-         profile_column_name(p_signed_dlnT) = 'signed_dlnT'
 
          profile_column_name(p_dE) = 'dE'
          profile_column_name(p_dr) = 'dr'
@@ -1372,16 +1246,16 @@
          profile_column_name(p_dlog_photo_dlogP) = 'dlog_photo_dlogP'
          profile_column_name(p_dlog_other_dlogP) = 'dlog_other_dlogP'
 
-         profile_column_name(p_total_energy) = 'total_energy'
          profile_column_name(p_total_energy_sign) = 'total_energy_sign'
-         profile_column_name(p_total_energy_integral_outward) = 'total_energy_integral_outward'
-         profile_column_name(p_total_energy_integral) = 'total_energy_integral'
+         profile_column_name(p_total_energy) = 'total_energy'
 
-         profile_column_name(p_Pturb) = 'Pturb'
-         profile_column_name(p_log_Pturb) = 'log_Pturb'
-         profile_column_name(p_Eturb) = 'Eturb'
-         profile_column_name(p_log_Eturb) = 'log_Eturb'
-         profile_column_name(p_avQ) = 'avQ'
+         profile_column_name(p_Ptrb) = 'Ptrb'
+         profile_column_name(p_log_Ptrb) = 'log_Ptrb'
+         profile_column_name(p_w) = 'w'
+         profile_column_name(p_log_w) = 'log_w'
+         profile_column_name(p_etrb) = 'etrb'
+         profile_column_name(p_log_etrb) = 'log_etrb'
+         profile_column_name(p_Pvsc) = 'Pvsc'
          profile_column_name(p_Hp_face) = 'Hp_face'
          profile_column_name(p_Y_face) = 'Y_face'
          profile_column_name(p_PII_face) = 'PII_face'
@@ -1403,8 +1277,6 @@
          profile_column_name(p_rsp_logEt) = 'rsp_logEt'
          profile_column_name(p_rsp_erad) = 'rsp_erad'
          profile_column_name(p_rsp_log_erad) = 'rsp_log_erad'
-         profile_column_name(p_rsp_vt_div_cs) = 'rsp_vt_div_cs'
-         profile_column_name(p_rsp_vt) = 'rsp_vt'
          profile_column_name(p_rsp_Pt) = 'rsp_Pt'
          profile_column_name(p_rsp_Lr) = 'rsp_Lr'
          profile_column_name(p_rsp_Lc) = 'rsp_Lc'
@@ -1423,7 +1295,7 @@
          profile_column_name(p_rsp_heat_exchange_timescale) = 'rsp_heat_exchange_timescale'
          profile_column_name(p_rsp_log_dt_div_heat_exchange_timescale) = 'rsp_log_dt_div_heat_exchange_timescale'
          profile_column_name(p_rsp_log_heat_exchange_timescale) = 'rsp_log_heat_exchange_timescale'
-         profile_column_name(p_rsp_avQ) = 'rsp_avQ'
+         profile_column_name(p_rsp_Pvsc) = 'rsp_Pvsc'
          profile_column_name(p_rsp_gradT) = 'rsp_gradT'
          profile_column_name(p_rsp_Lr_div_L) = 'rsp_Lr_div_L'
          profile_column_name(p_rsp_Lc_div_L) = 'rsp_Lc_div_L'
@@ -1437,8 +1309,6 @@
          profile_column_name(p_d_u_div_rmid) = 'd_u_div_rmid'
          profile_column_name(p_d_u_div_rmid_start) = 'd_u_div_rmid_start'
 
-         profile_column_name(p_conv_vel_residual) = 'conv_vel_residual'
-         profile_column_name(p_log_conv_vel_residual) = 'log_conv_vel_residual'
          profile_column_name(p_dconv_vel_dt) = 'dconv_vel_dt'
 
          profile_column_name(p_cell_specific_IE) = 'cell_specific_IE'
@@ -1501,10 +1371,6 @@
          profile_column_name(p_sl2_sub_omega2) = 'sl2_sub_omega2'
          profile_column_name(p_k_r_integral) = 'k_r_integral'
 
-         profile_column_name(p_num_steps) = 'num_steps'
-         profile_column_name(p_mtx_solve) = 'mtx_solve'
-         profile_column_name(p_mtx_factor) = 'mtx_factor'
-
          profile_column_name(p_log_brunt_nu) = 'log_brunt_nu'
          profile_column_name(p_log_lamb_Sl1) = 'log_lamb_Sl1'
          profile_column_name(p_log_lamb_Sl2) = 'log_lamb_Sl2'
@@ -1522,15 +1388,19 @@
 
          profile_column_name(p_log_zFe) = 'log_zFe'
          profile_column_name(p_zFe) = 'zFe'
-         profile_column_name(p_log_u_residual) = 'log_u_residual'
-         profile_column_name(p_u_residual) = 'u_residual'
          profile_column_name(p_u) = 'u'
          profile_column_name(p_u_face) = 'u_face'
          profile_column_name(p_dPdr_dRhodr_info) = 'dPdr_dRhodr_info'
-         profile_column_name(p_signed_log_ergs_err) = 'signed_log_ergs_err'
          profile_column_name(p_RTI_du_diffusion_kick) = 'RTI_du_diffusion_kick'
          profile_column_name(p_log_du_kick_div_du) = 'log_du_kick_div_du'
          profile_column_name(p_max_abs_xa_corr) = 'max_abs_xa_corr'
+
+         profile_column_name(p_log_dt_div_tau_conv) = 'log_dt_div_tau_conv'
+         profile_column_name(p_dt_div_tau_conv) = 'dt_div_tau_conv'
+         profile_column_name(p_tau_conv) = 'tau_conv'
+         profile_column_name(p_tau_qhse) = 'tau_qhse'
+         profile_column_name(p_tau_epsnuc) = 'tau_epsnuc'
+         profile_column_name(p_tau_cool) = 'tau_cool'
 
          cnt = 0
          do i=1,p_col_id_max

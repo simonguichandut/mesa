@@ -1,6 +1,6 @@
  ! ***********************************************************************
 !
-!   Copyright (C) 2010-2019  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2019  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -31,6 +31,8 @@
       use chem_def
       use interp_1d_def, only: pm_work_size
       use utils_lib
+      use star_utils, only: get_r_from_xh, store_r_in_xh, store_rho_in_xh, &
+         get_lnT_from_xh, store_lnT_in_xh, store_lnd_in_xh
 
       implicit none
 
@@ -53,24 +55,24 @@
             s, nz, nz_old, xh_old, xa_old, &
             energy_old, eta_old, lnd_old, lnPgas_old, &
             j_rot_old, i_rot_old, omega_old, D_omega_old, &
-            conv_vel_old, lnT_old, eturb_old, specific_PE_old, specific_KE_old, &
+            mlt_vc_old, lnT_old, w_old, specific_PE_old, specific_KE_old, &
             old_m, old_r, old_rho, dPdr_dRhodr_info_old, D_mix_old, &
             cell_type, comes_from, dq_old, xq_old, xh, xa, dq, xq, ierr)
+         use chem_lib, only: basic_composition_info
          use interp_1d_def
          use interp_1d_lib
+         use star_utils, only: set_m_grav_and_grav
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old
-         integer, dimension(:), pointer :: cell_type, comes_from
+         integer, dimension(:) :: cell_type, comes_from
          real(dp), dimension(:), pointer :: &
             dq_old, xq_old, dq, xq, energy_old, eta_old, &
-            lnd_old, lnPgas_old, conv_vel_old, lnT_old, eturb_old, &
+            lnd_old, lnPgas_old, mlt_vc_old, lnT_old, w_old, Hp_face_old, &
             specific_PE_old, specific_KE_old, &
             old_m, old_r, old_rho, dPdr_dRhodr_info_old, &
             j_rot_old, i_rot_old, omega_old, D_omega_old, D_mix_old
          real(dp), dimension(:,:), pointer :: xh_old, xa_old
          real(dp), dimension(:,:), pointer :: xh, xa
-         real(dp), dimension(:), pointer :: &
-            interp_work, density_new, energy_new, interp_y_old
          integer, intent(out) :: ierr
 
          real(dp) :: dxa, xmstar, mstar, sumx, remove1, remove2, &
@@ -78,12 +80,12 @@
          character (len=strlen) :: message
          integer :: k, from_k, j, op_err, nzlo, nzhi, nzlo_old, nzhi_old, species
          logical :: found_bad_one
-         real(dp), pointer :: p2(:,:)
-
-         real(dp), dimension(:), pointer :: &
-            xa1_c0, xa1_c1, xa1_c2, dqbar, dqbar_old, new_r, Vol_new, work, xq_old_plus1, &
-            xout_old, xout_new, xq_new, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7
-         real(dp), dimension(:,:), pointer :: xa_c0, xa_c1, xa_c2
+         real(dp), pointer :: work(:)
+         real(dp), dimension(:), allocatable :: &
+            dqbar, dqbar_old, new_r, Vol_new, xq_old_plus1, &
+            xout_old, xout_new, xq_new, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, &
+            energy_new, density_new
+         real(dp), dimension(:,:), allocatable :: xa_c0, xa_c1, xa_c2
 
          include 'formats'
 
@@ -193,15 +195,6 @@
             if (failed('dPdr_dRhodr_info')) return
          end if
 
-         if (s% Eturb_flag) then
-            if (dbg) write(*,*) 'call do_Eturb'
-            call do_Eturb( &
-               s, nz, nz_old, nzlo, nzhi, comes_from, &
-               xh, xh_old, xq, xq_old_plus1, xq_new, &
-               work, tmp1, tmp2, ierr)
-            if (failed('do_Eturb')) return
-         end if
-
          if (dbg) write(*,*) 'call do_lnR_and_lnd'
          call do_lnR_and_lnd( &
             s, nz, nz_old, nzlo, nzhi, cell_type, comes_from, &
@@ -229,6 +222,21 @@
             if (failed('do_u')) return
          end if
 
+         if (s% RSP2_flag) then ! calculate new etrb to conserve turbulent energy
+            if (dbg) write(*,*) 'call do_etrb'
+            call do_etrb( &
+               s, nz, nz_old, cell_type, comes_from, &
+               xq_old, xq, dq_old, dq, xh, xh_old, &
+               xout_old, xout_new, tmp1, ierr)
+            if (failed('do_etrb')) return
+            if (dbg) write(*,*) 'call do_Hp_face'
+            call do_Hp_face( &
+               s, nz, nz_old, nzlo, nzhi, comes_from, &
+               xh, xh_old, xq, xq_old_plus1, xq_new, &
+               work, tmp1, tmp2, ierr)
+            if (failed('do_Hp_face')) return
+         end if
+
          if (s% conv_vel_flag) then
             if (dbg) write(*,*) 'call do_conv_vel'
             call do_conv_vel( &
@@ -250,6 +258,11 @@
                if (failed('D_omega')) return
             end if
          end if
+         
+         call do_interp_pt_val( &
+            s, nz, nz_old, nzlo, nzhi, s% mlt_vc, mlt_vc_old, &
+            0d0, xq, xq_old_plus1, xq_new, .true., work, tmp1, tmp2, ierr)
+         if (failed('mlt_cv')) return
          
          call do_interp_pt_val( &
             s, nz, nz_old, nzlo, nzhi, s% D_mix, D_mix_old, &
@@ -306,7 +319,7 @@
             call do_xa( &
                s, nz, nz_old, k, species, cell_type, comes_from, xa, xa_old, &
                xa_c0, xa_c1, xa_c2, xq, dq, xq_old, dq_old, &
-               s% mesh_adjust_use_quadratic, op_err)
+               .true., op_err)
             if (op_err /= 0) then
                write(*,2) 'failed for do_xa', k
                stop
@@ -314,12 +327,37 @@
                ierr = op_err
             end if
 
+         end do
+
+         ! ensure the things we need to calculate m_grav and grav are up to date
+         do k = 1, nz
+
+            op_err = 0
+
+            ! ensure that mass corrections are up to date
+            call basic_composition_info( &
+                 species, s% chem_id, xa(1:species,k), s% X(k), s% Y(k), s% Z(k), &
+                 s% abar(k), s% zbar(k), s% z2bar(k), s% z53bar(k), &
+                 s% ye(k), s% mass_correction(k), sumx)
+
+            ! ensure that r is up to date
+            s% r(k) = exp(s% xh(s% i_lnr,k))
+
+         end do
+
+         ! needed because do1_lnT evaluates PE
+         call set_m_grav_and_grav(s)
+
+         do k = 1, nz
+
+            op_err = 0
+
             ! calculate new temperatures to conserve energy
             call do1_lnT( &
                s, nz_old, k, species, cell_type, comes_from, &
                xa, xh, xh_old, &
                xq, dq, xq_old, dq_old, eta_old, energy_old, lnT_old, &
-               specific_PE_old, specific_KE_old, eturb_old, &
+               specific_PE_old, specific_KE_old, w_old, &
                density_new, energy_new, op_err)
             if (op_err /= 0) then
                write(*,2) 'failed for do1_lnT', k
@@ -403,13 +441,16 @@
 
          end subroutine show_errors
 
-
          subroutine do_alloc(ierr)
             integer, intent(out) :: ierr
+            integer :: sz
+            sz = max(nz, nz_old) + 1
             call do_work_arrays(.true.,ierr)
-            xa_c0(1:nz_old,1:species) => xa1_c0(1:nz_old*species)
-            xa_c1(1:nz_old,1:species) => xa1_c1(1:nz_old*species)
-            xa_c2(1:nz_old,1:species) => xa1_c2(1:nz_old*species)
+            allocate( &
+               dqbar(sz), dqbar_old(sz), new_r(sz), Vol_new(sz), xq_old_plus1(sz), &
+               xout_old(sz), xout_new(sz), xq_new(sz), energy_new(sz), density_new(sz), &
+               tmp1(sz), tmp2(sz), tmp3(sz), tmp4(sz), tmp5(sz), tmp6(sz), tmp7(sz), &
+               xa_c0(sz,species), xa_c1(sz,species), xa_c2(sz,species))            
          end subroutine do_alloc
 
          subroutine dealloc
@@ -422,71 +463,9 @@
             logical, intent(in) :: alloc_flag
             integer, intent(out) :: ierr
             logical, parameter :: crit = .false.
-            integer :: tmp_sz
             ierr = 0
-            tmp_sz = max(nz, nz_old) + 1
-            call work_array(s, alloc_flag, crit, &
-                tmp1, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                tmp2, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                tmp3, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                tmp4, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                tmp5, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                tmp6, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                tmp7, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xq_new, tmp_sz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
             call work_array(s, alloc_flag, crit, &
                 work, (nz_old+1)*pm_work_size, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xq_old_plus1, nz_old+1, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xout_old, nz_old, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xout_new, nz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                density_new, nz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                energy_new, nz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                new_r, nz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                Vol_new, nz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                dqbar, nz, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                dqbar_old, nz_old, nz_alloc_extra, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xa1_c0, nz_old*species, nz_alloc_extra*species, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xa1_c1, nz_old*species, nz_alloc_extra*species, 'mesh_adjust', ierr)
-            if (ierr /= 0) return
-            call work_array(s, alloc_flag, crit, &
-                xa1_c2, nz_old*species, nz_alloc_extra*species, 'mesh_adjust', ierr)
             if (ierr /= 0) return
          end subroutine do_work_arrays
 
@@ -591,7 +570,7 @@
       subroutine do_prune_mesh_surface( &
             s, nz, nz_old, xh_old, xa_old, &
             j_rot_old, i_rot_old, omega_old, D_omega_old, am_nu_rot_old, &
-            conv_vel_old, lnT_old, &
+            mlt_vc_old, lnT_old, &
             dPdr_dRhodr_info_old, nu_ST_old, D_ST_old, D_DSI_old, D_SH_old, &
             D_SSI_old, D_ES_old, D_GSF_old, D_mix_old, &
             xh, xa, ierr)
@@ -599,7 +578,7 @@
          integer, intent(in) :: nz, nz_old
          real(dp), dimension(:), pointer :: &
             j_rot_old, i_rot_old, omega_old, &
-            D_omega_old, am_nu_rot_old, conv_vel_old, lnT_old, &
+            D_omega_old, am_nu_rot_old, mlt_vc_old, lnT_old, &
             dPdr_dRhodr_info_old, nu_ST_old, D_ST_old, D_DSI_old, D_SH_old, &
             D_SSI_old, D_ES_old, D_GSF_old, D_mix_old
          real(dp), dimension(:,:), pointer :: xh_old, xa_old
@@ -675,8 +654,9 @@
          integer, intent(in) :: i_var, nz, nz_old, nzlo, nzhi, comes_from(:)
          real(dp),intent(in) :: center_val
          real(dp), dimension(:,:), pointer :: xh, xh_old
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, work, var_old_plus1, var_new, xq_new
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, var_old_plus1, var_new, xq_new
          integer, intent(out) :: ierr
 
          integer :: n, k
@@ -728,8 +708,9 @@
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old, nzlo, nzhi, comes_from(:)
          real(dp), dimension(:,:), pointer :: xh, xh_old
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, work, L_old_plus1, L_new, xq_new
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, L_old_plus1, L_new, xq_new
          integer, intent(out) :: ierr
 
          integer :: n, i_lum, k
@@ -786,8 +767,9 @@
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old, nzlo, nzhi, comes_from(:)
          real(dp), dimension(:,:), pointer :: xh, xh_old
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, work, cv_old_plus1, cv_new, xq_new
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, cv_old_plus1, cv_new, xq_new
          integer, intent(out) :: ierr
 
          integer :: n, i_ln_cvpv0, k
@@ -844,8 +826,9 @@
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old, nzlo, nzhi, comes_from(:)
          real(dp), dimension(:,:), pointer :: xh, xh_old
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, work, alpha_RTI_old_plus1, alpha_RTI_new, xq_new
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, alpha_RTI_old_plus1, alpha_RTI_new, xq_new
          integer, intent(out) :: ierr
 
          integer :: n, i_alpha_RTI, k
@@ -890,62 +873,6 @@
       end subroutine do_alpha_RTI
 
 
-      subroutine do_Eturb( &  
-            ! this is not being careful to conserve Eturb.  may need to improve.
-            ! similarly not taking Eturb into account in adjusting lnT to conserve energy.
-            s, nz, nz_old, nzlo, nzhi, comes_from, xh, xh_old, &
-            xq, xq_old_plus1, xq_new, work, eturb_old_plus1, eturb_new, ierr)
-         use interp_1d_def
-         use interp_1d_lib
-         type (star_info), pointer :: s
-         integer, intent(in) :: nz, nz_old, nzlo, nzhi, comes_from(:)
-         real(dp), dimension(:,:), pointer :: xh, xh_old
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, work, eturb_old_plus1, eturb_new, xq_new
-         integer, intent(out) :: ierr
-
-         integer :: n, i_eturb, k
-
-         include 'formats'
-
-         ierr = 0
-         i_eturb = s% i_eturb
-         n = nzhi - nzlo + 1
-
-         do k=1,nz_old
-            eturb_old_plus1(k) = xh_old(i_eturb,k)
-         end do
-         eturb_old_plus1(nz_old+1) = 0
-
-         call interpolate_vector( &
-               nz_old+1, xq_old_plus1, n, xq_new, &
-               eturb_old_plus1, eturb_new, interp_pm, nwork, work, &
-               'mesh_adjust do_Eturb', ierr)
-         if (ierr /= 0) then
-            return
-         end if
-
-         do k=nzlo,nzhi
-            xh(i_eturb,k) = max(0d0,eturb_new(k+1-nzlo))
-         end do
-
-         n = nzlo - 1
-         if (n > 0) then
-            do k=1,n
-               xh(i_eturb,k) = xh_old(i_eturb,k)
-            end do
-         end if
-
-         if (nzhi < nz) then
-            n = nz - nzhi - 1 ! nz-n = nzhi+1
-            do k=0,n
-               xh(i_eturb,nz-k) = xh_old(i_eturb,nz_old-k)
-            end do
-         end if
-
-      end subroutine do_Eturb
-
-
       subroutine do_interp_pt_val( &
             s, nz, nz_old, nzlo, nzhi, val, val_old, center_val, &
             xq, xq_old_plus1, xq_new, force_non_negative, &
@@ -956,8 +883,9 @@
          integer, intent(in) :: nz, nz_old, nzlo, nzhi
          real(dp), dimension(:), pointer :: val, val_old
          real(dp), intent(in) :: center_val
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, xq_new, work, val_old_plus1, val_new
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, xq_new, val_old_plus1, val_new
          logical, intent(in) :: force_non_negative
          integer, intent(out) :: ierr
          integer :: n, k
@@ -1015,8 +943,9 @@
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old, nzlo, nzhi
          real(dp), dimension(:), pointer :: val_new_out, val_old
-         real(dp), dimension(:), pointer :: &
-            xq, xq_old_plus1, dq, dq_old, work, val_old_plus1, val_new
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, dq, dq_old, val_old_plus1, val_new
          integer, intent(out) :: ierr
 
          real(dp), pointer, dimension(:) :: &
@@ -1111,15 +1040,15 @@
          integer :: cell_type(:)
          real(dp), dimension(:,:), pointer :: xh, xh_old
          real(dp), intent(in) :: xmstar
-         real(dp), dimension(:), pointer :: lnd_old, lnPgas_old, &
-            dqbar, dqbar_old, old_r, old_m, old_rho, &
-            xq, dq, dq_old, xq_old_plus1, density_new, work, &
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            lnd_old, lnPgas_old, dqbar, dqbar_old, old_r, old_m, old_rho, &
+            xq, dq, dq_old, xq_old_plus1, density_new, &
             Vol_old_plus1, Vol_new, new_r, Vol_init, &
             interp_Vol_new, interp_xq, density_init
          integer, intent(out) :: ierr
 
-         integer :: k, from_k, kk, n, interp_lo, interp_hi, interp_n, &
-            num_revise, i_lnR, i_lnd
+         integer :: k, from_k, kk, n, interp_lo, interp_hi, interp_n, num_revise
          real(dp) :: Vol_min, Vol_max, cell_Vol, Vol_center, Vm1, V00, Vp1
 
          logical, parameter :: dbg = .false., trace_PE_residual = .false.
@@ -1129,8 +1058,6 @@
          ! NOTE: for interpolating volume, need to add point at center
 
          ierr = 0
-         i_lnR = s% i_lnR
-         i_lnd = s% i_lnd
 
          interp_lo = max(1, nzlo-1)
          interp_hi = min(nz, nzhi+1)
@@ -1238,7 +1165,7 @@
             call set1_new_r(k+1)
 
             if (cell_type(k) == unchanged_type) then
-               xh(i_lnd,k) = lnd_old(comes_from(k))
+               call store_lnd_in_xh(s, k, lnd_old(comes_from(k)), xh)
                density_new(k) = old_rho(comes_from(k))
                cycle
             end if
@@ -1265,7 +1192,7 @@
                ierr = -1; cycle
             end if
             density_new(k) = xmstar*dq(k)/cell_Vol
-            xh(i_lnd,k) = log(density_new(k))
+            call store_rho_in_xh(s, k, density_new(k), xh)
 
          end do
 
@@ -1309,14 +1236,14 @@
          do k=1,nz
             from_k = comes_from(k)
             if (new_r(k) == old_r(from_k)) then
-               xh(i_lnR,k) = xh_old(i_lnR,from_k)
+               xh(s%i_lnR,k) = xh_old(s%i_lnR,from_k)
             else
-               xh(i_lnR,k) = log(new_r(k))
+               call store_r_in_xh(s,k,new_r(k),xh)
             end if
             if (density_new(k) == old_rho(from_k)) then
-               xh(i_lnd,k) = lnd_old(from_k)
+               xh(s%i_lnd,k) = xh_old(s%i_lnd,from_k)
             else 
-               xh(i_lnd,k) = log(density_new(k))
+               call store_rho_in_xh(s,k,density_new(k),xh)
             end if
          end do
 
@@ -1344,8 +1271,9 @@
          use chem_def, only: chem_isos
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old, species, k, cell_type(:), comes_from(:)
-         real(dp), dimension(:,:), pointer :: xa, xa_old, xa_c0, xa_c1, xa_c2
-         real(dp), dimension(:), pointer :: xq, dq, xq_old,  dq_old
+         real(dp), dimension(:,:), pointer :: xa, xa_old
+         real(dp), dimension(:,:) :: xa_c0, xa_c1, xa_c2
+         real(dp), dimension(:), pointer :: xq, dq, xq_old, dq_old
          logical, intent(in) :: mesh_adjust_use_quadratic
          integer, intent(out) :: ierr
 
@@ -1465,19 +1393,19 @@
             species, cell_type, comes_from, &
             xa, xh, xh_old, &
             xq, dq, xq_old, dq_old, eta_old, energy_old, lnT_old, &
-            specific_PE_old, specific_KE_old, eturb_old, &
+            specific_PE_old, specific_KE_old, w_old, &
             density_new, energy_new, ierr)
          use eos_def
          use star_utils, only: set_rmid, cell_specific_PE, cell_specific_KE
          type (star_info), pointer :: s
          integer, intent(in) :: nz_old, k, species, cell_type(:), comes_from(:)
          real(dp), dimension(:,:), pointer :: xa, xh, xh_old
-         real(dp), dimension(:), pointer :: &
+         real(dp), dimension(:) :: &
             xq, dq, xq_old, dq_old, eta_old, energy_old, lnT_old, &
-            specific_PE_old, specific_KE_old, eturb_old, density_new, energy_new
+            specific_PE_old, specific_KE_old, w_old, density_new, energy_new
          integer, intent(out) :: ierr
 
-         integer :: k_old, k_old_last, i_lnT, lnT_order, energy_order
+         integer :: k_old, k_old_last, lnT_order, energy_order
          real(dp) :: &
             Rho, logRho, xq_outer, cell_dq, avg_energy, avg_PE, avg_KE, &
             new_PE, new_KE, max_delta_energy, delta_energy, revised_energy, &
@@ -1488,12 +1416,11 @@
          include 'formats'
 
          ierr = 0
-         i_lnT = s% i_lnT
          new_xa(:) = xa(:,k)
          k_old = comes_from(k)
 
          if (cell_type(k) == unchanged_type) then
-            xh(i_lnT, k) = xh_old(i_lnT, k_old)
+            xh(s%i_lnT, k) = xh_old(s%i_lnT, k_old)
             energy_new(k) = energy_old(k_old)
             if (is_bad(energy_old(k_old))) then
                write(*,2) 'energy_old(k_old)', k_old, energy_old(k_old)
@@ -1506,7 +1433,7 @@
          cell_dq = dq(k)
 
          if (cell_type(k) == revised_type) then
-            avg_lnT = xh_old(i_lnT, k_old)
+            avg_lnT = get_lnT_from_xh(s, k, xh_old)
          else ! find average lnT between xq_outer and xq_inner
             call get_old_value_integral( &
                k, k_old, nz_old, xq_old, dq_old, xq_outer, cell_dq, &
@@ -1529,7 +1456,7 @@
          end if
 
          if (.not. s% mesh_adjust_get_T_from_E) then
-            xh(i_lnT, k) = avg_lnT
+            call store_lnT_in_xh(s, k, avg_lnT, xh)
             energy_new(k) = energy_old(k_old)
             if (is_bad(energy_old(k_old))) then
                write(*,2) 'energy_old(k_old)', k_old, energy_old(k_old)
@@ -1539,7 +1466,7 @@
          end if
 
          if (eta_old(k_old) >= eta_limit) then
-            xh(i_lnT, k) = avg_lnT
+            call store_lnT_in_xh(s, k, avg_lnT, xh)
             energy_new(k) = energy_old(k_old)
             if (is_bad(energy_old(k_old))) then
                write(*,2) 'eta_old(k_old)', k_old, eta_old(k_old)
@@ -1599,8 +1526,6 @@
                avg_KE = sum_energy/cell_dq
             end if
          
-            s% r(k) = exp(s% xh(s% i_lnr,k))
-            if (k < s% nz) s% r(k+1) = exp(s% xh(s% i_lnr,k+1))
             if (ierr /= 0) return
             new_PE = cell_specific_PE(s,k,d_dlnR00,d_dlnRp1)
             if (s% u_flag) then
@@ -1614,10 +1539,6 @@
             max_delta_energy = avg_energy*s% max_rel_delta_IE_for_mesh_total_energy_balance
             delta_energy = avg_PE + avg_KE - (new_PE + new_KE)
             if (abs(delta_energy) > max_delta_energy) then
-               if (s% show_mesh_changes) &
-                  write(*,2) 'remesh: delta_energy too large to fix completely', k, &
-                     delta_energy, max_delta_energy, &
-                     specific_PE_old(k_old), specific_KE_old(k_old), eturb_old(k_old)
                delta_energy = sign(max_delta_energy,delta_energy)
             end if
             energy_new(k) = avg_energy + delta_energy
@@ -1643,8 +1564,8 @@
             energy_new(k) = energy_old(k_old)
             ierr = 0
          end if
-
-         xh(i_lnT,k) = new_lnT
+         
+         call store_lnT_in_xh(s, k, new_lnT, xh)
 
          if (ierr /= 0) then
             write(*,2) 'mesh_adjust do1_lnT ierr', ierr
@@ -1786,7 +1707,7 @@
             s, k, h1, he3, he4, species, xa, tol, &
             Rho, logRho, energy, lnT_guess, lnT, result_energy, ierr)
          use eos_support, only: solve_eos_given_DE
-         use eos_def, only: num_eos_basic_results, i_lnE
+         use eos_def, only: num_eos_basic_results, num_eos_d_dxa_results, i_lnE
          use chem_lib, only: basic_composition_info
          type (star_info), pointer :: s
          integer, intent(in) :: k, h1, he3, he4, species
@@ -1797,25 +1718,22 @@
          real(dp) :: &
             X, Y, Z, T, logT, res(num_eos_basic_results), &
             d_dlnd(num_eos_basic_results), d_dlnT(num_eos_basic_results), &
-            d_dabar(num_eos_basic_results), d_dzbar(num_eos_basic_results), &
-            abar, zbar, z53bar, z2bar, ye, mass_correction, sumx, logT_tol, logE_tol
+            d_dxa(num_eos_d_dxa_results, s% species), &
+            logT_tol, logE_tol
          integer :: j
 
          include 'formats'
 
          ierr = 0
 
-         call basic_composition_info(species, s% chem_id, xa(:), X, Y, Z, &
-               abar, zbar, z2bar, z53bar, ye, mass_correction, sumx)
-
          logT_tol = tol ! 1d-11
          logE_tol = tol ! 1d-11
          call solve_eos_given_DE( &
-            s, k, Z, X, abar, zbar, xa(:), &
+            s, k, xa(:), &
             logRho, log10(energy), lnT_guess/ln10, &
             logT_tol, logE_tol, &
             logT, res, d_dlnd, d_dlnT, &
-            d_dabar, d_dzbar, &
+            d_dxa, &
             ierr)
          lnT = logT*ln10
          
@@ -1843,10 +1761,6 @@
             write(*,1) 'logRho =', logRho
             write(*,1) 'logT_guess =', lnT_guess/ln10
             write(*,1) 'energy =', energy
-            write(*,1) 'Z =', Z
-            write(*,1) 'X =', X
-            write(*,1) 'abar =', abar
-            write(*,1) 'zbar =', zbar
             write(*,*)
             write(*,*)
          end subroutine show
@@ -2082,7 +1996,7 @@
          use alloc
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old
-         integer, dimension(:), pointer :: comes_from
+         integer, dimension(:) :: comes_from
          real(dp), dimension(:) :: &
             old_xq, new_xq, old_dq, new_dq, old_j_rot, &
             xout_old, xout_new, old_dqbar, new_dqbar
@@ -2111,7 +2025,7 @@
          ! set new value for s% omega(k)
          type (star_info), pointer :: s
          integer, intent(in) :: k, nz, nz_old
-         integer, dimension(:), pointer :: comes_from
+         integer, dimension(:) :: comes_from
          real(dp), dimension(:), intent(in) :: &
             xout_old, xout_new, old_dqbar, new_dqbar, old_j_rot
          real(dp), intent(in) :: xh(:,:)
@@ -2248,7 +2162,7 @@
          end do
 
          s% j_rot(k) = j_tot/dq_sum
-         r00 = exp(xh(s% i_lnR, k))
+         r00 = get_r_from_xh(s,k)
          if (s% fitted_fp_ft_i_rot) then
             s% w_div_w_crit_roche(k) = &
                w_div_w_roche_jrot(r00,s% m(k),s% j_rot(k),s% cgrav(k), &
@@ -2275,7 +2189,7 @@
          use alloc
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old
-         integer, dimension(:), pointer :: cell_type, comes_from
+         integer, dimension(:) :: cell_type, comes_from
          real(dp), dimension(:) :: &
             xout_old, xout_new, old_dqbar, new_dqbar, &
             old_xq, new_xq, old_dq, new_dq, old_ke
@@ -2343,7 +2257,7 @@
          ! set new value for s% v(k) to conserve kinetic energy
          type (star_info), pointer :: s
          integer, intent(in) :: k, nz, nz_old, i_v
-         integer, dimension(:), pointer :: cell_type, comes_from
+         integer, dimension(:) :: cell_type, comes_from
          real(dp), dimension(:), intent(in) :: &
             xout_old, xout_new, old_dqbar, new_dqbar, old_ke
          real(dp), dimension(:,:) :: xh, xh_old
@@ -2533,7 +2447,7 @@
          use alloc
          type (star_info), pointer :: s
          integer, intent(in) :: nz, nz_old
-         integer, dimension(:), pointer :: cell_type, comes_from
+         integer, dimension(:) :: cell_type, comes_from
          real(dp), dimension(:) :: &
             xout_old, xout_new, old_xq, new_xq, old_dq, new_dq, old_ke
          real(dp), dimension(:,:) :: xh, xh_old
@@ -2592,7 +2506,7 @@
          ! set new value for s% u(k) to conserve kinetic energy
          type (star_info), pointer :: s
          integer, intent(in) :: k, nz, nz_old, i_u
-         integer, dimension(:), pointer :: cell_type, comes_from
+         integer, dimension(:) :: cell_type, comes_from
          real(dp), dimension(:), intent(in) :: &
             xout_old, xout_new, old_dq, new_dq, old_ke
          real(dp), dimension(:,:) :: xh, xh_old
@@ -2758,6 +2672,288 @@
          end if
 
       end subroutine adjust1_u
+
+
+      subroutine do_Hp_face( &
+            s, nz, nz_old, nzlo, nzhi, comes_from, xh, xh_old, &
+            xq, xq_old_plus1, xq_new, work, Hp_face_old_plus1, Hp_face_new, ierr)
+         use interp_1d_def
+         use interp_1d_lib
+         type (star_info), pointer :: s
+         integer, intent(in) :: nz, nz_old, nzlo, nzhi, comes_from(:)
+         real(dp), dimension(:,:), pointer :: xh, xh_old
+         real(dp), dimension(:), pointer :: work
+         real(dp), dimension(:) :: &
+            xq, xq_old_plus1, Hp_face_old_plus1, Hp_face_new, xq_new
+         integer, intent(out) :: ierr
+
+         integer :: n, i_Hp, k
+
+         include 'formats'
+
+         ierr = 0
+         i_Hp = s% i_Hp
+         if (i_Hp == 0) return
+         n = nzhi - nzlo + 1
+
+         do k=1,nz_old
+            Hp_face_old_plus1(k) = xh_old(i_Hp,k)
+         end do
+         Hp_face_old_plus1(nz_old+1) = Hp_face_old_plus1(nz_old)
+
+         call interpolate_vector( &
+               nz_old+1, xq_old_plus1, n, xq_new, &
+               Hp_face_old_plus1, Hp_face_new, interp_pm, nwork, work, &
+               'mesh_adjust do_Hp_face', ierr)
+         if (ierr /= 0) then
+            return
+            write(*,*) 'interpolate_vector failed in do_Hp_face for remesh'
+            stop 'debug: mesh adjust: do_Hp_face'
+         end if
+
+         do k=nzlo,nzhi
+            xh(i_Hp,k) = Hp_face_new(k+1-nzlo)
+         end do
+
+         n = nzlo - 1
+         if (n > 0) then
+            do k=1,n
+               xh(i_Hp,k) = xh_old(i_Hp,k)
+            end do
+         end if
+
+         if (nzhi < nz) then
+            n = nz - nzhi - 1 ! nz-n = nzhi+1
+            do k=0,n
+               xh(i_Hp,nz-k) = xh_old(i_Hp,nz_old-k)
+            end do
+         end if
+
+      end subroutine do_Hp_face
+
+      
+      subroutine do_etrb( & ! same logic as do_u
+            s, nz, nz_old, cell_type, comes_from, &
+            old_xq, new_xq, old_dq, new_dq, xh, xh_old, &
+            xout_old, xout_new, old_eturb, ierr)
+         use alloc
+         type (star_info), pointer :: s
+         integer, intent(in) :: nz, nz_old
+         integer, dimension(:) :: cell_type, comes_from
+         real(dp), dimension(:) :: &
+            xout_old, xout_new, old_xq, new_xq, old_dq, new_dq, old_eturb
+         real(dp), dimension(:,:) :: xh, xh_old
+         integer, intent(out) :: ierr
+
+         integer :: k, j, op_err, old_k, new_k, i_w
+         real(dp) :: old_eturb_tot, new_eturb_tot, xmstar, err
+
+         include 'formats'
+         ierr = 0
+         i_w = s% i_w
+         xmstar = s% xmstar
+
+         old_eturb_tot = 0d0
+         do k=1,nz_old
+            old_eturb(k) = old_dq(k)*pow2(xh_old(i_w,k))
+            old_eturb_tot = old_eturb_tot + old_eturb(k)
+         end do
+
+!$OMP PARALLEL DO PRIVATE(k,op_err) SCHEDULE(dynamic,2)
+         do k = 1, nz
+            op_err = 0
+            call adjust1_etrb( &
+               s, k, nz, nz_old, cell_type, comes_from, xout_old, xout_new, &
+               old_dq, new_dq, old_eturb, i_w, xh, xh_old, op_err)
+            if (op_err /= 0) ierr = op_err
+         end do
+!$OMP END PARALLEL DO
+         if (ierr /= 0) then
+            return
+         end if
+
+         new_eturb_tot = 0
+         do k=1,nz
+            new_eturb_tot = new_eturb_tot + new_dq(k)*pow2(xh(i_w,k))
+         end do
+
+         err = abs(old_eturb_tot - new_eturb_tot)/max(new_eturb_tot,old_eturb_tot,1d0)
+         s% mesh_adjust_Eturb_conservation = err
+
+         if (s% trace_mesh_adjust_error_in_conservation) then
+            write(*,2) 'mesh adjust error in conservation of turbulent energy', s% model_number, &
+               err, new_eturb_tot, old_eturb_tot
+            if (err > 1d-10) then
+               write(*,*) 'err too large'
+               stop 'do_etrb'
+            end if
+         end if
+
+      end subroutine do_etrb
+
+
+      subroutine adjust1_etrb( &
+            s, k, nz, nz_old, cell_type, comes_from, xout_old, xout_new, &
+            old_dq, new_dq, old_eturb, i_w, xh, xh_old, ierr)
+         ! set new value for s% w(k) to conserve turbulent energy
+         type (star_info), pointer :: s
+         integer, intent(in) :: k, nz, nz_old, i_w
+         integer, dimension(:) :: cell_type, comes_from
+         real(dp), dimension(:), intent(in) :: &
+            xout_old, xout_new, old_dq, new_dq, old_eturb
+         real(dp), dimension(:,:) :: xh, xh_old
+         integer, intent(out) :: ierr
+
+         real(dp) :: xq_outer, xq_inner, eturb_sum, &
+            xq0, xq1, new_cell_dq, dq_sum, dq
+         integer :: kk, k_outer, j
+
+         integer, parameter :: k_dbg = -1
+
+         include 'formats'
+
+         ierr = 0
+
+         if (cell_type(k) == unchanged_type .or. &
+               cell_type(k) == revised_type) then
+            ! just copy the old value
+            if (k == 1) then
+               xh(i_w,k) = xh_old(i_w,comes_from(k))
+               return
+            end if
+            if (cell_type(k-1) == unchanged_type) then
+               xh(i_w,k) = xh_old(i_w,comes_from(k))
+               return
+            end if
+         end if
+
+         xq_outer = xout_new(k)
+         new_cell_dq = new_dq(k)
+         if (k < nz) then
+            xq_inner = xq_outer + new_cell_dq
+         else
+            xq_inner = 1d0
+         end if
+
+         if (k == k_dbg) then
+            write(*,2) 'xq_outer', k, xq_outer
+            write(*,2) 'xq_inner', k, xq_inner
+            write(*,2) 'new_cell_dq', k, new_cell_dq
+         end if
+
+         dq_sum = 0d0
+         eturb_sum = 0
+         if (xq_outer >= xout_old(nz_old)) then
+            ! new contained entirely in old center zone
+            k_outer = nz_old
+            if (k == k_dbg) &
+               write(*,2) 'new contained in old center', &
+                  k_outer, xout_old(k_outer)
+         else if (k == 1) then
+            k_outer = 1
+         else
+            k_outer = comes_from(k-1)
+         end if
+
+         do kk = k_outer, nz_old ! loop until reach xq_inner
+
+            if (kk == nz_old) then
+               xq1 = 1d0
+            else
+               xq1 = xout_old(kk+1)
+            end if
+            if (xq1 <= xq_outer) cycle
+
+            if (xq1 < xq_outer) then
+               ierr = -1
+               return
+            end if
+
+            xq0 = xout_old(kk)
+            if (xq0 >= xq_outer .and. xq1 <= xq_inner) then ! entire old kk is in new k
+
+               dq = old_dq(kk)
+               dq_sum = dq_sum + dq
+
+               if (dq_sum > new_cell_dq) then
+                  ! dq too large -- numerical roundoff problems
+                  dq = dq - (new_cell_dq - dq_sum)
+                  dq_sum = new_cell_dq
+               end if
+
+               eturb_sum = eturb_sum + old_eturb(kk)*dq/old_dq(kk)
+
+               if (k == k_dbg) &
+                  write(*,3) 'new k contains all of old kk', &
+                     k, kk, old_eturb(kk)*dq, eturb_sum
+
+            else if (xq0 <= xq_outer .and. xq1 >= xq_inner) then ! entire new k is in old kk
+
+               dq = new_dq(k)
+               dq_sum = dq_sum + dq
+               eturb_sum = eturb_sum + old_eturb(kk)*dq/old_dq(kk)
+
+               if (k == k_dbg) &
+                  write(*,3) 'all new k is in old kk', &
+                     k, kk, old_eturb(kk)*dq, eturb_sum
+
+            else ! only use the part of old kk that is in new k
+
+               if (k == k_dbg) then
+                  write(*,*) 'only use the part of old kk that is in new k', xq_inner <= xq1
+                  write(*,1) 'xq_outer', xq_outer
+                  write(*,1) 'xq_inner', xq_inner
+                  write(*,1) 'xq0', xq0
+                  write(*,1) 'xq1', xq1
+                  write(*,1) 'dq_sum', dq_sum
+                  write(*,1) 'new_cell_dq', new_cell_dq
+                  write(*,1) 'new_cell_dq - dq_sum', new_cell_dq - dq_sum
+               end if
+
+               if (xq_inner <= xq1) then ! this is the last part of new k
+
+                  dq = new_cell_dq - dq_sum
+                  dq_sum = new_cell_dq
+
+               else ! we avoid this case if possible because of numerical roundoff
+
+                  if (k == k_dbg) write(*,3) 'we avoid this case if possible', k, kk
+
+                  dq = max(0d0, xq1 - xq_outer)
+                  if (dq_sum + dq > new_cell_dq) dq = new_cell_dq - dq_sum
+                  dq_sum = dq_sum + dq
+
+               end if
+
+               if (k == k_dbg) then
+                  write(*,3) 'new k use only part of old kk', k, kk
+                  write(*,2) 'dq_sum', k, dq_sum
+                  write(*,2) 'dq', k, dq
+                  write(*,2) 'old_eturb(kk)', kk, old_eturb(kk)
+                  write(*,2) 'old eturb_sum', k, eturb_sum
+                  write(*,2) 'new eturb_sum', k, eturb_sum + old_eturb(kk)*dq
+               end if
+
+               eturb_sum = eturb_sum + old_eturb(kk)*dq/old_dq(kk)
+
+               if (dq <= 0) then
+                  ierr = -1
+                  !return
+                  write(*,*) 'dq <= 0', dq
+                  stop 'debugging: adjust1_etrb'
+               end if
+
+            end if
+
+            if (dq_sum >= new_cell_dq) then
+               exit
+            end if
+
+         end do
+
+         xh(i_w,k) = sqrt(max(0d0,eturb_sum/new_cell_dq))
+
+      end subroutine adjust1_etrb
 
 
 

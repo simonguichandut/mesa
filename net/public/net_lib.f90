@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010  Bill Paxton
+!   Copyright (C) 2010  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -590,7 +590,7 @@
             x, temp, log10temp, rho, log10rho,  &
             abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
             rate_factors, weak_rate_factor, &
-            reaction_Qs, reaction_neuQs, reuse_rate_raw, reuse_rate_screened, &
+            reaction_Qs, reaction_neuQs, &
             eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
             dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
             screening_mode,  &
@@ -635,7 +635,6 @@
          real(dp), intent(in) :: weak_rate_factor
          real(dp), pointer, intent(in) :: reaction_Qs(:) ! (rates_reaction_id_max)
          real(dp), pointer, intent(in) :: reaction_neuQs(:) ! (rates_reaction_id_max)
-         logical, intent(in) :: reuse_rate_raw, reuse_rate_screened ! if true. use given rate_screened
 
          real(dp), intent(out) :: eps_nuc ! ergs/g/s from burning after subtract reaction neutrinos
          real(dp), intent(out) :: d_eps_nuc_dT
@@ -690,7 +689,7 @@
                x, temp, log10temp, rho, log10rho,  &
                abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
                rate_factors, weak_rate_factor, &
-               reaction_Qs, reaction_neuQs, reuse_rate_raw, reuse_rate_screened, &
+               reaction_Qs, reaction_neuQs, &
                eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
                dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
                screening_mode,  &
@@ -791,8 +790,7 @@
          type (Net_General_Info), pointer :: g
          real(dp), pointer, dimension(:) :: actual_Qs, actual_neuQs
          logical, pointer :: from_weaklib(:) ! ignore if null
-         logical, parameter :: symbolic = .false., &
-            reuse_rate_raw = .false., reuse_rate_screened = .false.
+         logical, parameter :: symbolic = .false.
 
          real(dp) :: eps_nuc, d_eps_nuc_dT, d_eps_nuc_dRho, eps_neu_total
          
@@ -833,7 +831,7 @@
                x, temp, log10temp, rho, log10rho,  &
                abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
                rate_factors, weak_rate_factor, &
-               reaction_Qs, reaction_neuQs, reuse_rate_raw, reuse_rate_screened, &
+               reaction_Qs, reaction_neuQs, &
                eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
                dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
                screening_mode,  &
@@ -954,7 +952,7 @@
             x, temp, log10temp, rho, log10rho,  &
             abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
             rate_factors, weak_rate_factor, &
-            reaction_Qs, reaction_neuQs, .false., .false., &
+            reaction_Qs, reaction_neuQs, &
             eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
             dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
             screening_mode,  &
@@ -969,7 +967,7 @@
             x, temp, log10temp, rho, log10rho,  &
             abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
             rate_factors, weak_rate_factor, &
-            reaction_Qs, reaction_neuQs, reuse_rate_raw, reuse_rate_screened, &
+            reaction_Qs, reaction_neuQs, &
             eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
             dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
             screening_mode,  &
@@ -997,7 +995,6 @@
          real(dp), intent(in) :: weak_rate_factor
          real(dp), pointer, intent(in) :: reaction_Qs(:) ! (rates_reaction_id_max)
          real(dp), pointer, intent(in) :: reaction_neuQs(:) ! (rates_reaction_id_max)
-         logical, intent(in) :: reuse_rate_raw, reuse_rate_screened
          real(dp), intent(out) :: eps_nuc ! ergs/g/s from burning after subtract reaction neutrinos
          real(dp), intent(out) :: d_eps_nuc_dT
          real(dp), intent(out) :: d_eps_nuc_dRho
@@ -1038,7 +1035,7 @@
             x, temp, log10temp, rho, log10rho,  &
             abar, zbar, z2bar, ye, eta, d_eta_dlnT, d_eta_dlnRho, &
             rate_factors, weak_rate_factor, &
-            reaction_Qs, reaction_neuQs, reuse_rate_raw, reuse_rate_screened, &
+            reaction_Qs, reaction_neuQs, &
             eps_nuc, d_eps_nuc_dRho, d_eps_nuc_dT, d_eps_nuc_dx,  &
             dxdt, d_dxdt_dRho, d_dxdt_dT, d_dxdt_dx,  &
             screening_mode,  &
@@ -1070,13 +1067,12 @@
 
       ! a 1-zone integrator for nets -- for given temperature and density as functions of time
       subroutine net_1_zone_burn( &
-            handle, num_isos, num_reactions, t_start, t_end, starting_x, &
+            net_handle, eos_handle, num_isos, num_reactions, t_start, t_end, starting_x, &
             num_times_for_interpolation, times, log10Ts_f1, log10Rhos_f1, etas_f1, &
             dxdt_source_term, rate_factors, &
             weak_rate_factor, reaction_Qs, reaction_neuQs, &
             screening_mode, &
             stptry, max_steps, eps, odescal, &
-            okay_to_reuse_rate_screened, &
             use_pivoting, trace, dbg, burner_finish_substep, &
             burn_lwork, burn_work_array, &
             net_lwork, net_work_array, &
@@ -1087,7 +1083,7 @@
          use net_def
          use chem_def, only: num_categories
          
-         integer, intent(in) :: handle
+         integer, intent(in) :: net_handle, eos_handle
          integer, intent(in) :: num_isos
          integer, intent(in) :: num_reactions
          real(dp), intent(in) :: t_start, t_end, starting_x(:) ! (num_isos)
@@ -1107,13 +1103,6 @@
          real(dp), intent(in) :: stptry ! try this for 1st step.  0 means try in 1 step.
          integer, intent(in) :: max_steps ! maximal number of allowed steps.
          real(dp), intent(in) :: eps, odescal ! tolerances.  e.g., set both to 1d-6
-         logical, intent(in) :: okay_to_reuse_rate_screened
-            ! this flag should be false if there will be large changes in composition.
-            ! if the composition changes will be small, then can gain efficiency
-            ! by only evaluating the screening factors for the starting composition.
-            ! reuse_rate_raw should be false unless reuse_rate_screened is true, and
-            ! there is no change in temperature or density since the last call.
-            ! in both cases, the burn_work_array must be the same as used previously.
          logical, intent(in) :: use_pivoting ! for matrix solves
          logical, intent(in) :: trace, dbg
          interface
@@ -1133,12 +1122,11 @@
          integer, intent(out) :: ierr
          
          call burn_1_zone( &
-            handle, num_isos, num_reactions, t_start, t_end, starting_x, &
+            net_handle, eos_handle, num_isos, num_reactions, t_start, t_end, starting_x, &
             num_times_for_interpolation, times, log10Ts_f1, log10Rhos_f1, etas_f1, &
             dxdt_source_term, rate_factors, weak_rate_factor, &
             reaction_Qs, reaction_neuQs, screening_mode, &
             stptry, max_steps, eps, odescal, &
-            okay_to_reuse_rate_screened, &
             use_pivoting, trace, dbg, burner_finish_substep, &
             burn_lwork, burn_work_array, &
             net_lwork, net_work_array, &
@@ -1186,7 +1174,7 @@
       ! a 1-zone integrator for nets -- for given density
       ! evolve lnT according to dlnT/dt = eps_nuc/(Cv*T)
       subroutine net_1_zone_burn_const_density( &
-            handle, num_isos, num_reactions, t_start, t_end, &
+            net_handle, eos_handle, num_isos, num_reactions, t_start, t_end, &
             starting_x, starting_log10T, log10Rho, &
             get_eos_info_for_burn_at_const_density, &
             rate_factors, weak_rate_factor, reaction_Qs, reaction_neuQs, &
@@ -1202,7 +1190,7 @@
          use net_def
          use chem_def, only: num_categories
          
-         integer, intent(in) :: handle, num_isos, num_reactions
+         integer, intent(in) :: net_handle, eos_handle, num_isos, num_reactions
          real(dp), intent(in) :: t_start, t_end, starting_x(:) ! (num_isos)
          real(dp), intent(in) :: starting_log10T, log10Rho
          interface
@@ -1235,7 +1223,7 @@
          integer, intent(out) :: ierr
          
          call burn_const_density_1_zone( &
-            handle, num_isos, num_isos+1, num_reactions, t_start, t_end, &
+            net_handle, eos_handle, num_isos, num_isos+1, num_reactions, t_start, t_end, &
             starting_x, starting_log10T, log10Rho, &
             get_eos_info_for_burn_at_const_density, &
             rate_factors, weak_rate_factor, reaction_Qs, reaction_neuQs, &

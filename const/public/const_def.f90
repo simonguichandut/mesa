@@ -1,6 +1,6 @@
 ! ***********************************************************************
 !
-!   Copyright (C) 2010-2020  Bill Paxton & The MESA Team
+!   Copyright (C) 2010-2020  The MESA Team
 !
 !   MESA is free software; you can use it and/or modify
 !   it under the combined terms and restrictions of the MESA MANIFESTO
@@ -68,6 +68,7 @@
       real(dp), parameter :: two_13 = 1.2599210498948730d0 ! = pow(2d0,1d0/3d0)
       real(dp), parameter :: four_13 = 1.5874010519681994d0 ! = pow(4d0,1d0/3d0)
       real(dp), parameter :: sqrt2 = 1.414213562373095d0 ! = sqrt(2)
+      real(dp), parameter :: sqrt_2_div_3 = 0.8164965809d0 ! = sqrt(2/3)
 
 ! exact physical constants
 
@@ -87,7 +88,7 @@
       real(dp), parameter :: Qconv = mev_to_ergs*avo
       real(dp), parameter :: kev = kerg / ev2erg ! converts temp to ev (ev K^-1)
       real(dp), parameter :: boltz_sigma = (pi*pi * boltzm*boltzm*boltzm*boltzm) / (60 * hbar*hbar*hbar * clight*clight) ! Stefan-Boltzmann constant (erg cm^-2 K^-4 s^-1)
-      real(dp), parameter :: crad = boltz_sigma*4/clight ! radiation density constant, a (erg cm^-3 K^-4); Prad = crad * T^4 / 3
+      real(dp), parameter :: crad = boltz_sigma*4/clight ! radiation density constant, AKA "a" (erg cm^-3 K^-4); Prad = crad * T^4 / 3
 
       ! IAU
       real(dp), parameter :: au = 1.49597870700D13 ! (cm) - exact value defined by IAU 2009, 2012

@@ -7,7 +7,7 @@
       !show_net_reactions_info = .true.
 
       load_saved_model = .true.
-      saved_model_name = 'zams.mod'
+      load_model_filename = 'zams.mod'
       
       save_model_when_terminate = .true.
       save_model_filename = 'final.mod'
@@ -31,11 +31,12 @@
 
 / ! end of star_job namelist
 
+&eos
+/ ! end of eos namelist
+
 &kap
       Zbase = 0.02d0
-
       kap_file_prefix = 'gs98'
-
 / ! end of kap namelist
 
 &controls

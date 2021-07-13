@@ -1,3 +1,9 @@
+.. _R_CrB_star:
+
+**********
+R_CrB_star
+**********
+
 This test case creates and evolves a simple model of an R Corona
 Borealis star.  The model is constructed from an 0.875 |Msun|
 homogeneous He star and evolved until it first reaches a low effective
@@ -42,10 +48,14 @@ skip to part 3.  Options shared between all parts are contained in
   temperature 20,000 K to 6,000 K so that the outer layers cross the
   opacity blend from the OPAL opacities to the AESOPUS opacities.
 
+Click to see a larger plot:
+
+.. image:: ../../../star/test_suite/R_CrB_star/docs/grid1-000709.svg
+   :scale: 100%
 
 .. |Weiss1987| replace:: `Weiss (1987) <https://ui.adsabs.harvard.edu/abs/1987A%26A...185..165W/abstract>`__           
 .. |Schwab2019| replace:: `Schwab (2019) <https://ui.adsabs.harvard.edu/abs/2019ApJ...885...27S/abstract>`__
 
 
-Last-Updated: 2020-11-16 (mesa r14909) by Josiah Schwab
+Last-Updated: 2020-11-16 (mesa r14909) by Josiah Schwab, 30may2021 (MESA 15140) by fxt.
 

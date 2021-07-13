@@ -3,7 +3,7 @@
       show_log_description_at_start = .false. 
 
       load_saved_model = .true.
-      saved_model_name = 'zams.mod'
+      load_model_filename = 'zams.mod'
 
       new_rotation_flag = .true.
       change_rotation_flag = .true.
@@ -47,7 +47,6 @@
       ignore_species_in_max_correction = .true.
 
       use_dedt_form_of_energy_eqn = .true.
-      report_solver_progress = .true.
 
       num_trace_history_values = 2
       trace_history_value_name(1) = 'rel_E_err'
@@ -76,8 +75,8 @@
 
       max_mdot_redo_cnt = 200
       min_years_dt_for_redo_mdot = 1d-5
-      surf_w_div_w_crit_limit = 0.999d0
-      surf_w_div_w_crit_tol = 0.055
+      surf_omega_div_omega_crit_limit = 0.999d0
+      surf_omega_div_omega_crit_tol = 0.055
       rotational_mdot_boost_fac = 1d10
       rotational_mdot_kh_fac = 1d10
       mdot_revise_factor = 1.1
@@ -93,7 +92,7 @@
 
       star_mass_max_limit = 25d0
 
-      varcontrol_target = 5d-4
+      !varcontrol_target = 5d-4
       delta_lg_star_mass_limit = 2d-4
       delta_lg_star_mass_hard_limit = 4d-4
    
@@ -105,6 +104,8 @@
       terminal_interval = 10
       
       write_header_frequency = 10
+      
+      !report_solver_progress = .true.
 
 /
 
