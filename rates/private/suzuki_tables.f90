@@ -29,6 +29,8 @@ module suzuki_tables
      ! neutrino energy-loss rate: nu-energy-loss: log_{10}(rate)
      ! gamma-ray heating rate: gamma-energy: log_{10}(rate)
 
+     ! dQ, Vs, and gamma are not needed by MESA
+
      integer :: num_T
      real(dp), allocatable :: logTs(:)
 
@@ -88,14 +90,12 @@ contains
 
   subroutine interpolate_suzuki_table(table, T9, lYeRho, &
        lambda, dlambda_dlnT, dlambda_dlnRho, &
-       Qneu, dQneu_dlnT, dQneu_dlnRho, &
-       delta_Q, Vs, ierr)
+       Qneu, dQneu_dlnT, dQneu_dlnRho, ierr)
     use const_def, only : dp
     class(suzuki_rate_table), intent(inout) :: table
     real(dp), intent(in) :: T9, lYeRho
     real(dp), intent(out) :: lambda, dlambda_dlnT, dlambda_dlnRho
     real(dp), intent(out) :: Qneu, dQneu_dlnT, dQneu_dlnRho
-    real(dp), intent(out) :: delta_Q, Vs
     integer, intent(out) :: ierr
 
     integer :: ix, jy          ! target cell in the spline data
@@ -110,11 +110,7 @@ contains
     real(dp) :: ldecay, d_ldecay_dlogT, d_ldecay_dlYeRho, &
          lcapture, d_lcapture_dlogT, d_lcapture_dlYeRho, &
          ldecay_nu, d_ldecay_nu_dlogT, d_ldecay_nu_dlYeRho, &
-         lcapture_nu, d_lcapture_nu_dlogT, d_lcapture_nu_dlYeRho, &
-         decay_dQ, d_decay_dQ_dlogT, d_decay_dQ_dlYeRho, &
-         capture_dQ, d_capture_dQ_dlogT, d_capture_dQ_dlYeRho, &
-         decay_Vs, d_decay_Vs_dlogT, d_decay_Vs_dlYeRho, &
-         capture_Vs, d_capture_Vs_dlogT, d_capture_Vs_dlYeRho
+         lcapture_nu, d_lcapture_nu_dlogT, d_lcapture_nu_dlYeRho
 
     real(dp) :: decay, capture, nu, decay_nu, capture_nu
 
@@ -234,83 +230,6 @@ contains
        dQneu_dlnRho = 0d0
     endif
 
-    ! get coulomb corrections
-
-    if (table % has_capture_data) then
-
-       call do_linear_interp( &
-            table % data(:,1:table%num_T,1:table%num_lYeRho,table%i_capture_dQ), &
-            capture_dQ, d_capture_dQ_dlogT, d_capture_dQ_dlYeRho, ierr)
-
-       call do_linear_interp( &
-            table % data(:,1:table%num_T,1:table%num_lYeRho,table%i_capture_Vs), &
-            capture_Vs, d_capture_Vs_dlogT, d_capture_Vs_dlYeRho, ierr)
-
-    else
-
-       capture_dQ = 0
-       capture_Vs = 0
-
-    end if
-
-
-    if (table % has_decay_data) then
-
-       call do_linear_interp( &
-            table % data(:,1:table%num_T,1:table%num_lYeRho,table%i_decay_dQ), &
-            decay_dQ, d_decay_dQ_dlogT, d_decay_dQ_dlYeRho, ierr)
-
-       call do_linear_interp( &
-            table % data(:,1:table%num_T,1:table%num_lYeRho,table%i_decay_Vs), &
-            decay_Vs, d_decay_Vs_dlogT, d_decay_Vs_dlYeRho, ierr)
-
-    else
-
-       decay_dQ = 0
-       decay_Vs = 0
-
-    end if
-
-    ! it is unclear to me why decay_dQ and capture_dQ are different.
-    ! if both are defined, we pick the one corresponding to the
-    ! process that dominates the rate.
-
-    if ((decay_dQ * capture_dQ) .eq. 0) then
-       ! this will be
-       !    capture_dQ    if decay_dQ = 0
-       !    delta_dQ      if capture_dQ = 0
-       delta_Q = (capture_dQ + decay_dQ)
-    else
-       if (capture .gt. decay) then
-          delta_Q = capture_dQ
-       else
-          delta_Q = decay_dQ
-       endif
-
-       ! if they're too different, output an error message
-       if (dbg) then
-          if (abs((capture_dQ - decay_dQ) / delta_Q) .gt. 0.0d0) then
-             write(*,*) 'difference in dQ > 0'
-             write(*,*) 'logT', logT
-             write(*,*) 'lYeRho', lYeRho
-             write(*,*) 'decay_dQ', decay_dQ
-             write(*,*) 'capture_dQ', capture_dQ
-          end if
-       end if
-       
-    end if
-
-    if ((capture_Vs * decay_Vs) .eq. 0) then
-       Vs = (capture_Vs + decay_Vs)
-    else
-       if (capture .gt. decay) then
-          Vs = capture_Vs
-       else
-          Vs = decay_Vs
-       endif
-    end if
-
-
   contains
 
     subroutine find_location ! set ix, jy; x is logT; y is lYeRho
@@ -373,7 +292,7 @@ contains
          write(*,1) 'y1', y1
          write(*,1) 'delta_lYeRho', delta_lYeRho
          write(*,1) 'y_beta', y_beta
-         !stop 'weak setup_for_linear_interp'
+         !call mesa_error(__FILE__,__LINE__,'weak setup_for_linear_interp')
       end if
 
       if (dbg) then
@@ -381,7 +300,7 @@ contains
          write(*,2) 'lYeRho', jy, y0, lYeRho, y1
          write(*,1) 'x_alfa, x_beta', x_alfa, x_beta
          write(*,1) 'y_alfa, y_beta', y_alfa, y_beta
-         write(*,*)
+         write(*,'(A)')
       end if
 
     end subroutine setup_for_linear_interp
@@ -421,7 +340,7 @@ contains
          write(*,1) 'y_beta', y_beta
          write(*,1) 'f(1,ix,jy)', f(1,ix,jy)
          write(*,1) 'f(1,ix,jy+1)', f(1,ix,jy+1)
-         !stop 'weak do_linear_interp'
+         !call mesa_error(__FILE__,__LINE__,'weak do_linear_interp')
       end if
 
     end subroutine do_linear_interp
@@ -455,9 +374,9 @@ contains
      suzuki_data_dir = trim(mesa_data_dir) // '/rates_data'
      filename = trim(suzuki_data_dir) // '/suzuki/Suzuki2016.h5'
      if (dbg) then
-        write(*,*)
+        write(*,'(A)')
         write(*,*) 'read filename <' // trim(filename) // '>'
-        write(*,*)
+        write(*,'(A)')
      end if
 
      ! open file (read-only)

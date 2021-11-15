@@ -28,6 +28,7 @@
 
       use const_def, only: dp
       use star_def, only: star_ptr, star_info, maxlen_profile_column_name
+      use utils_lib, only: mesa_error
 
       use pulse, only: &
            star_export_pulse_data => export_pulse_data, &
@@ -61,6 +62,8 @@
             wrap_lnR_m1, wrap_lnR_00, wrap_lnR_p1, & ! values from s% lnr
             wrap_v_m1, wrap_v_00, wrap_v_p1, & ! Riemann or non-Riemann velocity at face, s% v or s% u_face
             wrap_u_m1, wrap_u_00, wrap_u_p1, & ! Riemann cell velocity s% u
+            wrap_w_div_wc_m1, wrap_w_div_wc_00, wrap_w_div_wc_p1, & ! Riemann cell velocity s% u
+            wrap_jrot_m1, wrap_jrot_00, wrap_jrot_p1, & ! Riemann cell velocity s% u
             ! the following check the flag using_velocity_time_centering
             wrap_opt_time_center_r_m1, wrap_opt_time_center_r_00, wrap_opt_time_center_r_p1, &
             wrap_opt_time_center_v_m1, wrap_opt_time_center_v_00, wrap_opt_time_center_v_p1
@@ -2102,7 +2105,7 @@
          !   res, dres_dlnRho, dres_dlnT, dres_dxa, ierr)
          ierr = -1
          write(*,*) 'star_get_peos no longer supported'
-         stop 1
+         call mesa_error(__FILE__,__LINE__)
       end subroutine star_get_peos
       
       subroutine star_solve_eos_given_PgasT( &
@@ -2263,7 +2266,6 @@
             lnP_surf, dlnP_dL, dlnP_dlnR, dlnP_dlnM, dlnP_dlnkap, &
             ierr)
        end subroutine star_get_surf_PT       
-
       
       integer function get_result_reason(id, ierr)
          integer, intent(in) :: id
@@ -2276,7 +2278,6 @@
          end if
          get_result_reason = s% result_reason
       end function get_result_reason
-      
       
       real(dp) function eval_tau_at_r(id, r, ierr)
          ! optical depth tau at radius r (cm)
@@ -2953,15 +2954,12 @@
       end subroutine star_history_values
 
 
-      integer function star_get_profile_id(s,name)
+      integer function star_get_profile_id(s, name)
+         ! If star_get_profile_id <0  then it failed to find the column
          use profile_getval, only: get_profile_id
          type (star_info), pointer :: s
          character(len=*),intent(in) :: name
          star_get_profile_id = get_profile_id(s,name)
-         if (star_get_profile_id < 0) THEN
-            write(*,*) "FATAL ERROR Bad value for profile name ",trim(name)
-            stop 'star_get_profile_id'
-         end if
       end function star_get_profile_id
 
 
@@ -2978,7 +2976,11 @@
          type (star_info), pointer :: s
          character(len=*),intent(in) :: name
          integer,intent(in) :: k
-         star_get_profile_output = get_profile_val(s,star_get_profile_id(s,name),k)
+         integer :: id
+         star_get_profile_output = -HUGE(star_get_profile_output)
+         id = star_get_profile_id(s,name)
+         if(id<0) return
+         star_get_profile_output = get_profile_val(s,id,k)
       end function star_get_profile_output
 
       real(dp) function star_get_profile_output_by_id(id, name, k)
@@ -3006,6 +3008,7 @@
       
 
       real(dp) function star_get_history_output(s,name)
+         ! If error return -huge(double)
          use history, only: get_history_specs, get_history_values, get1_hist_value
          type (star_info), pointer :: s   
          character(len=*),intent(in) :: name
@@ -3020,8 +3023,8 @@
             is_int_value, int_values, values, failed_to_find_value)
          if (failed_to_find_value(num_rows)) then
             if (.not. get1_hist_value(s, name, values(num_rows))) then
-               write(*,*) "FATAL ERROR Bad value for history name ",trim(name)
-               stop 'star_get_history_output'
+               star_get_history_output = -HUGE(star_get_history_output)
+               return
             end if
          end if
          if (is_int_value(1)) then 
@@ -3044,7 +3047,7 @@
       
       
       subroutine star_set_mlt_vars(id, nzlo, nzhi, ierr)
-         use mlt_info, only: set_mlt_vars
+         use turb_info, only: set_mlt_vars
          use star_def
          integer, intent(in) :: id ! id for star         
          integer, intent(in) :: nzlo, nzhi ! range of cell numbers   
@@ -3061,7 +3064,7 @@
             iso, XH1, cgrav, m, gradL_composition_term, mixing_length_alpha, &
             mixing_type, gradT, Y_face, conv_vel, D, Gamma, ierr)
          use const_def, only: dp
-         use mlt_get_results, only: get_gradT
+         use turb_support, only: get_gradT
          integer, intent(in) :: id
          character (len=*), intent(in) :: MLT_option
          real(dp), intent(in) :: &
@@ -3087,7 +3090,7 @@
             mixing_type, gradT, Y_face, conv_vel, D, Gamma, ierr)
          use const_def, only: dp
          use auto_diff
-         use mlt_get_results, only: Get_results
+         use turb_support, only: Get_results
          integer, intent(in) :: id
          integer, intent(in) :: k
          character (len=*), intent(in) :: MLT_option
@@ -3260,4 +3263,66 @@
       end subroutine star_init_star_handles
       
       
+      subroutine star_get_control_namelist(id, name, val, ierr)
+         use ctrls_io, only: get_control
+         integer, intent(in) :: id
+         character(len=*),intent(in) :: name
+         character(len=*),intent(out) :: val
+         integer, intent(out) :: ierr
+         type (star_info), pointer :: s
+
+         ierr = 0
+         call star_ptr(id, s, ierr)
+         if(ierr/=0) return
+         call get_control(s, name, val, ierr)
+
+      end subroutine star_get_control_namelist
+
+      subroutine star_set_control_namelist(id, name, val, ierr)
+         use ctrls_io, only: set_control
+         integer, intent(in) :: id
+         character(len=*),intent(in) :: name
+         character(len=*),intent(in) :: val
+         integer, intent(out) :: ierr
+         type (star_info), pointer :: s
+
+         ierr = 0
+         call star_ptr(id, s, ierr)
+         if(ierr/=0) return
+         call set_control(s, name, val, ierr)
+
+      end subroutine star_set_control_namelist
+
+
+      subroutine star_get_star_job_namelist(id, name, val, ierr)
+         use star_job_ctrls_io, only: get_star_job
+         integer, intent(in) :: id
+         character(len=*),intent(in) :: name
+         character(len=*),intent(out) :: val
+         integer, intent(out) :: ierr
+         type (star_info), pointer :: s
+
+         ierr = 0
+         call star_ptr(id, s, ierr)
+         if(ierr/=0) return
+         call get_star_job(s, name, val, ierr)
+
+      end subroutine star_get_star_job_namelist
+
+      subroutine star_set_star_job_namelist(id, name, val, ierr)
+         use star_job_ctrls_io, only: set_star_job
+         integer, intent(in) :: id
+         character(len=*),intent(in) :: name
+         character(len=*),intent(in) :: val
+         integer, intent(out) :: ierr
+         type (star_info), pointer :: s
+
+         ierr = 0
+         call star_ptr(id, s, ierr)
+         if(ierr/=0) return
+         call set_star_job(s, name, val, ierr)
+
+      end subroutine star_set_star_job_namelist
+
+
       end module star_lib

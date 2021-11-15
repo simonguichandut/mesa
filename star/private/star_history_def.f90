@@ -409,7 +409,9 @@
       integer, parameter :: h_log_Ledd = h_gradT_excess_alpha + 1
       integer, parameter :: h_compactness = h_log_Ledd + 1
       integer, parameter :: h_compactness_parameter = h_compactness + 1
-      integer, parameter :: h_max_infall_speed = h_compactness_parameter + 1
+      integer, parameter :: h_mu4 = h_compactness_parameter + 1
+      integer, parameter :: h_m4 = h_mu4 + 1
+      integer, parameter :: h_max_infall_speed = h_m4 + 1
       integer, parameter :: h_non_fe_core_rebound = h_max_infall_speed + 1
       integer, parameter :: h_non_fe_core_infall = h_non_fe_core_rebound + 1
       integer, parameter :: h_fe_core_infall = h_non_fe_core_infall + 1
@@ -646,7 +648,9 @@
 
       integer, parameter :: h_apsidal_constant_k2 = h_grav_dark_Teff_equatorial + 1
 
-      integer, parameter :: h_lg_Lnuc = h_apsidal_constant_k2 + 1
+      integer, parameter :: h_phase_of_evolution = h_apsidal_constant_k2 + 1
+
+      integer, parameter :: h_lg_Lnuc = h_phase_of_evolution + 1
       integer, parameter :: h_H_rich = h_lg_Lnuc + 1
       integer, parameter :: h_N_cntr = h_H_rich + 1
       integer, parameter :: h_lg_Lneu = h_N_cntr + 1
@@ -669,8 +673,7 @@
       integer, parameter :: h_zones = h_v_div_cs + 1
       integer, parameter :: h_lg_Dsurf = h_zones + 1
       integer, parameter :: h_C_cntr = h_lg_Dsurf + 1
-      integer, parameter :: h_using_TDC = h_C_cntr + 1
-      integer, parameter :: h_TDC_num_cells = h_using_TDC + 1
+      integer, parameter :: h_TDC_num_cells = h_C_cntr + 1
       integer, parameter :: h_retries = h_TDC_num_cells + 1
 
       integer, parameter :: h_col_id_max = h_retries
@@ -794,6 +797,8 @@
          history_column_name(h_non_fe_core_rebound) = 'non_fe_core_rebound'
          history_column_name(h_compactness) = 'compactness'
          history_column_name(h_compactness_parameter) = 'compactness_parameter'
+         history_column_name(h_m4) = 'm4'
+         history_column_name(h_mu4) = 'mu4'
          history_column_name(h_v_div_vesc) = 'v_div_vesc'
          history_column_name(h_v_surf_div_escape_v) = 'v_surf_div_escape_v'
          history_column_name(h_v_surf_km_s) = 'v_surf_km_s'
@@ -1321,6 +1326,8 @@
          history_column_name(h_grav_dark_Teff_equatorial) = 'grav_dark_Teff_equatorial'
 
          history_column_name(h_apsidal_constant_k2) = 'apsidal_constant_k2'
+
+         history_column_name(h_phase_of_evolution) = 'phase_of_evolution'
          
 ! items corresponding to names on terminal output lines
          history_column_name(h_lg_Lnuc) = 'lg_Lnuc'
@@ -1347,7 +1354,6 @@
          history_column_name(h_lg_Dsurf) = 'lg_Dsurf'
          history_column_name(h_C_cntr) = 'C_cntr'
          history_column_name(h_retries) = 'retries'
-         history_column_name(h_using_TDC) = 'using_TDC'
          history_column_name(h_TDC_num_cells) = 'TDC_num_cells'
          
          cnt = 0
@@ -1355,7 +1361,7 @@
             if (len_trim(history_column_name(i)) == 0) then
                write(*,*) 'missing name for log column id', i
                if (i > 1) write(*,*) 'following ' // trim(history_column_name(max(1,i-1))) ! bp: get rid of bogus compiler warning
-               write(*,*)
+               write(*,'(A)')
                cnt = cnt+1
             end if
             !write(*,'(a)') '    ! ' // trim(history_column_name(i))

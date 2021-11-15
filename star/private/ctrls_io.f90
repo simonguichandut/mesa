@@ -122,7 +122,7 @@
     write_model_with_profile, model_data_prefix, model_data_suffix, &
     mixing_D_limit_for_log, trace_mass_location, min_tau_for_max_abs_v_location, &
     min_q_for_inner_mach1_location, max_q_for_outer_mach1_location, &
-    mass_depth_for_L_surf, conv_core_gap_dq_limit, max_X_for_gradT_eqn, &
+    mass_depth_for_L_surf, conv_core_gap_dq_limit, &
     alpha_TDC_DAMP, alpha_TDC_DAMPR, alpha_TDC_PtdVdt, &
     
     ! burn zone eps definitions for use in logs and profiles
@@ -287,7 +287,7 @@
     simple_i_rot_flag, recalc_mixing_info_each_substep, adjust_J_fraction, &
     min_q_for_adjust_J_lost, min_J_div_delta_J, max_mdot_redo_cnt, mdot_revise_factor, &
     implicit_mdot_boost, min_years_dt_for_redo_mdot, surf_omega_div_omega_crit_limit, surf_omega_div_omega_crit_tol, &
-    fitted_fp_ft_i_rot, w_div_wcrit_max, w_div_wcrit_max2, &
+    w_div_wcrit_max, w_div_wcrit_max2, &
     fp_min, ft_min, fp_error_limit, ft_error_limit, &
     D_mix_rotation_max_logT_full_on, D_mix_rotation_min_logT_full_off, &
     set_uniform_am_nu_non_rot, uniform_am_nu_non_rot, &
@@ -337,13 +337,14 @@
     get_delta_nu_from_scaled_solar, nu_max_sun, delta_nu_sun, Teff_sun, delta_Pg_mode_freq, &
     
     ! hydro parameters
+    energy_eqn_option, &
     opacity_factor, opacity_max, min_logT_for_opacity_factor_off, min_logT_for_opacity_factor_on, &
     max_logT_for_opacity_factor_on, max_logT_for_opacity_factor_off, &
-    non_nuc_neu_factor, always_use_dedt_form_of_energy_eqn, &
-    use_dedt_form_of_energy_eqn, use_time_centered_eps_grav, &
+    non_nuc_neu_factor, &
+    use_time_centered_eps_grav, &
     use_mass_corrections, use_gravity_rotation_correction, eps_grav_factor, eps_mdot_factor, &
     include_composition_in_eps_grav, no_dedt_form_during_relax, &
-    max_abs_rel_change_surf_lnS, always_use_eps_grav_form_of_energy_eqn, &
+    max_abs_rel_change_surf_lnS, &
     max_num_surf_revisions, Gamma_lnS_eps_grav_full_off, Gamma_lnS_eps_grav_full_on, &
     use_dPrad_dm_form_of_T_gradient_eqn, use_gradT_actual_vs_gradT_MLT_for_T_gradient_eqn, dedt_eqn_r_scale, &
     RTI_A, RTI_B, RTI_C, RTI_D, RTI_max_alpha, RTI_C_X_factor, RTI_C_X0_frac, steps_before_use_velocity_time_centering, &
@@ -351,7 +352,7 @@
     RTI_D_mix_floor, RTI_min_m_for_D_mix_floor, RTI_log_max_boost, RTI_m_full_boost, RTI_m_no_boost, &
     conv_vel_D, conv_vel_siglimit, conv_vel_v0, include_P_in_velocity_time_centering, include_L_in_velocity_time_centering, &
     P_theta_for_velocity_time_centering, L_theta_for_velocity_time_centering, &
-    min_q_for_normal_mlt_gradT_full_off, max_q_for_normal_mlt_gradT_full_on, &
+    min_q_for_normal_mlt_gradT_full_off, max_q_for_normal_mlt_gradT_full_on, steps_before_use_TDC, &
     conv_vel_ignore_thermohaline, conv_vel_ignore_semiconvection, use_P_d_1_div_rho_form_of_work_when_time_centering_velocity, &
     conv_vel_fully_lagrangian, conv_vel_include_homologous_term, conv_vel_use_mlt_vc_start, compare_TDC_to_MLT, &
     velocity_logT_lower_bound, max_dt_yrs_for_velocity_logT_lower_bound, velocity_q_upper_bound, &
@@ -520,7 +521,7 @@
 
     ! misc
     min_chem_eqn_scale, zams_filename, set_rho_to_dm_div_dV, use_other_momentum_implicit, &
-    use_other_surface_PT, use_other_kap, use_other_diffusion, use_other_diffusion_factor, &
+    use_other_surface_PT, use_other_mlt_results, use_other_kap, use_other_diffusion, use_other_diffusion_factor, &
     use_other_adjust_mdot, use_other_j_for_adjust_J_lost, use_other_alpha_mlt, use_other_remove_surface, &
     use_other_am_mixing, use_other_brunt, use_other_brunt_smoothing, use_other_solver_monitor, &
     use_other_build_initial_model, use_other_cgrav, use_other_energy_implicit, use_other_momentum, &
@@ -614,10 +615,27 @@
  if (ierr /= 0) return
 
  call read_controls_file(s, filename, 1, ierr)
- call mkdir(s% photo_directory)
- call mkdir(s% log_directory)
+ call check_controls(s, ierr)
 
  end subroutine read_controls
+
+
+ subroutine check_controls(s, ierr)
+    type (star_info), pointer :: s
+    integer, intent(out) :: ierr
+
+    ierr = 0
+
+    if (.not. (trim(s% energy_eqn_option) == 'dedt' .or. trim(s% energy_eqn_option) == 'eps_grav')) then
+       write(*,'(A)')
+       write(*,*) "Invalid choice for energy_eqn_option"
+       write(*,*) "Available options are 'dedt' or 'eps_grav'"
+       write(*,'(A)')
+       ierr = -1
+       return
+    end if
+
+ end subroutine check_controls
 
 
  recursive subroutine read_controls_file(s, filename, level, ierr)
@@ -1103,6 +1121,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% min_logT_for_make_gradr_sticky_in_solver_iters = min_logT_for_make_gradr_sticky_in_solver_iters
  s% no_MLT_below_shock = no_MLT_below_shock
  s% MLT_option = MLT_option
+ s% steps_before_use_TDC = steps_before_use_TDC
  s% mlt_use_rotation_correction = mlt_use_rotation_correction
  s% mlt_Pturb_factor = mlt_Pturb_factor
 
@@ -1691,7 +1710,6 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% min_years_dt_for_redo_mdot = min_years_dt_for_redo_mdot
  s% surf_omega_div_omega_crit_limit = surf_omega_div_omega_crit_limit
  s% surf_omega_div_omega_crit_tol = surf_omega_div_omega_crit_tol
- s% fitted_fp_ft_i_rot = fitted_fp_ft_i_rot 
  s% w_div_wcrit_max = w_div_wcrit_max
  s% w_div_wcrit_max2 = w_div_wcrit_max2
  s% fp_min = fp_min
@@ -1826,6 +1844,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
 
 
  ! hydro parameters
+ s% energy_eqn_option = energy_eqn_option
  s% opacity_factor = opacity_factor
  s% opacity_max = opacity_max
  s% min_logT_for_opacity_factor_off = min_logT_for_opacity_factor_off
@@ -1835,11 +1854,8 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
 
  s% dxdt_nuc_factor = dxdt_nuc_factor
  s% non_nuc_neu_factor = non_nuc_neu_factor
- s% use_dedt_form_of_energy_eqn = use_dedt_form_of_energy_eqn
- s% always_use_dedt_form_of_energy_eqn = always_use_dedt_form_of_energy_eqn
  s% use_time_centered_eps_grav = use_time_centered_eps_grav
  s% no_dedt_form_during_relax = no_dedt_form_during_relax
- s% always_use_eps_grav_form_of_energy_eqn = always_use_eps_grav_form_of_energy_eqn
  s% dedt_eqn_r_scale = dedt_eqn_r_scale
  s% use_mass_corrections = use_mass_corrections
  s% use_gravity_rotation_correction = use_gravity_rotation_correction
@@ -2067,7 +2083,6 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% alpha_TDC_DAMP = alpha_TDC_DAMP
  s% alpha_TDC_DAMPR = alpha_TDC_DAMPR
  s% alpha_TDC_PtdVdt = alpha_TDC_PtdVdt
- s% max_X_for_gradT_eqn = max_X_for_gradT_eqn
  s% compare_TDC_to_MLT = compare_TDC_to_MLT
 
  s% RSP2_alfap = RSP2_alfap
@@ -2404,6 +2419,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% zams_filename = zams_filename
  s% set_rho_to_dm_div_dV = set_rho_to_dm_div_dV
 
+ s% use_other_mlt_results = use_other_mlt_results
  s% use_other_surface_PT = use_other_surface_PT
  s% use_other_kap = use_other_kap
  s% use_other_diffusion = use_other_diffusion
@@ -2787,6 +2803,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  min_logT_for_make_gradr_sticky_in_solver_iters = s% min_logT_for_make_gradr_sticky_in_solver_iters
  no_MLT_below_shock = s% no_MLT_below_shock
  MLT_option = s% MLT_option
+ steps_before_use_TDC = s% steps_before_use_TDC
  mlt_use_rotation_correction = s% mlt_use_rotation_correction
  mlt_Pturb_factor = s% mlt_Pturb_factor
 
@@ -3367,7 +3384,6 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  min_years_dt_for_redo_mdot = s% min_years_dt_for_redo_mdot
  surf_omega_div_omega_crit_limit = s% surf_omega_div_omega_crit_limit
  surf_omega_div_omega_crit_tol = S% surf_omega_div_omega_crit_tol
- fitted_fp_ft_i_rot = s% fitted_fp_ft_i_rot 
  w_div_wcrit_max = s% w_div_wcrit_max
  w_div_wcrit_max2 = s% w_div_wcrit_max2
  fp_min = s% fp_min
@@ -3501,6 +3517,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  delta_Pg_mode_freq = s% delta_Pg_mode_freq
 
  ! hydro parameters
+ energy_eqn_option = s% energy_eqn_option
  opacity_max = s% opacity_max
  opacity_factor = s% opacity_factor
  min_logT_for_opacity_factor_off = s% min_logT_for_opacity_factor_off
@@ -3509,11 +3526,8 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  max_logT_for_opacity_factor_off = s% max_logT_for_opacity_factor_off
 
  non_nuc_neu_factor = s% non_nuc_neu_factor
- use_dedt_form_of_energy_eqn = s% use_dedt_form_of_energy_eqn
- always_use_dedt_form_of_energy_eqn = s% always_use_dedt_form_of_energy_eqn
  use_time_centered_eps_grav = s% use_time_centered_eps_grav
  no_dedt_form_during_relax = s% no_dedt_form_during_relax
- always_use_eps_grav_form_of_energy_eqn = s% always_use_eps_grav_form_of_energy_eqn
  dedt_eqn_r_scale = s% dedt_eqn_r_scale
  use_mass_corrections = s% use_mass_corrections
  use_gravity_rotation_correction = s% use_gravity_rotation_correction
@@ -3741,7 +3755,6 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
  alpha_TDC_DAMP = s% alpha_TDC_DAMP
  alpha_TDC_DAMPR = s% alpha_TDC_DAMPR
  alpha_TDC_PtdVdt = s% alpha_TDC_PtdVdt
- max_X_for_gradT_eqn = s% max_X_for_gradT_eqn
  compare_TDC_to_MLT = s% compare_TDC_to_MLT
 
  RSP2_alfap= s% RSP2_alfap
@@ -4078,6 +4091,7 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
  zams_filename = s% zams_filename
  set_rho_to_dm_div_dV = s% set_rho_to_dm_div_dV
 
+ use_other_mlt_results = s% use_other_mlt_results
  use_other_surface_PT = s% use_other_surface_PT
  use_other_kap = s% use_other_kap
  use_other_diffusion = s% use_other_diffusion
@@ -4134,6 +4148,73 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
 
 
  end subroutine set_controls_for_writing
+
+   subroutine get_control(s, name, val, ierr)
+      use utils_lib, only: StrUpCase
+      type (star_info), pointer :: s
+      character(len=*),intent(in) :: name
+      character(len=*), intent(out) :: val
+      integer, intent(out) :: ierr
+
+      character(len(name)) :: upper_name
+      character(len=512) :: str
+      integer :: iounit,iostat,ind,i
+
+
+      ! First save current controls
+      call set_controls_for_writing(s, ierr)
+      if(ierr/=0) return
+
+      ! Write namelist to temporay file
+      open(newunit=iounit,status='scratch')
+      write(iounit,nml=controls)
+      rewind(iounit)
+
+      ! Namelists get written in captials
+      upper_name = StrUpCase(name)
+      val = ''
+      ! Search for name inside namelist
+      do 
+         read(iounit,'(A)',iostat=iostat) str
+         ind = index(str,trim(upper_name))
+         if( ind /= 0 ) then
+            val = str(ind+len_trim(upper_name)+1:len_trim(str)-1) ! Remove final comma and starting =
+            do i=1,len(val)
+               if(val(i:i)=='"') val(i:i) = ' '
+            end do
+            exit
+         end if
+         if(is_iostat_end(iostat)) exit
+      end do   
+
+      if(len_trim(val) == 0 .and. ind==0 ) ierr = -1
+
+      close(iounit)
+
+   end subroutine get_control
+
+   subroutine set_control(s, name, val, ierr)
+      type (star_info), pointer :: s
+      character(len=*), intent(in) :: name, val
+      character(len=len(name)+len(val)+13) :: tmp
+      integer, intent(out) :: ierr
+
+      ! First save current controls
+      call set_controls_for_writing(s, ierr)
+      if(ierr/=0) return
+
+      tmp=''
+      tmp = '&controls '//trim(name)//'='//trim(val)//' /'
+
+      ! Load into namelist
+      read(tmp, nml=controls)
+
+      ! Add to star
+      call store_controls(s, ierr)
+      if(ierr/=0) return
+
+   end subroutine set_control
+
 
  end module ctrls_io
 

@@ -84,9 +84,9 @@
          end if
          
          if (dbg) then
-            write(*,*)
+            write(*,'(A)')
             write(*,*) 'weak info filename <' // trim(filename) // '>'
-            write(*,*)
+            write(*,'(A)')
          end if
 
          do ! skip to line starting with 'from '
@@ -205,9 +205,9 @@
             end if
          
             if (dbg) then
-               write(*,*)
+               write(*,'(A)')
                write(*,*) 'weaklib filename <' // trim(filename) // '>'
-               write(*,*)
+               write(*,'(A)')
             end if
 
             do ! skip to after line starting with '='
@@ -389,7 +389,7 @@
                stat=ierr)
 
             do i = 1, num_weak_reactions
-               table = weaklib_rate_table(weak_reaction_T9s, weak_reaction_lYeRhos, .false.)
+               table = weaklib_rate_table(weak_reaction_T9s, weak_reaction_lYeRhos)
                allocate(weak_reactions_tables(i)% t, source=table)
             end do
                
@@ -434,8 +434,8 @@
                         read(iounit,fmt='(a)') string
                         write(*,'(a)') trim(string)
                      end do
-                     write(*,*)
-                     stop 'read_table'
+                     write(*,'(A)')
+                     call mesa_error(__FILE__,__LINE__,'read_table')
                   end if
                   return
                end if
@@ -596,7 +596,6 @@
           type(hdf5io_t)                      :: hi
           real(dp), allocatable, dimension(:) :: T9s, lYeRhos
           integer                             :: num_T9, num_lYeRho
-          logical                             :: has_cc
           type(weaklib_rate_table)            :: table
 
           logical, parameter :: dbg = .false.
@@ -616,24 +615,15 @@
           call hi% alloc_read_dset('lYeRhos', lYeRhos)
           num_lYeRho = SIZE(lYeRhos)
 
-          ! check if table has coulomb corrections
-
-          has_cc = hi% dset_exists('delta_Q') .AND. hi% dset_exists('Vs')
-          
           ! create the table
 
-          table = weaklib_rate_table(T9s, lYeRhos, has_cc)
+          table = weaklib_rate_table(T9s, lYeRhos)
 
           ! read data into it
 
           call hi% read_dset('ldecay', table% data(1, 1:num_T9, 1:num_lYeRho, table% i_ldecay))
           call hi% read_dset('lcapture', table% data(1, 1:num_T9, 1:num_lYeRho, table% i_lcapture))
           call hi% read_dset('lneutrino', table% data(1, 1:num_T9, 1:num_lYeRho, table% i_lneutrino))
-
-          if (has_cc) then
-             call hi% read_dset('delta_Q', table% data(1, 1:num_T9, 1:num_lYeRho, table% i_delta_Q))
-             call hi% read_dset('Vs', table% data(1, 1:num_T9, 1:num_lYeRho, table% i_Vs))
-          end if
 
           ! store the table
 

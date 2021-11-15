@@ -144,4 +144,18 @@ Nuclear reaction rates (``rates``)
 The ``rates`` module collects thermonuclear reaction rates and weak
 reaction rates from a range of sources.
 
+.. toctree::
+   :maxdepth: 1
 
+   rates/overview
+
+Turbulence (``turb``)
+=====================
+
+The ``turb`` module provides various mixing theories (semiconvection, thermohaline,
+mixing length thoery, time-dependant convection)
+
+.. toctree::
+   :maxdepth: 1
+
+   turb/overview

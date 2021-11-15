@@ -139,6 +139,16 @@ This test case checks the evolution of a 1 Msun, Z=0.02 metallicity from the pre
 
 The test checks thermohaline mixing in a rotating, 1 Msun, Z=0.02 metallicity model.
 
+:ref:`12M_pre_ms_to_core_collapse`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This test suite evolves a 12 |MSun| model from the pre-ms to core collapse.
+
+:ref:`20M_pre_ms_to_core_collapse`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This test suite evolves a low metalicity 20 |MSun| model from the pre-ms to core collapse.
+
 
 :ref:`20M_z2m2_high_rotation`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -171,10 +181,13 @@ This test suite example checks the accretion of material and angular momentum on
 This test suite example checks the functionality of the adaptive nuclear reaction network.
 
 
-:ref:`carbon_acc`
-^^^^^^^^^^^^^^^^^
+:ref:`carbon_kh`
+^^^^^^^^^^^^^^^^
 
-This test suite example checks the accretion of carbon onto a pure carbon white dwarf.
+This test suite case evolves a stellar model with a pure carbon
+composition as it Kelvin-Helmholtz contracts.  It provides a
+convergence example for the different forms of the energy equation.
+
 
 :ref:`cburn_inward`
 ^^^^^^^^^^^^^^^^^^^
@@ -203,11 +216,6 @@ This test suite example shows how to use user-defined color filter and extinctio
 ^^^^^^^^^^^^^^^^^^^
 
 This test suite case checks the use of custom nuclear reaction rates in an accreting 0.3 Msun helium white dwarf model.
-
-:ref:`dev_to_pisn_200`
-^^^^^^^^^^^^^^^^^^^^^^
-
-This test case evolves an initialy 200 |Msun| star from ZAMS untill it undergoes a pair instability supernovae (PISN).
 
 
 :ref:`diffusion_smoothness`
@@ -359,12 +367,22 @@ This test case shows an example of a carbon flash within a neutron star envelope
 This test case exercises several of the ``other_*`` physics hooks simultaneously in a 1 Msun, Z=0.02 metallicity, model.
 It provides an example of how to include your own physics code into a MESA run.
 
+:ref:`pisn`
+^^^^^^^^^^^^^^^^^^^^^^
+
+This test case evolves an initialy 200 |Msun| star from ZAMS untill it undergoes a pair instability supernovae (PISN).
 
 :ref:`radiative_levitation`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This test case exercises radiative levitation and the OP mono opacities in the outer layers of a 0.466 Msun, Z=0.02 metallicity, B-type subdwarf (sdB) model.
 
+
+:ref:`relax_composition_j_entropy`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This test calls the routines that relax the composition, angular
+momentum and energy of a model to given target values.
 
 :ref:`rsp_BEP`
 ^^^^^^^^^^^^^^
@@ -424,6 +442,11 @@ see |MESA V|.The test vehicle is with a 1.5 Msun, Z=0.02 metallicity, model.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This test case exercises the simplex framework with a check of the chi^2 value for 1.0 Msun, Z=0.02 metallicity, solar model.
+
+:ref:`split_burn_big_net`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This test case tests MESA's ability to perfom a split-burn calculation in a 25 |Msun| star during silicon burning.
 
 :ref:`test_memory`
 ^^^^^^^^^^^^^^^^^^

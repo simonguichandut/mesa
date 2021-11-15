@@ -101,7 +101,7 @@
             testhub_extras_names(3) = 'ign_co_core_mass'
 
             testhub_extras_vals(1) = ign_mass/msun
-            testhub_extras_vals(2) = log10(ign_density)
+            testhub_extras_vals(2) = safe_log10(ign_density)
             testhub_extras_vals(3) = ign_co_core_mass
 
          end select
@@ -149,7 +149,7 @@
          names(3) = 'ign_co_core_mass'
          names(4) = 'flame_mass'
          vals(1) = ign_mass/msun
-         vals(2) = log10(ign_density)
+         vals(2) = safe_log10(ign_density)
          vals(3) = ign_co_core_mass
          vals(4) = flame_mass/msun
       end subroutine data_for_extra_history_columns
@@ -271,7 +271,7 @@
  
          select case (s% x_integer_ctrl(1))
          case(2)
-            read(iounit,iostat=ierr) ign_mass, ign_density, ign_co_core_mass
+            read(iounit,iostat=ierr) ign_mass, ign_density, ign_co_core_mass,flame_mass
          end select
  
        end subroutine extras_photo_read
@@ -287,7 +287,7 @@
  
          select case (s% x_integer_ctrl(1))
          case(2)
-            write(iounit) ign_mass, ign_density, ign_co_core_mass
+            write(iounit) ign_mass, ign_density, ign_co_core_mass,flame_mass
          end select
  
        end subroutine extras_photo_write
