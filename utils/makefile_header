@@ -125,7 +125,7 @@ SKIP_NAN_TRAPS = YES
 # if not SKIP_NAN_TRAPS, then also add $(FCtrapNANs) to FCbasic2
 
 FCbasic = -Wno-uninitialized -fno-range-check -fmax-errors=7 $(SPECIAL_FC_FLAGS) $(FCbasic2)
-FCbasic2 = -fprotect-parens -fno-sign-zero -fbacktrace -ggdb -finit-real=snan
+FCbasic2 = -fprotect-parens -fno-sign-zero -fbacktrace -ggdb -finit-real=snan  -finit-integer=-9999999 -finit-logical=false -finit-character=0 -finit-derived
 
 # Set the fortran standard to compile against, files that can't be compiled to the standard and are 
 # unfixable should add a statement like:  $(filter-out -std=f2008, $(COMPILE))
