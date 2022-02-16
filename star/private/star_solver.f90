@@ -152,7 +152,7 @@
 
          ! locals
          real(dp)  ::  &
-            coeff, f, slope, residual_norm, max_residual, &
+            coeff, f, fold, slope, residual_norm, max_residual, &
             corr_norm_min, resid_norm_min, correction_factor, temp_correction_factor, &
             correction_norm, corr_norm_initial, max_correction, slope_extra, &
             tol_residual_norm, tol_max_residual, &
@@ -434,6 +434,10 @@
                exit iter_loop
             end if
 
+            ! Force min_corr_coeff <= 1d-1.
+            ! Why? Because we want to at least try the line search.
+            min_corr_coeff = min(min_corr_coeff, 1d-1)
+
             if (min_corr_coeff < 1d0) then
                ! compute gradient of f = equ<dot>jacobian
                ! NOTE: NOT jacobian<dot>equ
@@ -457,12 +461,26 @@
             
             f = 0d0
             call adjust_correction( &
-               min_corr_coeff, correction_factor, grad_f1, f, slope, coeff, err_msg, ierr)
+               min_corr_coeff, correction_factor, grad_f1, f, fold, slope, coeff, err_msg, ierr)
             if (ierr /= 0) then
                call oops(err_msg)
                exit iter_loop
             end if
             s% solver_adjust_iter = 0
+
+            if (f > fold) then
+               ! It's possible for there to be local minima for the residual norm.
+               ! This, and incorrect partials, are the only way for the line search
+               ! to fail to decrease the residual norm.
+               ! 
+               ! In either case we're feeling around blindly and have no reason to
+               ! expect a Newton solve to find a solution. Better to bail and retry
+               ! with a smaller time-step rather than waste the CPU time
+               ! wandering around in the dark.
+               write(*,2) 'Convergence failure: residual norm jumped in line search. model_number, f, fold:', s% model_number, f, fold
+               convergence_failure = .true.
+               exit iter_loop
+            end if
 
             ! coeff is factor by which adjust_correction rescaled the correction vector
             if (coeff > s% tiny_corr_factor*min_corr_coeff .or. min_corr_coeff >= 1d0) then
@@ -765,12 +783,13 @@
 
 
          subroutine adjust_correction( &
-               min_corr_coeff_in, max_corr_coeff, grad_f, f, slope, coeff,  &
+               min_corr_coeff_in, max_corr_coeff, grad_f, f, fold, slope, coeff,  &
                err_msg, ierr)
             real(dp), intent(in) :: min_corr_coeff_in
             real(dp), intent(in) :: max_corr_coeff
             real(dp), intent(in) :: grad_f(:) ! (neq) ! gradient df/ddx at xold
             real(dp), intent(out) :: f ! 1/2 fvec^2. minimize this.
+            real(dp), intent(out) :: fold ! 1/2 fvec^2 at the start.
             real(dp), intent(in) :: slope
             real(dp), intent(out) :: coeff
 
@@ -785,7 +804,7 @@
             character (len=strlen) :: message
             logical :: first_time
             real(dp) :: a1, alam, alam2, alamin, a2, disc, f2, &
-               rhs1, rhs2, temp, test, tmplam, max_corr, fold, min_corr_coeff
+               rhs1, rhs2, temp, test, tmplam, max_corr, min_corr_coeff
             real(dp) :: frac, f_target
             logical :: skip_eval_f, dbg_adjust
 
@@ -800,28 +819,24 @@
             dbg_adjust = .false.
             err_msg = ''
 
-            skip_eval_f = (min_corr_coeff_in == 1)
-            if (skip_eval_f) then
-               f = 0
-            else
-               do k=1,nz
-                  do i=1,nvar
-                     dxsave(i,k) = s% solver_dx(i,k)
-                     ddxsave(i,k) = ddx(i,k)
-                  end do
+            skip_eval_f = .false.
+            do k=1,nz
+               do i=1,nvar
+                  dxsave(i,k) = s% solver_dx(i,k)
+                  ddxsave(i,k) = ddx(i,k)
                end do
-               f = eval_f(nvar,nz,equ)
-               if (is_bad_num(f)) then
-                  ierr = -1
-                  write(err_msg,*) 'adjust_correction failed in eval_f'
-                  if (dbg_msg) write(*,*) &
-                     'adjust_correction: eval_f(nvar,nz,equ)', eval_f(nvar,nz,equ)
-                  if (s% stop_for_bad_nums) then
-                     write(*,1) 'f', f
-                     call mesa_error(__FILE__,__LINE__,'solver adjust_correction')
-                  end if
-                  return
+            end do
+            f = eval_f(nvar,nz,equ)
+            if (is_bad_num(f)) then
+               ierr = -1
+               write(err_msg,*) 'adjust_correction failed in eval_f'
+               if (dbg_msg) write(*,*) &
+                  'adjust_correction: eval_f(nvar,nz,equ)', eval_f(nvar,nz,equ)
+               if (s% stop_for_bad_nums) then
+                  write(*,1) 'f', f
+                  call mesa_error(__FILE__,__LINE__,'solver adjust_correction')
                end if
+               return
             end if
             fold = f
             min_corr_coeff = min(min_corr_coeff_in, max_corr_coeff) ! make sure min <= max
@@ -861,17 +876,6 @@
                   exit search_loop
                end if
 
-               if (min_corr_coeff == 1) return
-
-               if (dbg_adjust) then
-                  do k=1,nz
-                     do i=1,nvar
-                        write(*,5) trim(s% nameofequ(i)), k, iter, s% solver_iter, &
-                           s% model_number, equ(i,k)
-                     end do
-                  end do
-               end if
-
                f = eval_f(nvar,nz,equ)
                if (is_bad_num(f)) then
                   if (s% stop_for_bad_nums) then
@@ -887,6 +891,18 @@
                   ierr = -1
                   exit search_loop
                end if
+
+               if (dbg_adjust) then
+                  do k=1,nz
+                     do i=1,nvar
+                        write(*,5) trim(s% nameofequ(i)), k, iter, s% solver_iter, &
+                           s% model_number, equ(i,k)
+                     end do
+                  end do
+               end if
+
+
+               if (min_corr_coeff == 1) return
 
                f_target = max(fold/2, fold + alf*coeff*slope)
                if (f <= f_target) then
