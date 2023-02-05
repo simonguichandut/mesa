@@ -180,6 +180,14 @@
 
    mass_fraction_limit_for_Skye = 1d-4
 
+   ! Skye_use_ion_offsets
+   ! ~~~~~~~~~~~~~~~~~~~~
+   ! If true, set neutral ground state as zero point for each ion species energy.
+   ! If false, zero point assumes fully ionized.
+   ! ::
+
+   Skye_use_ion_offsets = .true.
+
    ! Skye Gamma Limits
    ! ~~~~~~~~~~~~~~~~~
    ! The one-component plasma fits in Skye are only valid in certain ranges of the ion interaction parameter Gamma.
@@ -208,10 +216,10 @@
    ! ::
 
    use_simple_Skye_blends = .false.
-   logRho_min_for_any_Skye = 1.8
-   logRho_min_for_all_Skye = 2.0
-   logT_min_for_any_Skye = 6.8
-   logT_min_for_all_Skye = 7.0
+   logRho_min_for_any_Skye = 2.3
+   logRho_min_for_all_Skye = 2.4
+   logT_min_for_any_Skye = 7.2
+   logT_min_for_all_Skye = 7.4
 
 
 ! CMS controls
@@ -328,61 +336,13 @@
    ! It works recursively, so the extras can read extras too.
 
 
-         ! read_extra_eos_inlist1
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-         ! extra_eos_inlist1_name
-         ! ~~~~~~~~~~~~~~~~~~~~~~
+         ! read_extra_eos_inlist(1..5)
+         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+         ! extra_eos_inlist_name(1..5)
+         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-         ! If ``read_extra_eos_inlist1`` is true, then read &eos from the file ``extra_eos_inlist1_name``.
+         ! If ``read_extra_eos_inlist(i)`` is true, then read &eos from the file ``extra_eos_inlist_name(i)``.
          ! ::
 
-      read_extra_eos_inlist1 = .false.
-      extra_eos_inlist1_name = 'undefined'
-
-
-         ! read_extra_eos_inlist2
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-         ! extra_eos_inlist2_name
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-
-         ! If ``read_extra_eos_inlist2`` is true, then read &eos from the file ``extra_eos_inlist2_name``.
-         ! ::
-
-      read_extra_eos_inlist2 = .false.
-      extra_eos_inlist2_name = 'undefined'
-
-
-         ! read_extra_eos_inlist3
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-         ! extra_eos_inlist3_name
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-
-         ! If ``read_extra_eos_inlist3`` is true, then read &eos from the file ``extra_eos_inlist3_name``.
-         ! ::
-
-      read_extra_eos_inlist3 = .false.
-      extra_eos_inlist3_name = 'undefined'
-
-
-         ! read_extra_eos_inlist4
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-         ! extra_eos_inlist4_name
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-
-         ! If ``read_extra_eos_inlist4`` is true, then read &eos from the file ``extra_eos_inlist4_name``.
-         ! ::
-
-      read_extra_eos_inlist4 = .false.
-      extra_eos_inlist4_name = 'undefined'
-
-
-         ! read_extra_eos_inlist5
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-         ! extra_eos_inlist5_name
-         ! ~~~~~~~~~~~~~~~~~~~~~~
-
-         ! If ``read_extra_eos_inlist5`` is true, then read &eos from the file ``extra_eos_inlist5_name``.
-         ! ::
-
-      read_extra_eos_inlist5 = .false.
-      extra_eos_inlist5_name = 'undefined'
+      read_extra_eos_inlist(:) = .false.
+      extra_eos_inlist_name(:) = 'undefined'

@@ -51,11 +51,12 @@ module skye
          bounds(2,2) = max(7.3d0,log10(1d5 * pow2(zbar))) + skye_blend_width
 
          ! Rough ionization density from Jermyn+2021 Equation 53, dividing by 3 so we get closer to Dragons.
-         bounds(3,1) = max(2d0,log10(abar * pow3(zbar))) + skye_blend_width
+         ! Don't let the density get below rho = 200 g/cc so that solar model stays away from blend into Skye.
+         bounds(3,1) = max(2.3d0,log10(abar * pow3(zbar))) + skye_blend_width
          bounds(3,2) = max(7.3d0,log10(1d5 * pow2(zbar))) + skye_blend_width
 
          ! HELM low-T bound
-         bounds(4,1) = max(2d0,log10(abar * pow3(zbar))) + skye_blend_width
+         bounds(4,1) = max(2.3d0,log10(abar * pow3(zbar))) + skye_blend_width
          bounds(4,2) = ht% logtlo
 
          ! Lower-right of (rho,T) plane
@@ -210,6 +211,7 @@ module skye
             T, Rho, X, abar, zbar, &
             rq%Skye_min_gamma_for_solid, rq%Skye_max_gamma_for_liquid, &
             rq%Skye_solid_mixing_rule, rq%mass_fraction_limit_for_Skye, &
+            rq%Skye_use_ion_offsets, &
             species, chem_id, xa, &
             res, d_dlnd, d_dlnT, d_dxa, ierr)
 
@@ -258,7 +260,8 @@ module skye
             temp_in, den_in, Xfrac, abar, zbar,  &
             Skye_min_gamma_for_solid, Skye_max_gamma_for_liquid, &
             Skye_solid_mixing_rule, &
-            mass_fraction_limit, species, chem_id, xa, &
+            mass_fraction_limit, use_ion_offsets, &
+            species, chem_id, xa, &
             res, d_dlnd, d_dlnT, d_dxa, ierr)
 
          use eos_def
@@ -278,6 +281,7 @@ module skye
          real(dp), intent(in) :: xa(:)
          real(dp), intent(in) :: temp_in, den_in, mass_fraction_limit, Skye_min_gamma_for_solid, Skye_max_gamma_for_liquid
          real(dp), intent(in) :: Xfrac, abar, zbar
+         logical, intent(in) :: use_ion_offsets
          character(len=128), intent(in) :: Skye_solid_mixing_rule
          integer, intent(out) :: ierr
          real(dp), intent(out), dimension(nv) :: res, d_dlnd, d_dlnT
@@ -350,7 +354,9 @@ module skye
          ! Ideal ion free energy, only depends on abar
          F_ideal_ion = compute_F_ideal_ion(temp, den, abar, relevant_species, ACMI, ya)
 
-         F_ideal_ion = F_ideal_ion + compute_ion_offset(relevant_species, select_xa, chem_id) ! Offset so ion ground state energy is zero.
+         if (use_ion_offsets) then
+            F_ideal_ion = F_ideal_ion + compute_ion_offset(species, xa, chem_id) ! Offset so ion ground state energy is zero.
+         end if
 
          ! Ideal electron-positron thermodynamics (s, e, p)
          ! Derivatives are handled by HELM code, so we don't pass *in* any auto_diff types (just get them as return values).
@@ -372,7 +378,8 @@ module skye
                                      F_coul, latent_ddlnT, latent_ddlnRho, phase)
 
          call  pack_for_export(F_ideal_ion, F_coul, F_rad, F_ele, temp, den, xnefer, etaele, abar, zbar, &
-                                 phase, latent_ddlnT, latent_ddlnRho, res, d_dlnd, d_dlnT)
+                                 phase, latent_ddlnT, latent_ddlnRho, res, d_dlnd, d_dlnT, ierr)
+         if(ierr/=0) return
 
       end subroutine skye_eos
 

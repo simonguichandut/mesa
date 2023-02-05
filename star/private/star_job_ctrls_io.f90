@@ -448,12 +448,6 @@
          co_net, &
          adv_net, &
          adjust_abundances_for_new_isos, &
-         set_rates_preference, &
-         new_rates_preference, &
-         set_rate_c12ag, &
-         set_rate_n14pg, &
-         set_rate_3a, &
-         set_rate_1212, &
          set_uniform_xa_from_file, &
          set_uniform_initial_xa_from_file, &
          file_for_uniform_xa, &
@@ -468,6 +462,7 @@
          T9_weaklib_full_on_hi_Z, &
 
          use_suzuki_weak_rates, &
+         use_3a_fl87, &
 
          use_special_weak_rates, &
          special_weak_states_file, &
@@ -500,16 +495,8 @@
          jina_reaclib_min_T9, &
          rate_tables_dir, &
          rate_cache_suffix, &
-         read_extra_star_job_inlist1, &
-         extra_star_job_inlist1_name, &
-         read_extra_star_job_inlist2, &
-         extra_star_job_inlist2_name, &
-         read_extra_star_job_inlist3, &
-         extra_star_job_inlist3_name, &
-         read_extra_star_job_inlist4, &
-         extra_star_job_inlist4_name, &
-         read_extra_star_job_inlist5, &
-         extra_star_job_inlist5_name, &
+         read_extra_star_job_inlist, &
+         extra_star_job_inlist_name, &
          set_abundance_nzlo, &
          set_abundance_nzhi, &
          set_abundance, &
@@ -539,6 +526,7 @@
          extras_lpar, &
          num_special_rate_factors, &
          special_rate_factor, &
+         filename_of_special_rate, &
          reaction_for_special_factor,&
          color_num_files,&
          color_file_names,&
@@ -573,9 +561,10 @@
          type (star_info), pointer :: s
          integer, intent(in) :: level
          integer, intent(out) :: ierr
-         logical :: read_extra1, read_extra2, read_extra3, read_extra4, read_extra5
-         character (len=strlen) :: message, extra1, extra2, extra3, extra4, extra5
-         integer :: unit
+         logical, dimension(max_extra_inlists) :: read_extra
+         character (len=strlen) :: message
+         character (len=strlen), dimension(max_extra_inlists) :: extra
+         integer :: unit, i
 
          ierr = 0
 
@@ -613,56 +602,18 @@
          call store_star_job_controls(s, ierr)
 
          ! recursive calls to read other inlists
+         do i=1, max_extra_inlists
+            read_extra(i) = read_extra_star_job_inlist(i)
+            read_extra_star_job_inlist(i) = .false.
+            extra(i) = extra_star_job_inlist_name(i)
+            extra_star_job_inlist_name(i) = 'undefined'
+            
+            if (read_extra(i)) then
+               call read_star_job_file(s, extra(i), level+1, ierr)
+               if (ierr /= 0) return
+            end if
+         end do
 
-         read_extra1 = read_extra_star_job_inlist1
-         read_extra_star_job_inlist1 = .false.
-         extra1 = extra_star_job_inlist1_name
-         extra_star_job_inlist1_name = 'undefined'
-
-         read_extra2 = read_extra_star_job_inlist2
-         read_extra_star_job_inlist2 = .false.
-         extra2 = extra_star_job_inlist2_name
-         extra_star_job_inlist2_name = 'undefined'
-
-         read_extra3 = read_extra_star_job_inlist3
-         read_extra_star_job_inlist3 = .false.
-         extra3 = extra_star_job_inlist3_name
-         extra_star_job_inlist3_name = 'undefined'
-
-         read_extra4 = read_extra_star_job_inlist4
-         read_extra_star_job_inlist4 = .false.
-         extra4 = extra_star_job_inlist4_name
-         extra_star_job_inlist4_name = 'undefined'
-
-         read_extra5 = read_extra_star_job_inlist5
-         read_extra_star_job_inlist5 = .false.
-         extra5 = extra_star_job_inlist5_name
-         extra_star_job_inlist5_name = 'undefined'
-
-         if (read_extra1) then
-            call read_star_job_file(s, extra1, level+1, ierr)
-            if (ierr /= 0) return
-         end if
-
-         if (read_extra2) then
-            call read_star_job_file(s, extra2, level+1, ierr)
-            if (ierr /= 0) return
-         end if
-
-         if (read_extra3) then
-            call read_star_job_file(s, extra3, level+1, ierr)
-            if (ierr /= 0) return
-         end if
-
-         if (read_extra4) then
-            call read_star_job_file(s, extra4, level+1, ierr)
-            if (ierr /= 0) return
-         end if
-
-         if (read_extra5) then
-            call read_star_job_file(s, extra5, level+1, ierr)
-            if (ierr /= 0) return
-         end if
 
       end subroutine read_star_job_file
 
@@ -1080,12 +1031,6 @@
          s% job% co_net = co_net
          s% job% adv_net = adv_net
          s% job% adjust_abundances_for_new_isos = adjust_abundances_for_new_isos
-         s% job% set_rates_preference = set_rates_preference
-         s% job% new_rates_preference = new_rates_preference
-         s% job% set_rate_c12ag = set_rate_c12ag
-         s% job% set_rate_n14pg = set_rate_n14pg
-         s% job% set_rate_3a = set_rate_3a
-         s% job% set_rate_1212 = set_rate_1212
          s% job% set_uniform_xa_from_file = set_uniform_xa_from_file
          s% job% set_uniform_initial_xa_from_file = set_uniform_initial_xa_from_file
          s% job% file_for_uniform_xa = file_for_uniform_xa
@@ -1102,6 +1047,7 @@
          s% job% T9_weaklib_full_on_hi_Z = T9_weaklib_full_on_hi_Z
 
          s% job% use_suzuki_weak_rates = use_suzuki_weak_rates
+         s% job% use_3a_fl87 = use_3a_fl87
 
          s% job% use_special_weak_rates = use_special_weak_rates
          s% job% special_weak_states_file = special_weak_states_file
@@ -1134,16 +1080,8 @@
          s% job% jina_reaclib_min_T9 = jina_reaclib_min_T9
          s% job% rate_tables_dir = rate_tables_dir
          s% job% rate_cache_suffix = rate_cache_suffix
-         s% job% read_extra_star_job_inlist1 = read_extra_star_job_inlist1
-         s% job% extra_star_job_inlist1_name = extra_star_job_inlist1_name
-         s% job% read_extra_star_job_inlist2 = read_extra_star_job_inlist2
-         s% job% extra_star_job_inlist2_name = extra_star_job_inlist2_name
-         s% job% read_extra_star_job_inlist3 = read_extra_star_job_inlist3
-         s% job% extra_star_job_inlist3_name = extra_star_job_inlist3_name
-         s% job% read_extra_star_job_inlist4 = read_extra_star_job_inlist4
-         s% job% extra_star_job_inlist4_name = extra_star_job_inlist4_name
-         s% job% read_extra_star_job_inlist5 = read_extra_star_job_inlist5
-         s% job% extra_star_job_inlist5_name = extra_star_job_inlist5_name
+         s% job% read_extra_star_job_inlist = read_extra_star_job_inlist
+         s% job% extra_star_job_inlist_name = extra_star_job_inlist_name
          s% job% set_abundance_nzlo = set_abundance_nzlo
          s% job% set_abundance_nzhi = set_abundance_nzhi
          s% job% set_abundance = set_abundance
@@ -1175,6 +1113,7 @@
          s% job% extras_lpar = extras_lpar
          s% job% num_special_rate_factors = num_special_rate_factors
          s% job% special_rate_factor = special_rate_factor
+         s% job% filename_of_special_rate = filename_of_special_rate
          s% job% reaction_for_special_factor = reaction_for_special_factor
          s% job% color_num_files = color_num_files
          s% job% color_file_names = color_file_names
@@ -1194,6 +1133,7 @@
          extras_cpar(:) = ''
          extras_lpar(:) = .false.
          special_rate_factor(:) = 1d0
+         filename_of_special_rate(:) = ''
          reaction_for_special_factor(:) = ''
          color_num_colors(:) = 0
          color_file_names(:) = ''
@@ -1639,12 +1579,6 @@
          co_net = s% job% co_net
          adv_net = s% job% adv_net
          adjust_abundances_for_new_isos = s% job% adjust_abundances_for_new_isos
-         set_rates_preference = s% job% set_rates_preference
-         new_rates_preference = s% job% new_rates_preference
-         set_rate_c12ag = s% job% set_rate_c12ag
-         set_rate_n14pg = s% job% set_rate_n14pg
-         set_rate_3a = s% job% set_rate_3a
-         set_rate_1212 = s% job% set_rate_1212
          set_uniform_xa_from_file = s% job% set_uniform_xa_from_file
          set_uniform_initial_xa_from_file = s% job% set_uniform_initial_xa_from_file
          file_for_uniform_xa = s% job% file_for_uniform_xa
@@ -1661,6 +1595,7 @@
          T9_weaklib_full_on_hi_Z = s% job% T9_weaklib_full_on_hi_Z
 
          use_suzuki_weak_rates = s% job% use_suzuki_weak_rates
+         use_3a_fl87 = s% job% use_3a_fl87
 
          use_special_weak_rates = s% job% use_special_weak_rates
          special_weak_states_file = s% job% special_weak_states_file
@@ -1693,16 +1628,8 @@
          jina_reaclib_min_T9 = s% job% jina_reaclib_min_T9
          rate_tables_dir = s% job% rate_tables_dir
          rate_cache_suffix = s% job% rate_cache_suffix
-         read_extra_star_job_inlist1 = s% job% read_extra_star_job_inlist1
-         extra_star_job_inlist1_name = s% job% extra_star_job_inlist1_name
-         read_extra_star_job_inlist2 = s% job% read_extra_star_job_inlist2
-         extra_star_job_inlist2_name = s% job% extra_star_job_inlist2_name
-         read_extra_star_job_inlist3 = s% job% read_extra_star_job_inlist3
-         extra_star_job_inlist3_name = s% job% extra_star_job_inlist3_name
-         read_extra_star_job_inlist4 = s% job% read_extra_star_job_inlist4
-         extra_star_job_inlist4_name = s% job% extra_star_job_inlist4_name
-         read_extra_star_job_inlist5 = s% job% read_extra_star_job_inlist5
-         extra_star_job_inlist5_name = s% job% extra_star_job_inlist5_name
+         read_extra_star_job_inlist = s% job% read_extra_star_job_inlist
+         extra_star_job_inlist_name = s% job% extra_star_job_inlist_name
          set_abundance_nzlo = s% job% set_abundance_nzlo
          set_abundance_nzhi = s% job% set_abundance_nzhi
          set_abundance = s% job% set_abundance
@@ -1734,6 +1661,8 @@
          extras_lpar = s% job% extras_lpar
          num_special_rate_factors = s% job% num_special_rate_factors
          special_rate_factor = s% job% special_rate_factor
+         filename_of_special_rate = s% job% filename_of_special_rate
+         
          reaction_for_special_factor = s% job% reaction_for_special_factor
          color_num_files = s% job% color_num_files
          color_file_names = s% job% color_file_names
@@ -1779,7 +1708,7 @@
          character(len=*), intent(out) :: val
          integer, intent(out) :: ierr
    
-         character(len(name)) :: upper_name
+         character(len(name)+1) :: upper_name
          character(len=512) :: str
          integer :: iounit,iostat,ind,i
    
@@ -1795,14 +1724,14 @@
          rewind(iounit)
    
          ! Namelists get written in captials
-         upper_name = StrUpCase(name)
+         upper_name = trim(StrUpCase(name))//'='
          val = ''
          ! Search for name inside namelist
          do 
             read(iounit,'(A)',iostat=iostat) str
-            ind = index(str,trim(upper_name))
+            ind = index(trim(str),trim(upper_name))
             if( ind /= 0 ) then
-               val = str(ind+len_trim(upper_name)+1:len_trim(str)-1) ! Remove final comma and starting =
+               val = str(ind+len_trim(upper_name):len_trim(str)-1) ! Remove final comma and starting =
                do i=1,len(val)
                   if(val(i:i)=='"') val(i:i) = ' '
                end do

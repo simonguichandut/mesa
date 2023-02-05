@@ -33,21 +33,8 @@
  include 'star_controls.inc'
  include 'star_controls_dev.inc'
 
- logical :: read_extra_controls_inlist1
- character (len=strlen) :: extra_controls_inlist1_name
-
- logical :: read_extra_controls_inlist2
- character (len=strlen) :: extra_controls_inlist2_name
-
- logical :: read_extra_controls_inlist3
- character (len=strlen) :: extra_controls_inlist3_name
-
- logical :: read_extra_controls_inlist4
- character (len=strlen) :: extra_controls_inlist4_name
-
- logical :: read_extra_controls_inlist5
- character (len=strlen) :: extra_controls_inlist5_name
-
+ logical, dimension(max_extra_inlists) :: read_extra_controls_inlist
+ character (len=strlen), dimension(max_extra_inlists) :: extra_controls_inlist_name
  logical :: save_controls_namelist
  character (len=strlen) :: controls_namelist_name
 
@@ -69,6 +56,7 @@
     log_center_density_lower_limit, center_entropy_limit, center_entropy_lower_limit, &
     max_entropy_limit, max_entropy_lower_limit, min_timestep_limit, non_fe_core_rebound_limit, &
     fe_core_infall_limit, center_Ye_lower_limit, center_R_lower_limit, non_fe_core_infall_limit, &
+    fe_core_infall_mass, non_fe_core_infall_mass, &
     v_div_csound_surf_limit, v_div_csound_max_limit, Lnuc_div_L_upper_limit, Lnuc_div_L_lower_limit,&
     v_surf_div_v_kh_upper_limit, v_surf_div_v_kh_lower_limit, v_surf_div_v_esc_limit, v_surf_kms_limit, &
     stop_near_zams, Lnuc_div_L_zams_limit, Pgas_div_P_limit, Pgas_div_P_limit_max_q, gamma1_limit, gamma1_limit_max_q, &
@@ -299,7 +287,7 @@
     dtau_gamma_NiCo_decay_heat, max_logT_for_net, reaction_neuQs_factor, &
     
     ! element diffusion parameters
-    diffusion_use_iben_macdonald, diffusion_use_paquette, diffusion_use_cgs_solver, &
+    diffusion_use_iben_macdonald, diffusion_use_paquette, diffusion_use_caplan, diffusion_use_cgs_solver, &
     diffusion_use_full_net, do_WD_sedimentation_heating, min_xa_for_WD_sedimentation_heating, &
     do_diffusion_heating, do_element_diffusion, &
     cgs_thermal_diffusion_eta_full_on, cgs_thermal_diffusion_eta_full_off, diffusion_min_dq_at_surface, &
@@ -316,6 +304,7 @@
     diffusion_max_T_for_radaccel, diffusion_min_T_for_radaccel, diffusion_max_Z_for_radaccel, &
     diffusion_min_Z_for_radaccel, diffusion_screening_for_radaccel, &
     op_mono_data_path, op_mono_data_cache_filename, &
+    emesh_data_for_op_mono_path, op_mono_method, &
     show_diffusion_info, show_diffusion_substep_info, show_diffusion_timing, &
     diffusion_num_classes, diffusion_class_representative, diffusion_class_A_max, &
     diffusion_class_typical_charge, diffusion_class_factor, &
@@ -408,7 +397,7 @@
     solver_test_partials_write_eos_call_info, solver_save_photo_call_number, RSP2_min_Lc_div_L_for_convective_mixing_type, &
     solver_test_partials_var_name, solver_test_partials_equ_name, RSP2_min_Lt_div_L_for_overshooting_mixing_type, &
     solver_test_eos_partials, solver_test_kap_partials, solver_test_net_partials, solver_test_atm_partials, &
-    fill_arrays_with_NaNs, zero_when_allocate, warn_when_large_rel_run_E_err, solver_test_partials_k_low, &
+    fill_arrays_with_NaNs, zero_when_allocate, warn_when_large_rel_run_E_err, absolute_cumulative_energy_err, solver_test_partials_k_low, &
     warn_when_large_virial_thm_rel_err, warn_when_get_a_bad_eos_result, warn_rates_for_high_temp, max_safe_logT_for_rates, &
     RSP2_alfap, RSP2_alfat, RSP2_alfam, RSP2_alfar, RSP2_Lsurf_factor, RSP2_use_Stellingwerf_Lr, RSP2_remesh_when_load, &
     RSP2_alfad, RSP2_num_outermost_cells_forced_nonturbulent, RSP2_num_innermost_cells_forced_nonturbulent, &
@@ -535,13 +524,11 @@
     use_other_diffusion_coefficients, use_other_pgstar_plots, use_other_eval_fp_ft, use_other_eval_i_rot, use_other_torque, &
     use_other_torque_implicit, use_other_wind, use_other_accreting_state, use_other_after_struct_burn_mix, use_other_mesh_delta_coeff_factor, &
     use_other_before_struct_burn_mix, use_other_astero_freq_corr, use_other_timestep_limit, use_other_set_pgstar_controls, &
-    use_other_screening, use_other_close_gaps, &
+    use_other_screening, use_other_rate_get, use_other_net_derivs, use_other_split_burn, use_other_close_gaps, &
     x_ctrl, x_integer_ctrl, x_logical_ctrl, x_character_ctrl, &
     
     ! extra files
-    read_extra_controls_inlist1, extra_controls_inlist1_name, read_extra_controls_inlist2, &
-    extra_controls_inlist2_name, read_extra_controls_inlist3, extra_controls_inlist3_name, &
-    read_extra_controls_inlist4, extra_controls_inlist4_name, read_extra_controls_inlist5, extra_controls_inlist5_name, &
+    read_extra_controls_inlist, extra_controls_inlist_name, &
     save_controls_namelist, controls_namelist_name
 
 
@@ -650,9 +637,10 @@
  type (star_info), pointer :: s
  integer, intent(in) :: level
  integer, intent(out) :: ierr
- logical :: read_extra1, read_extra2, read_extra3, read_extra4, read_extra5
- character (len=strlen) :: message, extra1, extra2, extra3, extra4, extra5
- integer :: unit
+ logical, dimension(max_extra_inlists) :: read_extra
+ character (len=strlen) :: message
+ character (len=strlen), dimension(max_extra_inlists) :: extra
+ integer :: unit, i
 
  ierr = 0
 
@@ -688,61 +676,19 @@
  call store_controls(s, ierr)
 
  ! recursive calls to read other inlists
+ do i=1, max_extra_inlists
+    read_extra(i) = read_extra_controls_inlist(i)
+    read_extra_controls_inlist(i) = .false.
+    extra(i) = extra_controls_inlist_name(i)
+    extra_controls_inlist_name(i) = 'undefined'
+   
+    if (read_extra(i)) then
+       write(*,*) 'read ' // trim(extra(i))
+       call read_controls_file(s, extra(i), level+1, ierr)
+       if (ierr /= 0) return
+    end if
+ end do
 
- read_extra1 = read_extra_controls_inlist1
- read_extra_controls_inlist1 = .false.
- extra1 = extra_controls_inlist1_name
- extra_controls_inlist1_name = 'undefined'
-
- read_extra2 = read_extra_controls_inlist2
- read_extra_controls_inlist2 = .false.
- extra2 = extra_controls_inlist2_name
- extra_controls_inlist2_name = 'undefined'
-
- read_extra3 = read_extra_controls_inlist3
- read_extra_controls_inlist3 = .false.
- extra3 = extra_controls_inlist3_name
- extra_controls_inlist3_name = 'undefined'
-
- read_extra4 = read_extra_controls_inlist4
- read_extra_controls_inlist4 = .false.
- extra4 = extra_controls_inlist4_name
- extra_controls_inlist4_name = 'undefined'
-
- read_extra5 = read_extra_controls_inlist5
- read_extra_controls_inlist5 = .false.
- extra5 = extra_controls_inlist5_name
- extra_controls_inlist5_name = 'undefined'
-
- if (read_extra1) then
- write(*,*) 'read ' // trim(extra1)
- call read_controls_file(s, extra1, level+1, ierr)
- if (ierr /= 0) return
- end if
-
- if (read_extra2) then
- write(*,*) 'read ' // trim(extra2)
- call read_controls_file(s, extra2, level+1, ierr)
- if (ierr /= 0) return
- end if
-
- if (read_extra3) then
- write(*,*) 'read ' // trim(extra3)
- call read_controls_file(s, extra3, level+1, ierr)
- if (ierr /= 0) return
- end if
-
- if (read_extra4) then
-    write(*,*) 'read ' // trim(extra4)
-    call read_controls_file(s, extra4, level+1, ierr)
-    if (ierr /= 0) return
- end if
-
- if (read_extra5) then
-    write(*,*) 'read ' // trim(extra5)
-    call read_controls_file(s, extra5, level+1, ierr)
-    if (ierr /= 0) return
- end if
 
  end subroutine read_controls_file
  
@@ -852,9 +798,11 @@
  s% max_entropy_lower_limit = max_entropy_lower_limit
 
  s% fe_core_infall_limit = fe_core_infall_limit
+ s% fe_core_infall_mass = fe_core_infall_mass
  s% center_Ye_lower_limit = center_Ye_lower_limit
  s% center_R_lower_limit = center_R_lower_limit
  s% non_fe_core_infall_limit = non_fe_core_infall_limit
+ s% non_fe_core_infall_mass = non_fe_core_infall_mass
  s% non_fe_core_rebound_limit = non_fe_core_rebound_limit
  s% v_div_csound_surf_limit = v_div_csound_surf_limit
  s% v_div_csound_max_limit = v_div_csound_max_limit
@@ -1754,6 +1702,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  ! element diffusion parameters
  s% diffusion_use_iben_macdonald = diffusion_use_iben_macdonald
  s% diffusion_use_paquette = diffusion_use_paquette
+ s% diffusion_use_caplan = diffusion_use_caplan
  s% diffusion_use_cgs_solver = diffusion_use_cgs_solver
  s% diffusion_use_full_net = diffusion_use_full_net
  s% do_WD_sedimentation_heating = do_WD_sedimentation_heating
@@ -1804,6 +1753,8 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% diffusion_screening_for_radaccel = diffusion_screening_for_radaccel
  s% op_mono_data_path = op_mono_data_path
  s% op_mono_data_cache_filename = op_mono_data_cache_filename
+ s% emesh_data_for_op_mono_path = emesh_data_for_op_mono_path
+ s% op_mono_method = op_mono_method
 
  s% show_diffusion_info = show_diffusion_info
  s% show_diffusion_substep_info = show_diffusion_substep_info
@@ -2078,6 +2029,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% fill_arrays_with_NaNs = fill_arrays_with_NaNs
  s% zero_when_allocate = zero_when_allocate
  s% warn_when_large_rel_run_E_err = warn_when_large_rel_run_E_err
+ s% absolute_cumulative_energy_err = absolute_cumulative_energy_err
  s% warn_when_large_virial_thm_rel_err = warn_when_large_virial_thm_rel_err
  s% warn_when_get_a_bad_eos_result = warn_when_get_a_bad_eos_result
  s% warn_rates_for_high_temp = warn_rates_for_high_temp
@@ -2465,6 +2417,9 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  s% use_other_timestep_limit = use_other_timestep_limit
  s% use_other_set_pgstar_controls = use_other_set_pgstar_controls
  s% use_other_screening = use_other_screening
+ s% use_other_rate_get = use_other_rate_get
+ s% use_other_net_derivs = use_other_net_derivs
+ s% use_other_split_burn = use_other_split_burn
  s% use_other_close_gaps = use_other_close_gaps
 
  s% x_ctrl = x_ctrl
@@ -2537,9 +2492,11 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  max_entropy_lower_limit = s% max_entropy_lower_limit
 
  fe_core_infall_limit = s% fe_core_infall_limit
+ fe_core_infall_mass = s% fe_core_infall_mass
  center_Ye_lower_limit = s% center_Ye_lower_limit
  center_R_lower_limit = s% center_R_lower_limit
  non_fe_core_infall_limit = s% non_fe_core_infall_limit
+ non_fe_core_infall_mass = s% non_fe_core_infall_mass
  non_fe_core_rebound_limit = s% non_fe_core_rebound_limit
  v_div_csound_surf_limit = s% v_div_csound_surf_limit
  v_div_csound_max_limit = s% v_div_csound_max_limit
@@ -3431,6 +3388,7 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  ! element diffusion parameters
  diffusion_use_iben_macdonald = s% diffusion_use_iben_macdonald
  diffusion_use_paquette = s% diffusion_use_paquette
+ diffusion_use_caplan = s% diffusion_use_caplan
  diffusion_use_cgs_solver = s% diffusion_use_cgs_solver
  diffusion_use_full_net = s% diffusion_use_full_net
  do_WD_sedimentation_heating = s% do_WD_sedimentation_heating
@@ -3486,6 +3444,8 @@ s% gradT_excess_max_log_tau_full_off = gradT_excess_max_log_tau_full_off
  diffusion_screening_for_radaccel = s% diffusion_screening_for_radaccel
  op_mono_data_path = s% op_mono_data_path
  op_mono_data_cache_filename = s% op_mono_data_cache_filename
+ emesh_data_for_op_mono_path = s% emesh_data_for_op_mono_path
+ op_mono_method = s% op_mono_method
 
  show_diffusion_info = s% show_diffusion_info
  show_diffusion_substep_info = s% show_diffusion_substep_info
@@ -3752,6 +3712,7 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
  fill_arrays_with_NaNs = s% fill_arrays_with_NaNs
  zero_when_allocate = s% zero_when_allocate
  warn_when_large_rel_run_E_err = s% warn_when_large_rel_run_E_err
+ absolute_cumulative_energy_err = s% absolute_cumulative_energy_err
  warn_when_large_virial_thm_rel_err = s% warn_when_large_virial_thm_rel_err
  warn_when_get_a_bad_eos_result = s% warn_when_get_a_bad_eos_result
  warn_rates_for_high_temp = s% warn_rates_for_high_temp
@@ -4140,6 +4101,10 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
  use_other_set_pgstar_controls = s% use_other_set_pgstar_controls
  use_other_screening = s% use_other_screening
  use_other_close_gaps = s% use_other_close_gaps
+ use_other_rate_get = s% use_other_rate_get
+ use_other_net_derivs = s% use_other_net_derivs
+ use_other_split_burn = s% use_other_split_burn
+ use_other_close_gaps = s% use_other_close_gaps
 
  x_ctrl = s% x_ctrl
  x_integer_ctrl = s% x_integer_ctrl
@@ -4174,7 +4139,7 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
       character(len=*), intent(out) :: val
       integer, intent(out) :: ierr
 
-      character(len(name)) :: upper_name
+      character(len(name)+1) :: upper_name
       character(len=512) :: str
       integer :: iounit,iostat,ind,i
 
@@ -4183,20 +4148,20 @@ solver_test_partials_sink_name = s% solver_test_partials_sink_name
       call set_controls_for_writing(s, ierr)
       if(ierr/=0) return
 
-      ! Write namelist to temporay file
+      ! Write namelist to temporary file
       open(newunit=iounit,status='scratch')
       write(iounit,nml=controls)
       rewind(iounit)
 
       ! Namelists get written in captials
-      upper_name = StrUpCase(name)
+      upper_name = trim(StrUpCase(name))//'='
       val = ''
       ! Search for name inside namelist
       do 
          read(iounit,'(A)',iostat=iostat) str
-         ind = index(str,trim(upper_name))
+         ind = index(trim(str),trim(upper_name))
          if( ind /= 0 ) then
-            val = str(ind+len_trim(upper_name)+1:len_trim(str)-1) ! Remove final comma and starting =
+            val = str(ind+len_trim(upper_name):len_trim(str)-1) ! Remove final comma and starting =
             do i=1,len(val)
                if(val(i:i)=='"') val(i:i) = ' '
             end do

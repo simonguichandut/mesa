@@ -1,9 +1,13 @@
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      ! PGstar controls
+      ! PGStar state
 
       type (pgstar_win_file_data) :: pgstar_win_file_ptr(num_pgstar_plots)
 
+      type (pgstar_hist_node), pointer :: pgstar_hist => null()
+
+
+      ! PGstar controls
       integer :: pgstar_interval
       character (len=32) :: file_device
       character (len=32) :: file_extension
@@ -2072,22 +2076,8 @@
       character :: annotation3_side
       real :: annotation3_disp, annotation3_coord, annotation3_fjust
 
-
-
-      logical :: read_extra_pgstar_inlist1
-      character (len=strlen) :: extra_pgstar_inlist1_name
-
-      logical :: read_extra_pgstar_inlist2
-      character (len=strlen) :: extra_pgstar_inlist2_name
-
-      logical :: read_extra_pgstar_inlist3
-      character (len=strlen) :: extra_pgstar_inlist3_name
-
-      logical :: read_extra_pgstar_inlist4
-      character (len=strlen) :: extra_pgstar_inlist4_name
-
-      logical :: read_extra_pgstar_inlist5
-      character (len=strlen) :: extra_pgstar_inlist5_name
+      logical, dimension(max_extra_inlists) :: read_extra_pgstar_inlist
+      character (len=strlen), dimension(max_extra_inlists) :: extra_pgstar_inlist_name
 
       logical :: Abundance_use_decorator, &
             Color_Magnitude1_use_decorator, &
@@ -2152,4 +2142,3 @@
             trho_use_decorator, &
             tmaxrho_use_decorator, &
             trho_profile_use_decorator
-

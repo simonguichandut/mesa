@@ -184,12 +184,12 @@ Second, modify ``inlist_semiconvection_header``
 
   change
 
-      !read_extra_pgstar_inlist1 = .true.
-      !extra_pgstar_inlist1_name = 'inlist_semiconvection'
+      !read_extra_pgstar_inlist(1) = .true.
+      !extra_pgstar_inlist_name(1)= 'inlist_semiconvection'
 
   to
-      read_extra_pgstar_inlist1 = .true.
-      extra_pgstar_inlist1_name = 'inlist_semiconvection'  
+      read_extra_pgstar_inlist(1) = .true.
+      extra_pgstar_inlist_name(1)= 'inlist_semiconvection'
 
    and save the file changes.
 
@@ -455,7 +455,7 @@ that is:
 .. code-block:: latex
 
   Modules for Experiments in Stellar Astrophysics
-  \citep[MESA][]{Paxton2011, Paxton2013, Paxton2015, Paxton2018, Paxton2019}.
+  \citep[MESA][]{Paxton2011, Paxton2013, Paxton2015, Paxton2018, Paxton2019, Jermyn2022}.
 
 
 MESA critically rests on the hard work of many researchers who have
@@ -473,7 +473,7 @@ briefly summarize these, including appropriate citations.
   Iglesias1996}, with low-temperature data from \citet{Ferguson2005}
   and the high-temperature, Compton-scattering dominated regime by
   \citet{Poutanen2017}.  Electron conduction opacities are from
-  \citet{Cassisi2007}.
+  \citet{Cassisi2007} and \citet{Blouin2020}.
   
   Nuclear reaction rates are from JINA REACLIB \citep{Cyburt2010}, NACRE \citep{Angulo1999} and
   additional tabulated weak reaction rates \citet{Fuller1985, Oda1994,
