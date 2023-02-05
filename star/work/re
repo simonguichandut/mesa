@@ -1,9 +1,11 @@
 #!/bin/bash
 
+shopt -u expand_aliases 
+
 photo_directory=photos
 
 function most_recent_photo {
-    \ls -tp "$photo_directory" | grep -v / | head -1
+    ls -tp "$photo_directory" | grep -v / | head -1
 }
 
 if [ $# -eq 0 ]
@@ -22,7 +24,7 @@ fi
 echo "restart from $photo"
 if ! cp "$photo_directory/$photo" restart_photo
 then
-    echo "failed to copy photo"
+    echo "failed to copy photo ($photo)"
     exit 1
 fi
 
