@@ -116,6 +116,8 @@
             other_after_set_mixing_info => null()
          procedure (other_diffusion_interface), pointer, nopass :: &
             other_diffusion => null()
+         procedure (other_close_gaps_interface), pointer, nopass :: &
+            other_close_gaps => null()
          procedure (other_screening_interface), pointer, nopass :: &
             other_screening => null()
 
